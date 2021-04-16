@@ -4,5 +4,5 @@
   "domains": ["sensor"],
   "iot_class": "Cloud Polling",
   "homeassistant": "0.118.0",
-  "render_readme": "Yes"
+  "render_readme": true
 }
