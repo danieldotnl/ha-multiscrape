@@ -1,0 +1,10 @@
+{
+  "_template": "gh:oncleben31/cookiecutter-homeassistant-custom-component",
+  "class_name_prefix": "Multiscrape",
+  "domain_name": "multiscrape",
+  "friendly_name": "HA Multiscrape",
+  "github_user": "danieldotnl",
+  "project_name": "multiscrape",
+  "test_suite": "no",
+  "version": "3.0.0"
+}
