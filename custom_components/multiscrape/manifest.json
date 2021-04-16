@@ -1,10 +1,15 @@
 {
   "domain": "multiscrape",
-  "name": "HA Multiscrape",
+  "name": "Multiscrape scraping component",
   "documentation": "https://github.com/danieldotnl/multiscrape",
   "issue_tracker": "https://github.com/danieldotnl/multiscrape/issues",
-  "dependencies": [],
-  "config_flow": true,
-  "codeowners": ["@danieldotnl"],
-  "requirements": []
+  "requirements": [
+    "lxml",
+    "beautifulsoup4==4.9.3"
+  ],
+  "config_flow": false,
+  "version": "3.0.0",
+  "codeowners": [
+    "@danieldotnl"
+  ]
 }

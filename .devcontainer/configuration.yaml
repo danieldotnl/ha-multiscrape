@@ -6,3 +6,17 @@ logger:
     custom_components.multiscrape: debug
 # If you need to debug uncommment the line below (doc: https://www.home-assistant.io/integrations/debugpy/)
 # debugpy:
+
+sensor:
+  - platform: multiscrape
+    name: home assistant scraper
+    resource: https://www.home-assistant.io
+    scan_interval: 3600
+    selectors:
+      ha_version:
+        name: Latest version
+        select: '.current-version > h1:nth-child(1)'
+        value_template: '{{ (value.split(":")[1]) }}'
+      ha_releasedate:
+        name: Release date
+        select: '.release-date'
