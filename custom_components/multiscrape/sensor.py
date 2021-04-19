@@ -1,43 +1,35 @@
 """Support for Multiscrape sensors."""
-import asyncio
 import datetime
-from datetime import timedelta
 import logging
-import socket
-import sys
-from xml.parsers.expat import ExpatError
 
 import aiohttp
 import async_timeout
-from bs4 import BeautifulSoup
-import voluptuous as vol
-import xmltodict
-
-from homeassistant.components.sensor import ENTITY_ID_FORMAT, PLATFORM_SCHEMA
-from homeassistant.const import (
-    CONF_AUTHENTICATION,
-    CONF_FORCE_UPDATE,
-    CONF_HEADERS,
-    CONF_METHOD,
-    CONF_NAME,
-    CONF_PASSWORD,
-    CONF_PAYLOAD,
-    CONF_RESOURCE,
-    CONF_RESOURCE_TEMPLATE,
-    CONF_SCAN_INTERVAL,
-    CONF_TIMEOUT,
-    CONF_UNIT_OF_MEASUREMENT,
-    CONF_USERNAME,
-    CONF_VALUE_TEMPLATE,
-    CONF_VERIFY_SSL,
-    HTTP_BASIC_AUTHENTICATION,
-    HTTP_DIGEST_AUTHENTICATION,
-)
-from homeassistant.exceptions import PlatformNotReady
-from homeassistant.helpers.aiohttp_client import async_get_clientsession
 import homeassistant.helpers.config_validation as cv
-from homeassistant.helpers.entity import Entity, async_generate_entity_id
-from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
+import voluptuous as vol
+from bs4 import BeautifulSoup
+from homeassistant.components.sensor import ENTITY_ID_FORMAT
+from homeassistant.components.sensor import PLATFORM_SCHEMA
+from homeassistant.const import CONF_AUTHENTICATION
+from homeassistant.const import CONF_FORCE_UPDATE
+from homeassistant.const import CONF_HEADERS
+from homeassistant.const import CONF_METHOD
+from homeassistant.const import CONF_NAME
+from homeassistant.const import CONF_PASSWORD
+from homeassistant.const import CONF_PAYLOAD
+from homeassistant.const import CONF_RESOURCE
+from homeassistant.const import CONF_RESOURCE_TEMPLATE
+from homeassistant.const import CONF_SCAN_INTERVAL
+from homeassistant.const import CONF_TIMEOUT
+from homeassistant.const import CONF_UNIT_OF_MEASUREMENT
+from homeassistant.const import CONF_USERNAME
+from homeassistant.const import CONF_VALUE_TEMPLATE
+from homeassistant.const import CONF_VERIFY_SSL
+from homeassistant.const import HTTP_BASIC_AUTHENTICATION
+from homeassistant.const import HTTP_DIGEST_AUTHENTICATION
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.helpers.entity import async_generate_entity_id
+from homeassistant.helpers.entity import Entity
+from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 

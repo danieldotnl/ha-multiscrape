@@ -1,7 +1,6 @@
 # HA Multiscrape
 
 [![GitHub Release][releases-shield]][releases]
-[![GitHub Activity][commits-shield]][commits]
 [![License][license-shield]](LICENSE)
 
 [![pre-commit][pre-commit-shield]][pre-commit]
@@ -14,52 +13,37 @@
 [![Discord][discord-shield]][discord]
 [![Community Forum][forum-shield]][forum]
 
-**TO BE REMOVED: If you need help, as a developer, to use this custom component tempalte,
-please look at the [User Guide in the Cookiecutter documentation](https://cookiecutter-homeassistant-custom-component.readthedocs.io/en/stable/quickstart.html)**
+# HA MultiScrape custom component
 
-**This component will set up the following platforms.**
+This Home Assistant custom component can scrape multiple fields (using CSS selectors) from a single HTTP request (the existing scrape sensor can scrape a single field only). The scraped data becomes available in separate sensors.
 
-| Platform        | Description                                                               |
-| --------------- | ------------------------------------------------------------------------- |
-| `binary_sensor` | Show something `True` or `False`.                                         |
-| `sensor`        | Show info from HA Multiscrape API. |
-| `switch`        | Switch something `True` or `False`.                                       |
+It is based on both the existing [Rest sensor](https://www.home-assistant.io/integrations/rest/) and the [Scrape sensor](https://www.home-assistant.io/integrations/scrape). Most properties of the Rest and Scrape sensor apply.
 
-![example][exampleimg]
+<a href="https://www.buymeacoffee.com/danieldotnl" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/default-blue.png" alt="Buy Me A Coffee" style="height: 51px !important;width: 217px !important;" ></a>
 
-## Installation
+### Installation
 
-1. Using the tool of choice open the directory (folder) for your HA configuration (where you find `configuration.yaml`).
-2. If you do not have a `custom_components` directory (folder) there, you need to create it.
-3. In the `custom_components` directory (folder) create a new folder called `multiscrape`.
-4. Download _all_ the files from the `custom_components/multiscrape/` directory (folder) in this repository.
-5. Place the files you downloaded in the new directory (folder) you created.
-6. Restart Home Assistant
-7. In the HA UI go to "Configuration" -> "Integrations" click "+" and search for "HA Multiscrape"
+[![hacs][hacsbadge]][hacs]
 
-Using your HA configuration directory (folder) as a starting point you should now also have this:
+Install via HACS (default store) or install manually by copying the files in a new 'custom_components/multiscrape' directory.
 
-```text
-custom_components/multiscrape/translations/en.json
-custom_components/multiscrape/translations/fr.json
-custom_components/multiscrape/translations/nb.json
-custom_components/multiscrape/translations/sensor.en.json
-custom_components/multiscrape/translations/sensor.fr.json
-custom_components/multiscrape/translations/sensor.nb.json
-custom_components/multiscrape/translations/sensor.nb.json
-custom_components/multiscrape/__init__.py
-custom_components/multiscrape/api.py
-custom_components/multiscrape/binary_sensor.py
-custom_components/multiscrape/config_flow.py
-custom_components/multiscrape/const.py
-custom_components/multiscrape/manifest.json
-custom_components/multiscrape/sensor.py
-custom_components/multiscrape/switch.py
+### Example configuration (YAML)
+
+```yaml
+sensor:
+  - platform: multiscrape
+    name: home assistant scraper
+    resource: https://www.home-assistant.io
+    scan_interval: 30
+    selectors:
+      version:
+        name: Current version
+        select: ".current-version > h1:nth-child(1)"
+        value_template: '{{ (value.split(":")[1]) }}'
+      releasedate:
+        name: Release date
+        select: ".release-date"
 ```
-
-## Configuration is done in the UI
-
-<!---->
 
 ## Contributions are welcome!
 
@@ -78,19 +62,18 @@ Code template was mainly taken from [@Ludeeus](https://github.com/ludeeus)'s [in
 [black-shield]: https://img.shields.io/badge/code%20style-black-000000.svg?style=for-the-badge
 [buymecoffee]: https://www.buymeacoffee.com/danieldotnl
 [buymecoffeebadge]: https://img.shields.io/badge/buy%20me%20a%20coffee-donate-yellow.svg?style=for-the-badge
-[commits-shield]: https://img.shields.io/github/commit-activity/y/danieldotnl/multiscrape.svg?style=for-the-badge
-[commits]: https://github.com/danieldotnl/multiscrape/commits/main
+[commits-shield]: https://img.shields.io/github/commit-activity/y/danieldotnl/ha-multiscrape.svg?style=for-the-badge
+[commits]: https://github.com/danieldotnl/ha-multiscrape/commits/main
 [hacs]: https://hacs.xyz
-[hacsbadge]: https://img.shields.io/badge/HACS-Custom-orange.svg?style=for-the-badge
+[hacsbadge]: https://img.shields.io/badge/HACS-Default-orange.svg?style=for-the-badge
 [discord]: https://discord.gg/Qa5fW2R
 [discord-shield]: https://img.shields.io/discord/330944238910963714.svg?style=for-the-badge
-[exampleimg]: example.png
 [forum-shield]: https://img.shields.io/badge/community-forum-brightgreen.svg?style=for-the-badge
-[forum]: https://community.home-assistant.io/
-[license-shield]: https://img.shields.io/github/license/danieldotnl/multiscrape.svg?style=for-the-badge
+[forum]: https://community.home-assistant.io/t/scrape-sensor-improved-scraping-multiple-values/218350
+[license-shield]: https://img.shields.io/github/license/danieldotnl/ha-multiscrape.svg?style=for-the-badge
 [maintenance-shield]: https://img.shields.io/badge/maintainer-%40danieldotnl-blue.svg?style=for-the-badge
 [pre-commit]: https://github.com/pre-commit/pre-commit
 [pre-commit-shield]: https://img.shields.io/badge/pre--commit-enabled-brightgreen?style=for-the-badge
-[releases-shield]: https://img.shields.io/github/release/danieldotnl/multiscrape.svg?style=for-the-badge
+[releases-shield]: https://img.shields.io/github/release/danieldotnl/ha-multiscrape.svg?style=for-the-badge
 [releases]: https://github.com/danieldotnl/multiscrape/releases
 [user_profile]: https://github.com/danieldotnl

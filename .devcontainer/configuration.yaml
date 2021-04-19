@@ -15,8 +15,8 @@ sensor:
     selectors:
       ha_version:
         name: Latest version
-        select: '.current-version > h1:nth-child(1)'
+        select: ".current-version > h1:nth-child(1)"
         value_template: '{{ (value.split(":")[1]) }}'
       ha_releasedate:
         name: Release date
-        select: '.release-date'
+        select: ".release-date"
