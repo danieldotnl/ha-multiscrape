@@ -1,7 +1,6 @@
 # HA Multiscrape
 
 [![GitHub Release][releases-shield]][releases]
-[![GitHub Activity][commits-shield]][commits]
 [![License][license-shield]](LICENSE)
 
 [![pre-commit][pre-commit-shield]][pre-commit]
@@ -64,7 +63,7 @@ Code template was mainly taken from [@Ludeeus](https://github.com/ludeeus)'s [in
 [buymecoffee]: https://www.buymeacoffee.com/danieldotnl
 [buymecoffeebadge]: https://img.shields.io/badge/buy%20me%20a%20coffee-donate-yellow.svg?style=for-the-badge
 [commits-shield]: https://img.shields.io/github/commit-activity/y/danieldotnl/multiscrape.svg?style=for-the-badge
-[commits]: https://github.com/danieldotnl/multiscrape/commits/main
+[commits]: https://github.com/danieldotnl/ha-multiscrape/commits/main
 [hacs]: https://hacs.xyz
 [hacsbadge]: https://img.shields.io/badge/HACS-Default-orange.svg?style=for-the-badge
 [discord]: https://discord.gg/Qa5fW2R
