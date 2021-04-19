@@ -23,7 +23,7 @@ It is based on both the existing [Rest sensor](https://www.home-assistant.io/int
 
 ### Installation
 
-[![hacs_badge]
+[![hacs][hacsbadge]][hacs]
 
 Install via HACS (default store) or install manually by copying the files in a new 'custom_components/multiscrape' directory.
 
