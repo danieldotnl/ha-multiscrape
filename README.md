@@ -23,9 +23,9 @@ It is based on both the existing [Rest sensor](https://www.home-assistant.io/int
 
 ### Installation
 
-[![hacs_badge](https://img.shields.io/badge/HACS-Custom-orange.svg?style=for-the-badge)](https://github.com/danieldotnl/hass-multiscrape)
+[![hacs_badge]
 
-Via HACS as a custom repository (https://github.com/danieldotnl/hass-multiscrape) or install manually by copying the files in a new 'custom_components/multiscrape' directory.
+Install via HACS (default store) or install manually by copying the files in a new 'custom_components/multiscrape' directory.
 
 ### Example configuration (YAML)
 
