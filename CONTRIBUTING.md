@@ -63,8 +63,6 @@ file.
 You can use the `pre-commit` settings implemented in this repository to have
 linting tool checking your contributions (see deicated section below).
 
-
-
 ## Pre-commit
 
 You can use the [pre-commit](https://pre-commit.com/) settings included in the
