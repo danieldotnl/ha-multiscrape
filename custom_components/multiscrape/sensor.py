@@ -47,7 +47,6 @@ CONF_SELECT = "select"
 CONF_INDEX = "index"
 CONF_PARSER = "parser"
 
-CONF_SELECTORS = "selectors"
 METHODS = ["POST", "GET", "PUT"]
 
 PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend(
