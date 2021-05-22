@@ -7,9 +7,12 @@ import async_timeout
 import homeassistant.helpers.config_validation as cv
 import voluptuous as vol
 from bs4 import BeautifulSoup
+from homeassistant.components.sensor import DEVICE_CLASSES_SCHEMA
 from homeassistant.components.sensor import ENTITY_ID_FORMAT
 from homeassistant.components.sensor import PLATFORM_SCHEMA
+from homeassistant.components.sensor import SensorEntity
 from homeassistant.const import CONF_AUTHENTICATION
+from homeassistant.const import CONF_DEVICE_CLASS
 from homeassistant.const import CONF_FORCE_UPDATE
 from homeassistant.const import CONF_HEADERS
 from homeassistant.const import CONF_METHOD
@@ -28,7 +31,6 @@ from homeassistant.const import HTTP_BASIC_AUTHENTICATION
 from homeassistant.const import HTTP_DIGEST_AUTHENTICATION
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.entity import async_generate_entity_id
-from homeassistant.helpers.entity import Entity
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -76,6 +78,7 @@ SENSOR_SCHEMA = vol.Schema(
         vol.Optional(CONF_ATTR): cv.string,
         vol.Optional(CONF_INDEX, default=0): cv.positive_int,
         vol.Required(CONF_NAME): cv.string,
+        vol.Optional(CONF_DEVICE_CLASS): DEVICE_CLASSES_SCHEMA,
         vol.Optional(CONF_VALUE_TEMPLATE): cv.template,
         vol.Optional(CONF_UNIT_OF_MEASUREMENT): cv.string,
         vol.Optional(CONF_VALUE_TEMPLATE): cv.template,
@@ -206,12 +209,14 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
     for device, device_config in selectors.items():
         name = device_config.get(CONF_NAME)
         unit = device_config.get(CONF_UNIT_OF_MEASUREMENT)
+        device_class = device_config.get(CONF_DEVICE_CLASS)
 
         entities.append(
             MultiscrapeSensor(
                 hass,
                 coordinator,
                 device,
+                device_class,
                 name,
                 unit,
                 force_update,
@@ -225,14 +230,24 @@ class UpdateFailed(Exception):
     """Raised when an update has failed."""
 
 
-class MultiscrapeSensor(Entity):
+class MultiscrapeSensor(SensorEntity):
     """Implementation of the Multiscrape sensor."""
 
-    def __init__(self, hass, coordinator, key, name, unit_of_measurement, force_update):
+    def __init__(
+        self,
+        hass,
+        coordinator,
+        key,
+        device_class,
+        name,
+        unit_of_measurement,
+        force_update,
+    ):
         """Initialize the sensor."""
         self._hass = hass
         self._coordinator = coordinator
         self._key = key
+        self._device_class = device_class
         self._name = name
         self._state = None
         self._unit_of_measurement = unit_of_measurement
@@ -251,6 +266,11 @@ class MultiscrapeSensor(Entity):
     def unit_of_measurement(self):
         """Return the unit the value is expressed in."""
         return self._unit_of_measurement
+
+    @property
+    def device_class(self):
+        """Return the device_class."""
+        return self._device_class
 
     @property
     def available(self):
