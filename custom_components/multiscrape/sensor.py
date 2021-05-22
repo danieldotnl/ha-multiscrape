@@ -1,5 +1,4 @@
 """Support for Multiscrape sensors."""
-import datetime
 import logging
 
 import aiohttp
@@ -7,11 +6,8 @@ import async_timeout
 import homeassistant.helpers.config_validation as cv
 import voluptuous as vol
 from bs4 import BeautifulSoup
-from homeassistant.components.sensor import DEVICE_CLASSES_SCHEMA
 from homeassistant.components.sensor import ENTITY_ID_FORMAT
-from homeassistant.components.sensor import PLATFORM_SCHEMA
 from homeassistant.components.sensor import SensorEntity
-from homeassistant.const import CONF_AUTHENTICATION
 from homeassistant.const import CONF_DEVICE_CLASS
 from homeassistant.const import CONF_FORCE_UPDATE
 from homeassistant.const import CONF_HEADERS
@@ -27,67 +23,22 @@ from homeassistant.const import CONF_UNIT_OF_MEASUREMENT
 from homeassistant.const import CONF_USERNAME
 from homeassistant.const import CONF_VALUE_TEMPLATE
 from homeassistant.const import CONF_VERIFY_SSL
-from homeassistant.const import HTTP_BASIC_AUTHENTICATION
-from homeassistant.const import HTTP_DIGEST_AUTHENTICATION
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.entity import async_generate_entity_id
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
+from .const import CONF_ATTR
+from .const import CONF_INDEX
+from .const import CONF_PARSER
+from .const import CONF_SELECT
+from .const import CONF_SELECTORS
+from .schema import PLATFORM_SCHEMA
+
+PLATFORM_SCHEMA = vol.All(
+    cv.has_at_least_one_key(CONF_RESOURCE, CONF_RESOURCE_TEMPLATE), PLATFORM_SCHEMA
+)
+
 _LOGGER = logging.getLogger(__name__)
-
-DEFAULT_METHOD = "GET"
-DEFAULT_NAME = "Multiscrape Sensor"
-DEFAULT_VERIFY_SSL = True
-DEFAULT_FORCE_UPDATE = False
-DEFAULT_TIMEOUT = 10
-DEFAULT_PARSER = "lxml"
-DEFAULT_SCAN_INTERVAL = datetime.timedelta(seconds=30)
-
-CONF_SELECTORS = "selectors"
-CONF_ATTR = "attribute"
-CONF_SELECT = "select"
-CONF_INDEX = "index"
-CONF_PARSER = "parser"
-
-METHODS = ["POST", "GET", "PUT"]
-
-PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend(
-    {
-        vol.Exclusive(CONF_RESOURCE, CONF_RESOURCE): cv.url,
-        vol.Exclusive(CONF_RESOURCE_TEMPLATE, CONF_RESOURCE): cv.template,
-        vol.Optional(CONF_AUTHENTICATION): vol.In(
-            [HTTP_BASIC_AUTHENTICATION, HTTP_DIGEST_AUTHENTICATION]
-        ),
-        vol.Optional(CONF_HEADERS): vol.Schema({cv.string: cv.string}),
-        vol.Optional(CONF_METHOD, default=DEFAULT_METHOD): vol.In(METHODS),
-        vol.Optional(CONF_NAME, default=DEFAULT_NAME): cv.string,
-        vol.Optional(CONF_PASSWORD): cv.string,
-        vol.Optional(CONF_PAYLOAD): cv.string,
-        vol.Optional(CONF_USERNAME): cv.string,
-        vol.Optional(CONF_VERIFY_SSL, default=DEFAULT_VERIFY_SSL): cv.boolean,
-        vol.Optional(CONF_FORCE_UPDATE, default=DEFAULT_FORCE_UPDATE): cv.boolean,
-        vol.Optional(CONF_TIMEOUT, default=DEFAULT_TIMEOUT): cv.positive_int,
-        vol.Optional(CONF_PARSER, default=DEFAULT_PARSER): cv.string,
-        vol.Optional(CONF_SCAN_INTERVAL, default=DEFAULT_SCAN_INTERVAL): cv.time_period,
-    }
-)
-
-SENSOR_SCHEMA = vol.Schema(
-    {
-        vol.Required(CONF_SELECT): cv.template,
-        vol.Optional(CONF_ATTR): cv.string,
-        vol.Optional(CONF_INDEX, default=0): cv.positive_int,
-        vol.Required(CONF_NAME): cv.string,
-        vol.Optional(CONF_DEVICE_CLASS): DEVICE_CLASSES_SCHEMA,
-        vol.Optional(CONF_VALUE_TEMPLATE): cv.template,
-        vol.Optional(CONF_UNIT_OF_MEASUREMENT): cv.string,
-        vol.Optional(CONF_VALUE_TEMPLATE): cv.template,
-    }
-)
-
-PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend(
-    {vol.Required(CONF_SELECTORS): cv.schema_with_slug_keys(SENSOR_SCHEMA)}
-)
 
 
 async def async_setup_platform(hass, config, async_add_entities, discovery_info=None):
