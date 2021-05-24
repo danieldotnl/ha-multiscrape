@@ -27,7 +27,6 @@ from .const import DEFAULT_FORCE_UPDATE
 from .const import DEFAULT_METHOD
 from .const import DEFAULT_NAME
 from .const import DEFAULT_PARSER
-from .const import DEFAULT_SCAN_INTERVAL
 from .const import DEFAULT_TIMEOUT
 from .const import DEFAULT_VERIFY_SSL
 from .const import METHODS
@@ -46,7 +45,7 @@ PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend(
         vol.Optional(CONF_FORCE_UPDATE, default=DEFAULT_FORCE_UPDATE): cv.boolean,
         vol.Optional(CONF_TIMEOUT, default=DEFAULT_TIMEOUT): cv.positive_int,
         vol.Optional(CONF_PARSER, default=DEFAULT_PARSER): cv.string,
-        vol.Optional(CONF_SCAN_INTERVAL, default=DEFAULT_SCAN_INTERVAL): cv.time_period,
+        vol.Optional(CONF_SCAN_INTERVAL): cv.time_period,
     }
 )
 
