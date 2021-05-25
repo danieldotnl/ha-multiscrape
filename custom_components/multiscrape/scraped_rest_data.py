@@ -1,11 +1,9 @@
 import logging
 
-import httpx
 from bs4 import BeautifulSoup
 from homeassistant.components.rest.data import RestData
 from homeassistant.const import CONF_NAME
 from homeassistant.const import CONF_VALUE_TEMPLATE
-from homeassistant.helpers.httpx_client import get_async_client
 
 from .const import CONF_ATTR
 from .const import CONF_INDEX
@@ -96,37 +94,6 @@ class ScrapedRestData(RestData):
             else:
                 self.values[key] = value
 
-    #    async def async_update(self, log_errors=True):
-    #        super().async_update(log_errors)
-    #        self.scrape_data()
-
     async def async_update(self, log_errors=True):
-        """Get the latest data from REST service with provided method."""
-        if not self._async_client:
-            self._async_client = get_async_client(
-                self._hass, verify_ssl=self._verify_ssl
-            )
-
-        _LOGGER.debug("Updating from %s", self._resource)
-        try:
-            response = await self._async_client.request(
-                self._method,
-                self._resource,
-                headers=self._headers,
-                params=self._params,
-                auth=self._auth,
-                data=self._request_data,
-                timeout=self._timeout,
-            )
-            self.data = response.text
-            self.headers = response.headers
-        except httpx.RequestError as ex:
-            if log_errors:
-                _LOGGER.error(
-                    "Error fetching data: %s failed with %s", self._resource, ex
-                )
-            self.last_exception = ex
-            self.data = None
-            self.headers = None
-
+        await super().async_update(log_errors)
         self.scrape_data()
