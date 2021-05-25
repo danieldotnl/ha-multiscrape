@@ -2,7 +2,7 @@ import logging
 
 import httpx
 from bs4 import BeautifulSoup
-from homeassistant.components.rest import RestData
+from homeassistant.components.rest.data import RestData
 from homeassistant.const import CONF_NAME
 from homeassistant.const import CONF_VALUE_TEMPLATE
 from homeassistant.helpers.httpx_client import get_async_client
