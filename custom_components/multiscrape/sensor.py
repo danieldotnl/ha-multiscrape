@@ -31,7 +31,7 @@ from .const import CONF_PARSER
 from .const import CONF_SELECTORS
 from .const import DEFAULT_SCAN_INTERVAL
 from .schema import PLATFORM_SCHEMA
-from .ScrapedRestData import ScrapedRestData
+from .scraped_rest_data import ScrapedRestData
 
 PLATFORM_SCHEMA = vol.All(
     cv.has_at_least_one_key(CONF_RESOURCE, CONF_RESOURCE_TEMPLATE), PLATFORM_SCHEMA
