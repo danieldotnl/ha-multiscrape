@@ -4,6 +4,7 @@
   "documentation": "https://github.com/danieldotnl/ha-multiscrape",
   "issue_tracker": "https://github.com/danieldotnl/ha-multiscrape/issues",
   "requirements": ["lxml", "beautifulsoup4==4.9.3"],
+  "dependencies": ["rest"],
   "config_flow": false,
   "version": "3.0.0",
   "codeowners": ["@danieldotnl"],
