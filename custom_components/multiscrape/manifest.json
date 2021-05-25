@@ -8,5 +8,5 @@
   "config_flow": false,
   "version": "3.0.0",
   "codeowners": ["@danieldotnl"],
-  "iot_class": "cloud_polling"
+  "iot_class": "local_polling"
 }
