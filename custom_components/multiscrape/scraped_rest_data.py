@@ -50,6 +50,7 @@ class ScrapedRestData(RestData):
     def scrape_data(self):
         result = BeautifulSoup(self.data, self._parser)
         result.prettify()
+        # _LOGGER.debug("Data to scrape: %s", result)
 
         for device, device_config in self._selectors.items():
             key = device

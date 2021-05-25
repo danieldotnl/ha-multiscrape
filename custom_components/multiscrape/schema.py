@@ -51,13 +51,14 @@ PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend(
 
 SENSOR_SCHEMA = vol.Schema(
     {
+        vol.Required(CONF_NAME): cv.string,
         vol.Required(CONF_SELECT): cv.template,
         vol.Optional(CONF_ATTR): cv.string,
         vol.Optional(CONF_INDEX, default=0): cv.positive_int,
-        vol.Required(CONF_NAME): cv.string,
         vol.Optional(CONF_DEVICE_CLASS): DEVICE_CLASSES_SCHEMA,
         vol.Optional(CONF_UNIT_OF_MEASUREMENT): cv.string,
         vol.Optional(CONF_VALUE_TEMPLATE): cv.template,
+        vol.Optional(CONF_FORCE_UPDATE): cv.boolean,
     }
 )
 

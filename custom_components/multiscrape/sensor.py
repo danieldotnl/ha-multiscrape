@@ -114,21 +114,19 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
     coordinator = _create_rest_coordinator(
         hass, scraper, resource_template, scan_interval
     )
-
     # Fetch initial data so we have data when entities subscribe
     await coordinator.async_refresh()
 
     entities = []
-
     selectors = config.get(CONF_SELECTORS)
-
-    # TODO: This is actually a bug, force_update should be implemented on selector/sensor level
+    # Retrieve for backward-compatability reasons the force_update from the platform level, can be overruled per sensor.
     force_update = config.get(CONF_FORCE_UPDATE)
 
     for device, device_config in selectors.items():
         name = device_config.get(CONF_NAME)
         unit = device_config.get(CONF_UNIT_OF_MEASUREMENT)
         device_class = device_config.get(CONF_DEVICE_CLASS)
+        force_update = device_config.get(CONF_FORCE_UPDATE, force_update)
 
         entities.append(
             MultiscrapeSensor(
