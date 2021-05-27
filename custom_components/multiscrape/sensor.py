@@ -21,7 +21,7 @@ _LOGGER = logging.getLogger(__name__)
 
 
 async def async_setup_platform(hass, config, async_add_entities, discovery_info=None):
-    """Set up the RESTful sensor."""
+    """Set up the multiscrape sensor."""
     # Must update the sensor now (including fetching the rest resource) to
     # ensure it's updating its state.
     if discovery_info is not None:
@@ -70,7 +70,7 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
 
 
 class RestSensor(MultiscrapeEntity, SensorEntity):
-    """Implementation of a REST sensor."""
+    """Implementation of a multiscrape sensor."""
 
     def __init__(
         self,
@@ -87,7 +87,7 @@ class RestSensor(MultiscrapeEntity, SensorEntity):
         attribute,
         index,
     ):
-        """Initialize the REST sensor."""
+        """Initialize the multiscrape sensor."""
         super().__init__(
             coordinator, rest, name, device_class, resource_template, force_update
         )

@@ -1,4 +1,4 @@
-"""The rest component schemas."""
+"""The multiscrape component schemas."""
 import homeassistant.helpers.config_validation as cv
 import voluptuous as vol
 from homeassistant.components.binary_sensor import (

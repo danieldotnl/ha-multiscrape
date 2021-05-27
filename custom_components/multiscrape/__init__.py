@@ -1,4 +1,4 @@
-"""The rest component."""
+"""The multiscrape component."""
 import asyncio
 import logging
 from datetime import timedelta
@@ -47,7 +47,7 @@ COORDINATOR_AWARE_PLATFORMS = [SENSOR_DOMAIN, BINARY_SENSOR_DOMAIN]
 
 
 async def async_setup(hass: HomeAssistant, config: dict):
-    """Set up the rest platforms."""
+    """Set up the multiscrape platforms."""
     component = EntityComponent(_LOGGER, DOMAIN, hass)
     _async_setup_shared_data(hass)
 

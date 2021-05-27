@@ -1,4 +1,4 @@
-"""Support for RESTful binary sensors."""
+"""Support for multiscrape binary sensors."""
 import logging
 
 from homeassistant.components.binary_sensor import BinarySensorEntity
@@ -20,7 +20,7 @@ _LOGGER = logging.getLogger(__name__)
 
 
 async def async_setup_platform(hass, config, async_add_entities, discovery_info=None):
-    """Set up the REST binary sensor."""
+    """Set up the multiscrape binary sensor."""
     # Must update the sensor now (including fetching the rest resource) to
     # ensure it's updating its state.
     if discovery_info is not None:
@@ -67,7 +67,7 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
 
 
 class RestBinarySensor(MultiscrapeEntity, BinarySensorEntity):
-    """Representation of a REST binary sensor."""
+    """Representation of a multiscrape binary sensor."""
 
     def __init__(
         self,
@@ -83,7 +83,7 @@ class RestBinarySensor(MultiscrapeEntity, BinarySensorEntity):
         attribute,
         index,
     ):
-        """Initialize a REST binary sensor."""
+        """Initialize a multiscrape binary sensor."""
         super().__init__(
             coordinator, rest, name, device_class, resource_template, force_update
         )
@@ -107,7 +107,7 @@ class RestBinarySensor(MultiscrapeEntity, BinarySensorEntity):
         return self._is_on
 
     def _update_from_rest_data(self):
-        """Update state from the rest data."""
+        """Update state from the scraped data."""
 
         if self.rest.soup is None:
             self._is_on = False

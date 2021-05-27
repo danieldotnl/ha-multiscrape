@@ -11,7 +11,7 @@ _LOGGER = logging.getLogger(__name__)
 
 
 class MultiscrapeEntity(RestEntity):
-    """A class for entities using DataUpdateCoordinator or rest data directly."""
+    """A class for entities using DataUpdateCoordinator."""
 
     def __init__(
         self,
