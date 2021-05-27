@@ -5,8 +5,6 @@ from homeassistant.components.binary_sensor import (
     DEVICE_CLASSES_SCHEMA as BINARY_SENSOR_DEVICE_CLASSES_SCHEMA,
 )
 from homeassistant.components.binary_sensor import DOMAIN as BINARY_SENSOR_DOMAIN
-from homeassistant.components.rest.const import CONF_JSON_ATTRS
-from homeassistant.components.rest.const import CONF_JSON_ATTRS_PATH
 from homeassistant.components.rest.const import DEFAULT_FORCE_UPDATE
 from homeassistant.components.rest.schema import RESOURCE_SCHEMA
 from homeassistant.components.sensor import (
@@ -35,8 +33,6 @@ SENSOR_SCHEMA = {
     vol.Optional(CONF_NAME, default=DEFAULT_SENSOR_NAME): cv.string,
     vol.Optional(CONF_UNIT_OF_MEASUREMENT): cv.string,
     vol.Optional(CONF_DEVICE_CLASS): SENSOR_DEVICE_CLASSES_SCHEMA,
-    vol.Optional(CONF_JSON_ATTRS, default=[]): cv.ensure_list_csv,
-    vol.Optional(CONF_JSON_ATTRS_PATH): cv.string,
     vol.Optional(CONF_VALUE_TEMPLATE): cv.template,
     vol.Optional(CONF_FORCE_UPDATE, default=DEFAULT_FORCE_UPDATE): cv.boolean,
     vol.Required(CONF_SELECT): cv.template,
@@ -49,7 +45,7 @@ BINARY_SENSOR_SCHEMA = {
     vol.Optional(CONF_DEVICE_CLASS): BINARY_SENSOR_DEVICE_CLASSES_SCHEMA,
     vol.Optional(CONF_VALUE_TEMPLATE): cv.template,
     vol.Optional(CONF_FORCE_UPDATE, default=DEFAULT_FORCE_UPDATE): cv.boolean,
-    vol.Required(CONF_SELECT): cv.string,
+    vol.Required(CONF_SELECT): cv.template,
     vol.Optional(CONF_ATTR): cv.string,
     vol.Optional(CONF_INDEX, default=0): cv.positive_int,
 }

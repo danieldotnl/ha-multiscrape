@@ -1,8 +1,6 @@
 """Support for Multiscrape sensors."""
 import logging
 
-from homeassistant.components.rest.const import CONF_JSON_ATTRS
-from homeassistant.components.rest.const import CONF_JSON_ATTRS_PATH
 from homeassistant.components.sensor import DOMAIN as SENSOR_DOMAIN
 from homeassistant.components.sensor import SensorEntity
 from homeassistant.const import CONF_DEVICE_CLASS
@@ -14,7 +12,6 @@ from homeassistant.const import CONF_VALUE_TEMPLATE
 from homeassistant.exceptions import PlatformNotReady
 
 from . import async_get_config_and_coordinator
-from . import create_rest_data_from_config
 from .const import CONF_ATTR
 from .const import CONF_INDEX
 from .const import CONF_SELECT
@@ -32,10 +29,7 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
             hass, SENSOR_DOMAIN, discovery_info
         )
     else:
-        conf = config
-        coordinator = None
-        rest = create_rest_data_from_config(hass, conf)
-        await rest.async_update(log_errors=False)
+        _LOGGER.error("Could not find sensor configuration")
 
     if rest.data is None:
         if rest.last_exception:
@@ -45,8 +39,6 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
     name = conf.get(CONF_NAME)
     unit = conf.get(CONF_UNIT_OF_MEASUREMENT)
     device_class = conf.get(CONF_DEVICE_CLASS)
-    json_attrs = conf.get(CONF_JSON_ATTRS)
-    json_attrs_path = conf.get(CONF_JSON_ATTRS_PATH)
     select = conf.get(CONF_SELECT)
     attribute = conf.get(CONF_ATTR)
     index = conf.get(CONF_INDEX)
@@ -67,10 +59,8 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
                 unit,
                 device_class,
                 value_template,
-                json_attrs,
                 force_update,
                 resource_template,
-                json_attrs_path,
                 select,
                 attribute,
                 index,
@@ -91,10 +81,8 @@ class RestSensor(RestEntity, SensorEntity):
         unit_of_measurement,
         device_class,
         value_template,
-        json_attrs,
         force_update,
         resource_template,
-        json_attrs_path,
         select,
         attribute,
         index,
@@ -107,9 +95,7 @@ class RestSensor(RestEntity, SensorEntity):
         self._hass = hass
         self._unit_of_measurement = unit_of_measurement
         self._value_template = value_template
-        self._json_attrs = json_attrs
         self._attributes = None
-        self._json_attrs_path = json_attrs_path
         self._select = select
         self._attribute = attribute
         self._index = index
