@@ -14,7 +14,7 @@ from . import async_get_config_and_coordinator
 from .const import CONF_ATTR
 from .const import CONF_INDEX
 from .const import CONF_SELECT
-from .entity import RestEntity
+from .entity import MultiscrapeEntity
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -66,7 +66,7 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
     )
 
 
-class RestBinarySensor(RestEntity, BinarySensorEntity):
+class RestBinarySensor(MultiscrapeEntity, BinarySensorEntity):
     """Representation of a REST binary sensor."""
 
     def __init__(
@@ -79,7 +79,7 @@ class RestBinarySensor(RestEntity, BinarySensorEntity):
         value_template,
         force_update,
         resource_template,
-        select,
+        select_template,
         attribute,
         index,
     ):
@@ -92,9 +92,14 @@ class RestBinarySensor(RestEntity, BinarySensorEntity):
         self._value_template = value_template
         self._is_on = None
         self._hass = hass
-        self._select = select
+        self._select_template = select_template
         self._attribute = attribute
         self._index = index
+
+        if self._select_template is not None:
+            self._select_template.hass = self._hass
+            self._select = self._select_template.async_render()
+            _LOGGER.debug("Parsed select template: %s", self._select)
 
     @property
     def is_on(self):
@@ -107,35 +112,8 @@ class RestBinarySensor(RestEntity, BinarySensorEntity):
         if self.rest.soup is None:
             self._is_on = False
 
-        value = self.rest.soup
         # _LOGGER.debug("Data fetched from resource: %s", value)
-
-        if self._select is not None:
-            self._select.hass = self._hass
-            select = self._select.async_render()
-
-        _LOGGER.debug("Parsed select template: %s", select)
-
-        try:
-            if self._attribute is not None:
-                value = value.select(select)[self._index][self._attribute]
-            else:
-                tag = value.select(select)[self._index]
-                if tag.name in ("style", "script", "template"):
-                    value = tag.string
-                else:
-                    value = tag.text
-
-            _LOGGER.debug("Sensor %s selected: %s", self._name, value)
-        except IndexError as exception:
-            _LOGGER.error("Sensor %s was unable to extract data from HTML", self._name)
-            _LOGGER.debug("Exception: %s", exception)
-            return
-
-        if value is not None and self._value_template is not None:
-            value = self._value_template.async_render_with_possible_json_value(
-                value, None
-            )
+        value = self._scrape(self.rest.soup, self._select, self._attribute, self._index)
 
         try:
             self._is_on = bool(int(value))
