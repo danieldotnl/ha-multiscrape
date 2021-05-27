@@ -1,20 +1,25 @@
+"""The rest component constants."""
+
 DOMAIN = "multiscrape"
 
-DEFAULT_NAME = "Multiscrape Sensor"
+DEFAULT_METHOD = "GET"
 DEFAULT_VERIFY_SSL = True
 DEFAULT_FORCE_UPDATE = False
-DEFAULT_TIMEOUT = 10
+
+DEFAULT_BINARY_SENSOR_NAME = "Multiscrape Binary Sensor"
+DEFAULT_SENSOR_NAME = "Multiscrape Sensor"
+CONF_PARSER = "parser"
+CONF_SELECT = "select"
+CONF_ATTR = "attr"
+CONF_INDEX = "index"
 DEFAULT_PARSER = "lxml"
 
-DEFAULT_SCAN_INTERVAL = 60
+REST_IDX = "rest_idx"
+PLATFORM_IDX = "platform_idx"
 
-METHODS = ["POST", "GET", "PUT"]
-DEFAULT_METHOD = "GET"
+COORDINATOR = "coordinator"
+REST = "rest"
 
-CONF_SELECTORS = "selectors"
+REST_DATA = "rest_data"
 
-CONF_PARSER = "parser"
-
-CONF_ATTR = "attribute"
-CONF_SELECT = "select"
-CONF_INDEX = "index"
+METHODS = ["POST", "GET"]
