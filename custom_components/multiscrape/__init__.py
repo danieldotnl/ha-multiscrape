@@ -1,6 +1,7 @@
 """The rest component."""
 import asyncio
 import logging
+from datetime import timedelta
 
 import httpx
 import voluptuous as vol
@@ -23,7 +24,6 @@ from homeassistant.const import SERVICE_RELOAD
 from homeassistant.core import callback
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import discovery
-from homeassistant.helpers.entity_component import DEFAULT_SCAN_INTERVAL
 from homeassistant.helpers.entity_component import EntityComponent
 from homeassistant.helpers.reload import async_reload_integration_platforms
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
@@ -39,6 +39,8 @@ from .data import ScrapedRestData
 from .schema import CONFIG_SCHEMA  # noqa: F401
 
 _LOGGER = logging.getLogger(__name__)
+# we don't want to go with the default 15 seconds defined in helpers/entity_component
+DEFAULT_SCAN_INTERVAL = timedelta(seconds=60)
 
 PLATFORMS = ["binary_sensor", "sensor"]
 COORDINATOR_AWARE_PLATFORMS = [SENSOR_DOMAIN, BINARY_SENSOR_DOMAIN]
