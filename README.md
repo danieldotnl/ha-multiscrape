@@ -14,7 +14,8 @@
 [![Community Forum][forum-shield]][forum]
 
 ## BREAKING CHANGE in release 4.0.0
-If you are upgrading to release 4.0.0, see the [upgrade notes.](https://github.com/danieldotnl/ha-multiscrape/wiki/Upgrade-notes-for-3.x-to-4.x)
+
+If you are upgrading to release 4.0.0, see the [upgrade notes](https://github.com/danieldotnl/ha-multiscrape/wiki/Upgrade-notes-for-3.x-to-4.x).
 
 # HA MultiScrape custom component
 
