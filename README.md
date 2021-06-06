@@ -13,6 +13,9 @@
 [![Discord][discord-shield]][discord]
 [![Community Forum][forum-shield]][forum]
 
+## BREAKING CHANGE in release 4.0.0
+If you are upgrading to release 4.0.0, see the [upgrade notes.](https://github.com/danieldotnl/ha-multiscrape/wiki/Upgrade-notes-for-3.x-to-4.x)
+
 # HA MultiScrape custom component
 
 This Home Assistant custom component can scrape multiple fields (using CSS selectors) from a single HTTP request (the existing scrape sensor can scrape a single field only). The scraped data becomes available in separate sensors.
@@ -30,19 +33,19 @@ Install via HACS (default store) or install manually by copying the files in a n
 ### Example configuration (YAML)
 
 ```yaml
-sensor:
-  - platform: multiscrape
-    name: home assistant scraper
-    resource: https://www.home-assistant.io
-    scan_interval: 30
-    selectors:
-      version:
-        name: Current version
+multiscrape:
+  - resource: https://www.home-assistant.io
+    scan_interval: 3600
+    sensor:
+      - name: Latest version
         select: ".current-version > h1:nth-child(1)"
         value_template: '{{ (value.split(":")[1]) }}'
-      releasedate:
-        name: Release date
+      - name: Release date
         select: ".release-date"
+    binary_sensor:
+      - name: Latest version == 2021.7.0
+        select: ".current-version > h1:nth-child(1)"
+        value_template: '{{ (value.split(":")[1]) | trim == "2021.7.0" }}'
 ```
 
 ## Contributions are welcome!
