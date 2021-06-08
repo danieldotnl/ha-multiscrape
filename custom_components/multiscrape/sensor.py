@@ -51,7 +51,7 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
 
     async_add_entities(
         [
-            RestSensor(
+            MultiscrapeSensor(
                 hass,
                 coordinator,
                 rest,
@@ -69,7 +69,7 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
     )
 
 
-class RestSensor(MultiscrapeEntity, SensorEntity):
+class MultiscrapeSensor(MultiscrapeEntity, SensorEntity):
     """Implementation of a multiscrape sensor."""
 
     def __init__(

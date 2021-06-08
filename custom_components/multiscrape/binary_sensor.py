@@ -49,7 +49,7 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
 
     async_add_entities(
         [
-            RestBinarySensor(
+            MultiscrapeBinarySensor(
                 hass,
                 coordinator,
                 rest,
@@ -66,7 +66,7 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
     )
 
 
-class RestBinarySensor(MultiscrapeEntity, BinarySensorEntity):
+class MultiscrapeBinarySensor(MultiscrapeEntity, BinarySensorEntity):
     """Representation of a multiscrape binary sensor."""
 
     def __init__(

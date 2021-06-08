@@ -28,6 +28,7 @@ from homeassistant.helpers.entity_component import EntityComponent
 from homeassistant.helpers.reload import async_reload_integration_platforms
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
+from .const import CONF_FORM_SUBMIT
 from .const import CONF_PARSER
 from .const import COORDINATOR
 from .const import DOMAIN
@@ -159,6 +160,7 @@ def create_rest_data_from_config(hass, config):
     params = config.get(CONF_PARAMS)
     parser = config.get(CONF_PARSER)
     timeout = config.get(CONF_TIMEOUT)
+    form_submit = config.get(CONF_FORM_SUBMIT)
 
     if resource_template is not None:
         resource_template.hass = hass
@@ -182,5 +184,6 @@ def create_rest_data_from_config(hass, config):
         payload,
         verify_ssl,
         parser,
+        form_submit,
         timeout,
     )
