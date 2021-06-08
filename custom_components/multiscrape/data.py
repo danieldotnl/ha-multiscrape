@@ -1,7 +1,5 @@
 """Support for multiscrape requests."""
 import logging
-from json import dumps
-from json import loads
 from urllib.parse import urljoin
 
 import httpx
@@ -48,7 +46,7 @@ class ScrapedRestData(RestData):
         self._verify_ssl = verify_ssl
         self._parser = parser
         self._async_client = None
-        self._form_submit_config = loads(dumps(form_submit_config))
+        self._form_submit_config = form_submit_config
         self.data = None
         self.last_exception = None
         self.headers = None
