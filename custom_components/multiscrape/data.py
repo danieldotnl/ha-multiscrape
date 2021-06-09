@@ -9,6 +9,7 @@ from homeassistant.helpers.httpx_client import get_async_client
 
 from .const import CONF_FORM_INPUT
 from .const import CONF_FORM_RESOURCE
+from .const import CONF_FORM_RESUBMIT_ERROR
 from .const import CONF_FORM_SELECT
 from .const import CONF_FORM_SUBMIT_ONCE
 
@@ -53,11 +54,17 @@ class ScrapedRestData(RestData):
         self._skip_form = False
 
         if form_submit_config:
-
             self._form_resource = self._form_submit_config.get(CONF_FORM_RESOURCE)
             self._form_select = self._form_submit_config.get(CONF_FORM_SELECT)
             self._form_input = self._form_submit_config.get(CONF_FORM_INPUT)
             self._form_submit_once = self._form_submit_config.get(CONF_FORM_SUBMIT_ONCE)
+            self._form_resubmit_error = self._form_submit_config.get(
+                CONF_FORM_RESUBMIT_ERROR
+            )
+
+    def notify_scrape_exception(self):
+        if self._form_resubmit_error:
+            self._skip_form = False
 
     async def async_update(self, log_errors=True):
         """Get the latest data from REST service with provided method."""

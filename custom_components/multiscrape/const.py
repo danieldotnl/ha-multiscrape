@@ -17,6 +17,7 @@ CONF_FORM_SELECT = "select"
 CONF_FORM_INPUT = "input"
 CONF_FORM_RESOURCE = "resource"
 CONF_FORM_SUBMIT_ONCE = "submit_once"
+CONF_FORM_RESUBMIT_ERROR = "resubmit_on_error"
 DEFAULT_PARSER = "lxml"
 
 REST_IDX = "rest_idx"

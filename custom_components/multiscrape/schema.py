@@ -21,6 +21,7 @@ from homeassistant.const import CONF_VALUE_TEMPLATE
 from .const import CONF_ATTR
 from .const import CONF_FORM_INPUT
 from .const import CONF_FORM_RESOURCE
+from .const import CONF_FORM_RESUBMIT_ERROR
 from .const import CONF_FORM_SELECT
 from .const import CONF_FORM_SUBMIT
 from .const import CONF_FORM_SUBMIT_ONCE
@@ -37,6 +38,7 @@ FORM_SUBMIT_SCHEMA = {
     vol.Required(CONF_FORM_SELECT): cv.string,
     vol.Optional(CONF_FORM_INPUT): vol.Schema({cv.string: cv.string}),
     vol.Optional(CONF_FORM_SUBMIT_ONCE, default=False): cv.boolean,
+    vol.Optional(CONF_FORM_RESUBMIT_ERROR, default=True): cv.boolean,
 }
 
 RESOURCE_SCHEMA.update({vol.Optional(CONF_PARSER, default=DEFAULT_PARSER): cv.string})
