@@ -5,12 +5,12 @@ from urllib.parse import urljoin
 import httpx
 from bs4 import BeautifulSoup
 from homeassistant.components.rest.data import RestData
-from homeassistant.const import CONF_HEADERS
 from homeassistant.helpers.httpx_client import get_async_client
 
 from .const import CONF_FORM_INPUT
 from .const import CONF_FORM_RESOURCE
 from .const import CONF_FORM_SELECT
+from .const import CONF_FORM_SUBMIT_ONCE
 
 DEFAULT_TIMEOUT = 10
 
@@ -50,13 +50,14 @@ class ScrapedRestData(RestData):
         self.data = None
         self.last_exception = None
         self.headers = None
+        self._skip_form = False
 
         if form_submit_config:
 
             self._form_resource = self._form_submit_config.get(CONF_FORM_RESOURCE)
             self._form_select = self._form_submit_config.get(CONF_FORM_SELECT)
             self._form_input = self._form_submit_config.get(CONF_FORM_INPUT)
-            self._form_headers = self._form_submit_config.get(CONF_HEADERS)
+            self._form_submit_once = self._form_submit_config.get(CONF_FORM_SUBMIT_ONCE)
 
     async def async_update(self, log_errors=True):
         """Get the latest data from REST service with provided method."""
@@ -65,7 +66,9 @@ class ScrapedRestData(RestData):
                 self._hass, verify_ssl=self._verify_ssl
             )
 
-        if self._form_submit_config is None:
+        if self._form_submit_config is None or self._skip_form:
+            if self._skip_form:
+                _LOGGER.debug("Skip submitting form for resource: %s", self._resource)
             await self._async_update_data()
 
         else:
@@ -106,6 +109,9 @@ class ScrapedRestData(RestData):
                 data=form_data,
                 timeout=self._timeout,
             )
+
+            if self._form_submit_once:
+                self._skip_form = True
             return response
         except httpx.RequestError as ex:
             if log_errors:
@@ -176,7 +182,7 @@ class ScrapedRestData(RestData):
             return await self._async_client.request(
                 "GET",
                 self._form_resource,
-                headers=self._form_headers,
+                headers=self._headers,
                 params=self._params,
                 auth=self._auth,
                 data=self._request_data,

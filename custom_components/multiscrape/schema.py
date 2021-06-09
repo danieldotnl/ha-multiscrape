@@ -23,6 +23,7 @@ from .const import CONF_FORM_INPUT
 from .const import CONF_FORM_RESOURCE
 from .const import CONF_FORM_SELECT
 from .const import CONF_FORM_SUBMIT
+from .const import CONF_FORM_SUBMIT_ONCE
 from .const import CONF_INDEX
 from .const import CONF_PARSER
 from .const import CONF_SELECT
@@ -35,6 +36,7 @@ FORM_SUBMIT_SCHEMA = {
     vol.Optional(CONF_FORM_RESOURCE): cv.string,
     vol.Required(CONF_FORM_SELECT): cv.string,
     vol.Optional(CONF_FORM_INPUT): vol.Schema({cv.string: cv.string}),
+    vol.Optional(CONF_FORM_SUBMIT_ONCE, default=False): cv.boolean,
 }
 
 RESOURCE_SCHEMA.update({vol.Optional(CONF_PARSER, default=DEFAULT_PARSER): cv.string})
