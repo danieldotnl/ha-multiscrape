@@ -184,11 +184,13 @@ class ScrapedRestData(RestData):
 
     async def _async_get_form_page(self, log_errors=True):
 
-        _LOGGER.debug("Updating from %s", self._form_resource)
+        resource = self._form_resource if self._form_resource else self._resource
+
+        _LOGGER.debug("Updating from %s", resource)
         try:
             return await self._async_client.request(
                 "GET",
-                self._form_resource,
+                resource,
                 headers=self._headers,
                 params=self._params,
                 auth=self._auth,
