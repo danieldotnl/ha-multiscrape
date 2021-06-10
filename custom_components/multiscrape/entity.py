@@ -27,13 +27,13 @@ class MultiscrapeEntity(RestEntity):
             coordinator, rest, name, device_class, resource_template, force_update
         )
 
-    def _scrape(self, value, select, attribute, index):
+    def _scrape(self, content, select, attribute, index, value_template):
 
         try:
             if attribute is not None:
-                value = value.select(select)[index][attribute]
+                value = content.select(select)[index][attribute]
             else:
-                tag = value.select(select)[index]
+                tag = content.select(select)[index]
                 if tag.name in ("style", "script", "template"):
                     value = tag.string
                 else:
@@ -45,9 +45,7 @@ class MultiscrapeEntity(RestEntity):
             _LOGGER.debug("Exception: %s", exception)
             return
 
-        if value is not None and self._value_template is not None:
-            value = self._value_template.async_render_with_possible_json_value(
-                value, None
-            )
+        if value is not None and value_template is not None:
+            value = value_template.async_render_with_possible_json_value(value, None)
 
         return value

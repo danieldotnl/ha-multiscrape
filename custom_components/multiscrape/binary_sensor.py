@@ -14,6 +14,7 @@ from . import async_get_config_and_coordinator
 from .const import CONF_ATTR
 from .const import CONF_INDEX
 from .const import CONF_SELECT
+from .const import CONF_SENSOR_ATTRS
 from .entity import MultiscrapeEntity
 
 _LOGGER = logging.getLogger(__name__)
@@ -43,6 +44,7 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
     value_template = conf.get(CONF_VALUE_TEMPLATE)
     force_update = conf.get(CONF_FORCE_UPDATE)
     resource_template = conf.get(CONF_RESOURCE_TEMPLATE)
+    sensor_attributes = conf.get(CONF_SENSOR_ATTRS)
 
     if value_template is not None:
         value_template.hass = hass
@@ -61,6 +63,7 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
                 select,
                 attribute,
                 index,
+                sensor_attributes,
             )
         ],
     )
@@ -82,6 +85,7 @@ class RestBinarySensor(MultiscrapeEntity, BinarySensorEntity):
         select_template,
         attribute,
         index,
+        sensor_attributes,
     ):
         """Initialize a multiscrape binary sensor."""
         super().__init__(
@@ -95,11 +99,18 @@ class RestBinarySensor(MultiscrapeEntity, BinarySensorEntity):
         self._select_template = select_template
         self._attribute = attribute
         self._index = index
+        self._attributes = None
+        self._sensor_attributes = sensor_attributes
 
         if self._select_template is not None:
             self._select_template.hass = self._hass
             self._select = self._select_template.async_render()
             _LOGGER.debug("Parsed select template: %s", self._select)
+
+    @property
+    def extra_state_attributes(self):
+        """Return the state attributes."""
+        return self._attributes
 
     @property
     def is_on(self):
@@ -113,7 +124,13 @@ class RestBinarySensor(MultiscrapeEntity, BinarySensorEntity):
             self._is_on = False
 
         # _LOGGER.debug("Data fetched from resource: %s", value)
-        value = self._scrape(self.rest.soup, self._select, self._attribute, self._index)
+        value = self._scrape(
+            self.rest.soup,
+            self._select,
+            self._attribute,
+            self._index,
+            self._value_template,
+        )
 
         try:
             self._is_on = bool(int(value))
@@ -121,3 +138,31 @@ class RestBinarySensor(MultiscrapeEntity, BinarySensorEntity):
             self._is_on = {"true": True, "on": True, "open": True, "yes": True}.get(
                 value.lower(), False
             )
+
+        if self._sensor_attributes:
+            self._attributes = {}
+
+            for idx, sensor_attribute in enumerate(self._sensor_attributes):
+
+                name = sensor_attribute.get(CONF_NAME)
+
+                select = sensor_attribute.get(CONF_SELECT)
+                if select is not None:
+                    select.hass = self._hass
+                    select = select.async_render()
+                _LOGGER.debug(
+                    "Parsed binary sensor attribute select template: %s", select
+                )
+
+                select_attr = sensor_attribute.get(CONF_ATTR)
+                index = sensor_attribute.get(CONF_INDEX)
+                value_template = sensor_attribute.get(CONF_VALUE_TEMPLATE)
+                attr_value = self._scrape(
+                    self.rest.soup, select, select_attr, index, value_template
+                )
+
+                self._attributes[name] = attr_value
+
+                _LOGGER.debug(
+                    "Binary sensor attr %s scrape value: %s", name, attr_value
+                )

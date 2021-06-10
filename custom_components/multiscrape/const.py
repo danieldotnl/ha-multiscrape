@@ -11,6 +11,7 @@ DEFAULT_SENSOR_NAME = "Multiscrape Sensor"
 CONF_PARSER = "parser"
 CONF_SELECT = "select"
 CONF_ATTR = "attribute"
+CONF_SENSOR_ATTRS = "attributes"
 CONF_INDEX = "index"
 DEFAULT_PARSER = "lxml"
 

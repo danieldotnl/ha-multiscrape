@@ -15,6 +15,7 @@ from . import async_get_config_and_coordinator
 from .const import CONF_ATTR
 from .const import CONF_INDEX
 from .const import CONF_SELECT
+from .const import CONF_SENSOR_ATTRS
 from .entity import MultiscrapeEntity
 
 _LOGGER = logging.getLogger(__name__)
@@ -45,6 +46,7 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
     value_template = conf.get(CONF_VALUE_TEMPLATE)
     force_update = conf.get(CONF_FORCE_UPDATE)
     resource_template = conf.get(CONF_RESOURCE_TEMPLATE)
+    sensor_attributes = conf.get(CONF_SENSOR_ATTRS)
 
     if value_template is not None:
         value_template.hass = hass
@@ -64,6 +66,7 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
                 select,
                 attribute,
                 index,
+                sensor_attributes,
             )
         ],
     )
@@ -86,6 +89,7 @@ class RestSensor(MultiscrapeEntity, SensorEntity):
         select_template,
         attribute,
         index,
+        sensor_attributes,
     ):
         """Initialize the multiscrape sensor."""
         super().__init__(
@@ -99,6 +103,7 @@ class RestSensor(MultiscrapeEntity, SensorEntity):
         self._select_template = select_template
         self._attribute = attribute
         self._index = index
+        self._sensor_attributes = sensor_attributes
 
         if self._select_template is not None:
             self._select_template.hass = self._hass
@@ -122,7 +127,36 @@ class RestSensor(MultiscrapeEntity, SensorEntity):
 
     def _update_from_rest_data(self):
         """Update state from the rest data."""
-        # _LOGGER.debug("Data fetched from resource: %s", value)
-        value = self._scrape(self.rest.soup, self._select, self._attribute, self._index)
 
+        value = self._scrape(
+            self.rest.soup,
+            self._select,
+            self._attribute,
+            self._index,
+            self._value_template,
+        )
         self._state = value
+
+        if self._sensor_attributes:
+            self._attributes = {}
+
+            for idx, sensor_attribute in enumerate(self._sensor_attributes):
+
+                name = sensor_attribute.get(CONF_NAME)
+
+                select = sensor_attribute.get(CONF_SELECT)
+                if select is not None:
+                    select.hass = self._hass
+                    select = select.async_render()
+                _LOGGER.debug("Parsed sensor attribute select template: %s", select)
+
+                select_attr = sensor_attribute.get(CONF_ATTR)
+                index = sensor_attribute.get(CONF_INDEX)
+                value_template = sensor_attribute.get(CONF_VALUE_TEMPLATE)
+                attr_value = self._scrape(
+                    self.rest.soup, select, select_attr, index, value_template
+                )
+
+                self._attributes[name] = attr_value
+
+                _LOGGER.debug("Sensor attr %s scrape value: %s", name, attr_value)
