@@ -7,6 +7,7 @@ from homeassistant.const import CONF_DEVICE_CLASS
 from homeassistant.const import CONF_FORCE_UPDATE
 from homeassistant.const import CONF_NAME
 from homeassistant.const import CONF_RESOURCE_TEMPLATE
+from homeassistant.const import CONF_UNIQUE_ID
 from homeassistant.const import CONF_UNIT_OF_MEASUREMENT
 from homeassistant.const import CONF_VALUE_TEMPLATE
 from homeassistant.exceptions import PlatformNotReady
@@ -38,6 +39,7 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
         raise PlatformNotReady
 
     name = conf.get(CONF_NAME)
+    unique_id = conf.get(CONF_UNIQUE_ID)
     unit = conf.get(CONF_UNIT_OF_MEASUREMENT)
     device_class = conf.get(CONF_DEVICE_CLASS)
     select = conf.get(CONF_SELECT)
@@ -57,6 +59,7 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
                 hass,
                 coordinator,
                 rest,
+                unique_id,
                 name,
                 unit,
                 device_class,
@@ -80,6 +83,7 @@ class RestSensor(MultiscrapeEntity, SensorEntity):
         hass,
         coordinator,
         rest,
+        unique_id,
         name,
         unit_of_measurement,
         device_class,
@@ -97,6 +101,7 @@ class RestSensor(MultiscrapeEntity, SensorEntity):
         )
         self._state = None
         self._hass = hass
+        self._unique_id = unique_id
         self._unit_of_measurement = unit_of_measurement
         self._value_template = value_template
         self._attributes = None

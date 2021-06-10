@@ -15,6 +15,7 @@ from homeassistant.const import CONF_DEVICE_CLASS
 from homeassistant.const import CONF_FORCE_UPDATE
 from homeassistant.const import CONF_NAME
 from homeassistant.const import CONF_SCAN_INTERVAL
+from homeassistant.const import CONF_UNIQUE_ID
 from homeassistant.const import CONF_UNIT_OF_MEASUREMENT
 from homeassistant.const import CONF_VALUE_TEMPLATE
 
@@ -40,6 +41,7 @@ SENSOR_ATTRIBUTE_SCHEMA = {
 
 SENSOR_SCHEMA = {
     vol.Optional(CONF_NAME, default=DEFAULT_SENSOR_NAME): cv.string,
+    vol.Optional(CONF_UNIQUE_ID): cv.string,
     vol.Optional(CONF_UNIT_OF_MEASUREMENT): cv.string,
     vol.Optional(CONF_DEVICE_CLASS): SENSOR_DEVICE_CLASSES_SCHEMA,
     vol.Optional(CONF_VALUE_TEMPLATE): cv.template,
@@ -54,6 +56,7 @@ SENSOR_SCHEMA = {
 
 BINARY_SENSOR_SCHEMA = {
     vol.Optional(CONF_NAME, default=DEFAULT_BINARY_SENSOR_NAME): cv.string,
+    vol.Optional(CONF_UNIQUE_ID): cv.string,
     vol.Optional(CONF_DEVICE_CLASS): BINARY_SENSOR_DEVICE_CLASSES_SCHEMA,
     vol.Optional(CONF_VALUE_TEMPLATE): cv.template,
     vol.Optional(CONF_FORCE_UPDATE, default=DEFAULT_FORCE_UPDATE): cv.boolean,

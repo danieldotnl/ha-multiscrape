@@ -7,6 +7,7 @@ from homeassistant.const import CONF_DEVICE_CLASS
 from homeassistant.const import CONF_FORCE_UPDATE
 from homeassistant.const import CONF_NAME
 from homeassistant.const import CONF_RESOURCE_TEMPLATE
+from homeassistant.const import CONF_UNIQUE_ID
 from homeassistant.const import CONF_VALUE_TEMPLATE
 from homeassistant.exceptions import PlatformNotReady
 
@@ -37,6 +38,7 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
         raise PlatformNotReady
 
     name = conf.get(CONF_NAME)
+    unique_id = conf.get(CONF_UNIQUE_ID)
     device_class = conf.get(CONF_DEVICE_CLASS)
     select = conf.get(CONF_SELECT)
     attribute = conf.get(CONF_ATTR)
@@ -55,6 +57,7 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
                 hass,
                 coordinator,
                 rest,
+                unique_id,
                 name,
                 device_class,
                 value_template,
@@ -77,6 +80,7 @@ class RestBinarySensor(MultiscrapeEntity, BinarySensorEntity):
         hass,
         coordinator,
         rest,
+        unique_id,
         name,
         device_class,
         value_template,
@@ -95,6 +99,7 @@ class RestBinarySensor(MultiscrapeEntity, BinarySensorEntity):
         self._previous_data = None
         self._value_template = value_template
         self._is_on = None
+        self._unique_id = unique_id
         self._hass = hass
         self._select_template = select_template
         self._attribute = attribute

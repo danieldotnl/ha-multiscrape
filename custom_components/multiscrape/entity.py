@@ -26,6 +26,12 @@ class MultiscrapeEntity(RestEntity):
         super().__init__(
             coordinator, rest, name, device_class, resource_template, force_update
         )
+        self._unique_id = None
+
+    @property
+    def unique_id(self):
+        """Return the unique id of this sensor."""
+        return self._unique_id
 
     def _scrape(self, content, select, attribute, index, value_template):
 
