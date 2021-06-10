@@ -105,6 +105,10 @@ class ScrapedRestData(RestData):
         self.soup.prettify()
 
     async def _submit_form(self, resource, method, form_data, log_errors=True):
+
+        if not method:
+            method = "POST"
+
         _LOGGER.debug("Submitting form data %s to %s", form_data, resource)
         try:
             response = await self._async_client.request(
