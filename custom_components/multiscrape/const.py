@@ -10,7 +10,7 @@ DEFAULT_BINARY_SENSOR_NAME = "Multiscrape Binary Sensor"
 DEFAULT_SENSOR_NAME = "Multiscrape Sensor"
 CONF_PARSER = "parser"
 CONF_SELECT = "select"
-CONF_ATTR = "attr"
+CONF_ATTR = "attribute"
 CONF_INDEX = "index"
 DEFAULT_PARSER = "lxml"
 
