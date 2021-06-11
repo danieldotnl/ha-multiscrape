@@ -42,7 +42,7 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
     unique_id = conf.get(CONF_UNIQUE_ID)
     unit = conf.get(CONF_UNIT_OF_MEASUREMENT)
     device_class = conf.get(CONF_DEVICE_CLASS)
-    select = conf.get(CONF_SELECT)
+    select_template = conf.get(CONF_SELECT)
     attribute = conf.get(CONF_ATTR)
     index = conf.get(CONF_INDEX)
     value_template = conf.get(CONF_VALUE_TEMPLATE)
@@ -66,7 +66,7 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
                 value_template,
                 force_update,
                 resource_template,
-                select,
+                select_template,
                 attribute,
                 index,
                 sensor_attributes,
@@ -110,11 +110,6 @@ class RestSensor(MultiscrapeEntity, SensorEntity):
         self._index = index
         self._sensor_attributes = sensor_attributes
 
-        if self._select_template is not None:
-            self._select_template.hass = self._hass
-            self._select = self._select_template.async_render()
-            _LOGGER.debug("Parsed select template: %s", self._select)
-
     @property
     def unit_of_measurement(self):
         """Return the unit the value is expressed in."""
@@ -132,6 +127,11 @@ class RestSensor(MultiscrapeEntity, SensorEntity):
 
     def _update_from_rest_data(self):
         """Update state from the rest data."""
+
+        if self._select_template is not None:
+            self._select_template.hass = self._hass
+            self._select = self._select_template.async_render(parse_result=False)
+            _LOGGER.debug("Parsed select template: %s", self._select)
 
         value = self._scrape(
             self.rest.soup,
@@ -152,7 +152,7 @@ class RestSensor(MultiscrapeEntity, SensorEntity):
                 select = sensor_attribute.get(CONF_SELECT)
                 if select is not None:
                     select.hass = self._hass
-                    select = select.async_render()
+                    select = select.async_render(parse_result=False)
                 _LOGGER.debug("Parsed sensor attribute select template: %s", select)
 
                 select_attr = sensor_attribute.get(CONF_ATTR)
