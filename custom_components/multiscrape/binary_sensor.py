@@ -5,6 +5,7 @@ from homeassistant.components.binary_sensor import BinarySensorEntity
 from homeassistant.components.binary_sensor import DOMAIN as BINARY_SENSOR_DOMAIN
 from homeassistant.const import CONF_DEVICE_CLASS
 from homeassistant.const import CONF_FORCE_UPDATE
+from homeassistant.const import CONF_ICON
 from homeassistant.const import CONF_NAME
 from homeassistant.const import CONF_RESOURCE_TEMPLATE
 from homeassistant.const import CONF_UNIQUE_ID
@@ -47,6 +48,7 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
     force_update = conf.get(CONF_FORCE_UPDATE)
     resource_template = conf.get(CONF_RESOURCE_TEMPLATE)
     sensor_attributes = conf.get(CONF_SENSOR_ATTRS)
+    icon_template = conf.get(CONF_ICON)
 
     if value_template is not None:
         value_template.hass = hass
@@ -67,6 +69,7 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
                 attribute,
                 index,
                 sensor_attributes,
+                icon_template,
             )
         ],
     )
@@ -90,6 +93,7 @@ class RestBinarySensor(MultiscrapeEntity, BinarySensorEntity):
         attribute,
         index,
         sensor_attributes,
+        icon_template,
     ):
         """Initialize a multiscrape binary sensor."""
         super().__init__(
@@ -106,11 +110,10 @@ class RestBinarySensor(MultiscrapeEntity, BinarySensorEntity):
         self._index = index
         self._attributes = None
         self._sensor_attributes = sensor_attributes
+        self._icon_template = icon_template
 
         if self._select_template is not None:
             self._select_template.hass = self._hass
-            self._select = self._select_template.async_render()
-            _LOGGER.debug("Parsed select template: %s", self._select)
 
     @property
     def extra_state_attributes(self):
@@ -125,10 +128,12 @@ class RestBinarySensor(MultiscrapeEntity, BinarySensorEntity):
     def _update_from_rest_data(self):
         """Update state from the scraped data."""
 
+        self._select = self._select_template.async_render(parse_result=False)
+        _LOGGER.debug("Parsed select template: %s", self._select)
+
         if self.rest.soup is None:
             self._is_on = False
 
-        # _LOGGER.debug("Data fetched from resource: %s", value)
         value = self._scrape(
             self.rest.soup,
             self._select,

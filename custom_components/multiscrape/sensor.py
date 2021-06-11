@@ -110,6 +110,9 @@ class RestSensor(MultiscrapeEntity, SensorEntity):
         self._index = index
         self._sensor_attributes = sensor_attributes
 
+        if self._select_template is not None:
+            self._select_template.hass = self._hass
+
     @property
     def unit_of_measurement(self):
         """Return the unit the value is expressed in."""
@@ -128,10 +131,8 @@ class RestSensor(MultiscrapeEntity, SensorEntity):
     def _update_from_rest_data(self):
         """Update state from the rest data."""
 
-        if self._select_template is not None:
-            self._select_template.hass = self._hass
-            self._select = self._select_template.async_render(parse_result=False)
-            _LOGGER.debug("Parsed select template: %s", self._select)
+        self._select = self._select_template.async_render(parse_result=False)
+        _LOGGER.debug("Parsed select template: %s", self._select)
 
         value = self._scrape(
             self.rest.soup,
