@@ -5,6 +5,7 @@ from homeassistant.components.sensor import DOMAIN as SENSOR_DOMAIN
 from homeassistant.components.sensor import SensorEntity
 from homeassistant.const import CONF_DEVICE_CLASS
 from homeassistant.const import CONF_FORCE_UPDATE
+from homeassistant.const import CONF_ICON
 from homeassistant.const import CONF_NAME
 from homeassistant.const import CONF_RESOURCE_TEMPLATE
 from homeassistant.const import CONF_UNIQUE_ID
@@ -49,13 +50,14 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
     force_update = conf.get(CONF_FORCE_UPDATE)
     resource_template = conf.get(CONF_RESOURCE_TEMPLATE)
     sensor_attributes = conf.get(CONF_SENSOR_ATTRS)
+    icon_template = conf.get(CONF_ICON)
 
     if value_template is not None:
         value_template.hass = hass
 
     async_add_entities(
         [
-            RestSensor(
+            MultiscrapeSensor(
                 hass,
                 coordinator,
                 rest,
@@ -70,12 +72,13 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
                 attribute,
                 index,
                 sensor_attributes,
+                icon_template,
             )
         ],
     )
 
 
-class RestSensor(MultiscrapeEntity, SensorEntity):
+class MultiscrapeSensor(MultiscrapeEntity, SensorEntity):
     """Implementation of a multiscrape sensor."""
 
     def __init__(
@@ -94,10 +97,17 @@ class RestSensor(MultiscrapeEntity, SensorEntity):
         attribute,
         index,
         sensor_attributes,
+        icon_template,
     ):
         """Initialize the multiscrape sensor."""
         super().__init__(
-            coordinator, rest, name, device_class, resource_template, force_update
+            coordinator,
+            rest,
+            name,
+            device_class,
+            resource_template,
+            force_update,
+            icon_template,
         )
         self._state = None
         self._hass = hass

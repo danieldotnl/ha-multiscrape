@@ -45,6 +45,7 @@ SENSOR_SCHEMA = {
     vol.Optional(CONF_UNIQUE_ID): cv.string,
     vol.Optional(CONF_UNIT_OF_MEASUREMENT): cv.string,
     vol.Optional(CONF_DEVICE_CLASS): SENSOR_DEVICE_CLASSES_SCHEMA,
+    vol.Optional(CONF_ICON): cv.template,
     vol.Optional(CONF_VALUE_TEMPLATE): cv.template,
     vol.Optional(CONF_FORCE_UPDATE, default=DEFAULT_FORCE_UPDATE): cv.boolean,
     vol.Required(CONF_SELECT): cv.template,

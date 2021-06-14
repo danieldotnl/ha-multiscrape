@@ -3,6 +3,7 @@ import logging
 from typing import Any
 
 from homeassistant.components.rest.entity import RestEntity
+from homeassistant.components.template.template_entity import TemplateEntity
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
 from .data import RestData
@@ -10,7 +11,7 @@ from .data import RestData
 _LOGGER = logging.getLogger(__name__)
 
 
-class MultiscrapeEntity(RestEntity):
+class MultiscrapeEntity(RestEntity, TemplateEntity):
     """A class for entities using DataUpdateCoordinator."""
 
     def __init__(
@@ -21,11 +22,22 @@ class MultiscrapeEntity(RestEntity):
         device_class,
         resource_template,
         force_update,
+        icon_template,
     ) -> None:
         """Create the entity that may have a coordinator."""
+
         super().__init__(
-            coordinator, rest, name, device_class, resource_template, force_update
+            coordinator,
+            rest,
+            name,
+            device_class,
+            resource_template,
+            force_update,
         )
+
+        # ideally _icon_template is pass to __init__ of TemplateEntity but MRO doens't want to cooperate and this works as well.
+        # Help is welcome!
+        self._icon_template = icon_template
         self._unique_id = None
 
     @property
