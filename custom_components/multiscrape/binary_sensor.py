@@ -11,6 +11,7 @@ from homeassistant.const import CONF_RESOURCE_TEMPLATE
 from homeassistant.const import CONF_UNIQUE_ID
 from homeassistant.const import CONF_VALUE_TEMPLATE
 from homeassistant.exceptions import PlatformNotReady
+from homeassistant.helpers.entity import async_generate_entity_id
 
 from . import async_get_config_and_coordinator
 from .const import CONF_ATTR
@@ -19,6 +20,7 @@ from .const import CONF_SELECT
 from .const import CONF_SENSOR_ATTRS
 from .entity import MultiscrapeEntity
 
+ENTITY_ID_FORMAT = BINARY_SENSOR_DOMAIN + ".{}"
 _LOGGER = logging.getLogger(__name__)
 
 
@@ -117,6 +119,10 @@ class MultiscrapeBinarySensor(MultiscrapeEntity, BinarySensorEntity):
         self._index = index
         self._attributes = None
         self._sensor_attributes = sensor_attributes
+
+        self.entity_id = async_generate_entity_id(
+            ENTITY_ID_FORMAT, unique_id or name, hass=hass
+        )
 
         if self._select_template is not None:
             self._select_template.hass = self._hass
