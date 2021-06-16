@@ -13,6 +13,7 @@ from homeassistant.const import CONF_UNIT_OF_MEASUREMENT
 from homeassistant.const import CONF_VALUE_TEMPLATE
 from homeassistant.exceptions import PlatformNotReady
 from homeassistant.helpers.entity import async_generate_entity_id
+from homeassistant.util import slugify
 
 from . import async_get_config_and_coordinator
 from .const import CONF_ATTR
@@ -164,7 +165,7 @@ class MultiscrapeSensor(MultiscrapeEntity, SensorEntity):
 
             for idx, sensor_attribute in enumerate(self._sensor_attributes):
 
-                name = sensor_attribute.get(CONF_NAME)
+                name = slugify(sensor_attribute.get(CONF_NAME))
 
                 select = sensor_attribute.get(CONF_SELECT)
                 if select is not None:
