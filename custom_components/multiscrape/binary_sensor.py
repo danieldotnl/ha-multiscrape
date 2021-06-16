@@ -171,14 +171,17 @@ class MultiscrapeBinarySensor(MultiscrapeEntity, BinarySensorEntity):
                 select = sensor_attribute.get(CONF_SELECT)
                 if select is not None:
                     select.hass = self._hass
-                    select = select.async_render()
+                    select = select.render(parse_result=False)
                 _LOGGER.debug(
                     "Parsed binary sensor attribute select template: %s", select
                 )
 
                 select_attr = sensor_attribute.get(CONF_ATTR)
                 index = sensor_attribute.get(CONF_INDEX)
+
                 value_template = sensor_attribute.get(CONF_VALUE_TEMPLATE)
+                if value_template:
+                    value_template.hass = self._hass
                 attr_value = self._scrape(
                     self.rest.soup, select, select_attr, index, value_template
                 )

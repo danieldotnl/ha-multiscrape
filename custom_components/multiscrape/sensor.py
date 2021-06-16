@@ -147,8 +147,8 @@ class MultiscrapeSensor(MultiscrapeEntity, SensorEntity):
     def _update_from_rest_data(self):
         """Update state from the rest data."""
 
-        self._select = self._select_template.async_render(parse_result=False)
-        _LOGGER.debug("Parsed select template: %s", self._select)
+        self._select = self._select_template.async_render(parse_result=True)
+        _LOGGER.debug("Rendered select template: %s", self._select)
 
         value = self._scrape(
             self.rest.soup,
@@ -169,12 +169,14 @@ class MultiscrapeSensor(MultiscrapeEntity, SensorEntity):
                 select = sensor_attribute.get(CONF_SELECT)
                 if select is not None:
                     select.hass = self._hass
-                    select = select.async_render(parse_result=False)
+                    select = select.render(parse_result=False)
                 _LOGGER.debug("Parsed sensor attribute select template: %s", select)
 
                 select_attr = sensor_attribute.get(CONF_ATTR)
                 index = sensor_attribute.get(CONF_INDEX)
                 value_template = sensor_attribute.get(CONF_VALUE_TEMPLATE)
+                if value_template:
+                    value_template.hass = self._hass
                 attr_value = self._scrape(
                     self.rest.soup, select, select_attr, index, value_template
                 )
