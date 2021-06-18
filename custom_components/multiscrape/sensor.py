@@ -104,6 +104,7 @@ class MultiscrapeSensor(MultiscrapeEntity, SensorEntity):
     ):
         """Initialize the multiscrape sensor."""
         super().__init__(
+            hass,
             coordinator,
             rest,
             name,
@@ -113,7 +114,6 @@ class MultiscrapeSensor(MultiscrapeEntity, SensorEntity):
             icon_template,
         )
         self._state = None
-        self._hass = hass
         self._unique_id = unique_id
         self._unit_of_measurement = unit_of_measurement
         self._value_template = value_template
@@ -159,6 +159,9 @@ class MultiscrapeSensor(MultiscrapeEntity, SensorEntity):
             self._value_template,
         )
         self._state = value
+
+        if self._icon_template:
+            self._set_icon(value)
 
         if self._sensor_attributes:
             self._attributes = {}

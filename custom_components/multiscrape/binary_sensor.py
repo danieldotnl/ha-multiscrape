@@ -101,6 +101,7 @@ class MultiscrapeBinarySensor(MultiscrapeEntity, BinarySensorEntity):
 
         """Initialize a multiscrape binary sensor."""
         super().__init__(
+            hass,
             coordinator,
             rest,
             name,
@@ -114,7 +115,6 @@ class MultiscrapeBinarySensor(MultiscrapeEntity, BinarySensorEntity):
         self._value_template = value_template
         self._is_on = None
         self._unique_id = unique_id
-        self._hass = hass
         self._select_template = select_template
         self._attribute = attribute
         self._index = index
@@ -161,6 +161,9 @@ class MultiscrapeBinarySensor(MultiscrapeEntity, BinarySensorEntity):
             self._is_on = {"true": True, "on": True, "open": True, "yes": True}.get(
                 value.lower(), False
             )
+
+        if self._icon_template:
+            self._set_icon(self._is_on)
 
         if self._sensor_attributes:
             self._attributes = {}

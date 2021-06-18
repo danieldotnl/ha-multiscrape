@@ -3,7 +3,6 @@ import logging
 from typing import Any
 
 from homeassistant.components.rest.entity import RestEntity
-from homeassistant.components.template.template_entity import TemplateEntity
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
 from .data import RestData
@@ -11,11 +10,12 @@ from .data import RestData
 _LOGGER = logging.getLogger(__name__)
 
 
-class MultiscrapeEntity(RestEntity, TemplateEntity):
+class MultiscrapeEntity(RestEntity):
     """A class for entities using DataUpdateCoordinator."""
 
     def __init__(
         self,
+        hass,
         coordinator: DataUpdateCoordinator[Any],
         rest: RestData,
         name,
@@ -35,15 +35,28 @@ class MultiscrapeEntity(RestEntity, TemplateEntity):
             force_update,
         )
 
-        # ideally _icon_template is pass to __init__ of TemplateEntity but MRO doens't want to cooperate and this works as well.
-        # Help is welcome!
+        self._hass = hass
+        self._icon = None
         self._icon_template = icon_template
+        if self._icon_template:
+            self._icon_template.hass = hass
         self._unique_id = None
 
     @property
     def unique_id(self):
         """Return the unique id of this sensor."""
         return self._unique_id
+
+    @property
+    def icon(self):
+        """Return the icon to use in the frontend, if any."""
+        return self._icon
+
+    def _set_icon(self, value):
+        self._icon = self._icon_template.async_render_with_possible_json_value(
+            value, None
+        )
+        _LOGGER.debug("Icon template rendered and set to: %s", self._icon)
 
     def _scrape(self, content, select, attribute, index, value_template):
 
