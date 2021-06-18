@@ -25,13 +25,13 @@ It is based on both the existing [Rest sensor](https://www.home-assistant.io/int
 
 <a href="https://www.buymeacoffee.com/danieldotnl" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/default-blue.png" alt="Buy Me A Coffee" style="height: 51px !important;width: 217px !important;" ></a>
 
-### Installation
+## Installation
 
 [![hacs][hacsbadge]][hacs]
 
 Install via HACS (default store) or install manually by copying the files in a new 'custom_components/multiscrape' directory.
 
-### Example configuration (YAML)
+## Example configuration (YAML)
 
 ```yaml
 multiscrape:
@@ -62,11 +62,48 @@ multiscrape:
             attribute: href
 ```
 
-## Contributions are welcome!
+## Options
+
+|name|description|required|default|type|
+|---|---|---|---|---|
+|resource|The url for retrieving the site or a template that will output an url.|True||string/template|
+|authentication|Configure HTTP authentication. `basic` or `digest`. Use this with username and password fields. |False||string|
+|username|The username for accessing the url.|False||string|
+|password|The password for accessing the url.|False||string|
+|headers|The headers for the requests.|False||string - list|
+|params|The query params for the requests.|False||string - list|
+|method|The method for the request. Either `POST` or `GET`.|False|GET|string|
+|payload|Optional payload to send with a POST request.|False||string|
+|verify_ssl|Verify the SSL certificate of the endpoint.|False|True|boolean|
+|timeout|Defines max time to wait data from the endpoint.|False|10|int|
+|scan_interval|Determines how often the url will be requested.|False|60|int|
+|parser|Determines the parser to be used with beautifulsoup. Either `lxml` or `html.parser`.|False|lxml|string|
+|sensor|See [Sensor](#sensor)|False||list|
+|binary_sensor|See [Binary sensor](#binary-sensor)|False||list|
+
+
+
+### Sensor
+Configure the sensors that will scrape the data.
+
+|name|description|required|default|type|
+|---|---|---|---|---|
+todo
+
+### Binary sensor
+Configure the binary sensors that will scrape the data.
+
+|name|description|required|default|type|
+|---|---|---|---|---|
+todo
+
+
+
+### Contributions are welcome!
 
 If you want to contribute to this please read the [Contribution guidelines](CONTRIBUTING.md)
 
-## Credits
+### Credits
 
 This project was generated from [@oncleben31](https://github.com/oncleben31)'s [Home Assistant Custom Component Cookiecutter](https://github.com/oncleben31/cookiecutter-homeassistant-custom-component) template.
 
