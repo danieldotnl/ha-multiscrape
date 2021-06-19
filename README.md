@@ -64,54 +64,54 @@ multiscrape:
 
 ## Options
 
-|name|description|required|default|type|
-|---|---|---|---|---|
-|resource|The url for retrieving the site or a template that will output an url.|True||string/template|
-|authentication|Configure HTTP authentication. `basic` or `digest`. Use this with username and password fields. |False||string|
-|username|The username for accessing the url.|False||string|
-|password|The password for accessing the url.|False||string|
-|headers|The headers for the requests.|False||string - list|
-|params|The query params for the requests.|False||string - list|
-|method|The method for the request. Either `POST` or `GET`.|False|GET|string|
-|payload|Optional payload to send with a POST request.|False||string|
-|verify_ssl|Verify the SSL certificate of the endpoint.|False|True|boolean|
-|timeout|Defines max time to wait data from the endpoint.|False|10|int|
-|scan_interval|Determines how often the url will be requested.|False|60|int|
-|parser|Determines the parser to be used with beautifulsoup. Either `lxml` or `html.parser`.|False|lxml|string|
-|sensor|See [Sensor](#sensorbinary-sensor)|False||list|
-|binary_sensor|See [Binary sensor](#sensorbinary-sensor)|False||list|
+Based on latest (pre) release.
 
-
+| name           | description                                                                                     | required | default | type            |
+| -------------- | ----------------------------------------------------------------------------------------------- | -------- | ------- | --------------- |
+| resource       | The url for retrieving the site or a template that will output an url.                          | True     |         | string/template |
+| authentication | Configure HTTP authentication. `basic` or `digest`. Use this with username and password fields. | False    |         | string          |
+| username       | The username for accessing the url.                                                             | False    |         | string          |
+| password       | The password for accessing the url.                                                             | False    |         | string          |
+| headers        | The headers for the requests.                                                                   | False    |         | string - list   |
+| params         | The query params for the requests.                                                              | False    |         | string - list   |
+| method         | The method for the request. Either `POST` or `GET`.                                             | False    | GET     | string          |
+| payload        | Optional payload to send with a POST request.                                                   | False    |         | string          |
+| verify_ssl     | Verify the SSL certificate of the endpoint.                                                     | False    | True    | boolean         |
+| timeout        | Defines max time to wait data from the endpoint.                                                | False    | 10      | int             |
+| scan_interval  | Determines how often the url will be requested.                                                 | False    | 60      | int             |
+| parser         | Determines the parser to be used with beautifulsoup. Either `lxml` or `html.parser`.            | False    | lxml    | string          |
+| sensor         | See [Sensor](#sensorbinary-sensor)                                                              | False    |         | list            |
+| binary_sensor  | See [Binary sensor](#sensorbinary-sensor)                                                       | False    |         | list            |
 
 ### Sensor/Binary Sensor
+
 Configure the sensors that will scrape the data.
 
-|name|description|required|default|type|
-|---|---|---|---|---|
-|unique_id|Will be used as entity_id and enables editing the entity in the UI|False||string|
-|name|Friendly name for the sensor|False||string|
-|select|CSS selector used for retrieving the value of the sensor|True||string|
-|attribute|Attribute from the selected element to read as value|False||string|
-|index|The occurence to read when the selector returns multiple results|False|0|int|
-|value_template|Defines a template applied on the result of the selector to extract the value. For binary sensors, the sensor is on if the template evaluates as True|False||string/template|
-|attributes|See [Sensor attributes](#sensor-attributes)|False||list|
-|unit_of_measurement|Defines the units of measurement of the sensor|False||string|
-|device_class|Sets the device_class for [sensors](https://www.home-assistant.io/integrations/sensor/) or [binary sensors](https://www.home-assistant.io/integrations/binary_sensor/)|False||string|
-|icon|Defines the icon or a template for the icon of the sensor. The value of the selector is provided as input for the template.|False||string/template|
-|force_update|Sends update events even if the value hasn’t changed. Useful if you want to have meaningful value graphs in history.|False|False|boolean|
+| name                | description                                                                                                                                                            | required | default | type            |
+| ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- | ------- | --------------- |
+| unique_id           | Will be used as entity_id and enables editing the entity in the UI                                                                                                     | False    |         | string          |
+| name                | Friendly name for the sensor                                                                                                                                           | False    |         | string          |
+| select              | CSS selector used for retrieving the value of the sensor                                                                                                               | True     |         | string          |
+| attribute           | Attribute from the selected element to read as value                                                                                                                   | False    |         | string          |
+| index               | The occurence to read when the selector returns multiple results                                                                                                       | False    | 0       | int             |
+| value_template      | Defines a template applied on the result of the selector to extract the value. For binary sensors, the sensor is on if the template evaluates as True                  | False    |         | string/template |
+| attributes          | See [Sensor attributes](#sensor-attributes)                                                                                                                            | False    |         | list            |
+| unit_of_measurement | Defines the units of measurement of the sensor                                                                                                                         | False    |         | string          |
+| device_class        | Sets the device_class for [sensors](https://www.home-assistant.io/integrations/sensor/) or [binary sensors](https://www.home-assistant.io/integrations/binary_sensor/) | False    |         | string          |
+| icon                | Defines the icon or a template for the icon of the sensor. The value of the selector is provided as input for the template.                                            | False    |         | string/template |
+| force_update        | Sends update events even if the value hasn’t changed. Useful if you want to have meaningful value graphs in history.                                                   | False    | False   | boolean         |
 
 ### Sensor attributes
+
 Configure the attributes on the sensor that can be set with additional scraping values.
 
-|name|description|required|default|type|
-|---|---|---|---|---|
-|name|Name of the attribute (will be slugified)|True||string|
-|select|CSS selector used for retrieving the value of the attribute|True||string|
-|attribute|Attribute from the selected element to read as value|False||string|
-|index|The occurence to read when the selector returns multiple results|False|0|int|
-|value_template|Defines a template applied on the result of the selector to extract the value|False||string/template|
-
-
+| name           | description                                                                   | required | default | type            |
+| -------------- | ----------------------------------------------------------------------------- | -------- | ------- | --------------- |
+| name           | Name of the attribute (will be slugified)                                     | True     |         | string          |
+| select         | CSS selector used for retrieving the value of the attribute                   | True     |         | string          |
+| attribute      | Attribute from the selected element to read as value                          | False    |         | string          |
+| index          | The occurence to read when the selector returns multiple results              | False    | 0       | int             |
+| value_template | Defines a template applied on the result of the selector to extract the value | False    |         | string/template |
 
 ### Contributions are welcome!
 
