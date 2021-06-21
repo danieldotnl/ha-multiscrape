@@ -6,7 +6,7 @@
   "requirements": ["lxml", "beautifulsoup4==4.9.3"],
   "dependencies": ["rest"],
   "config_flow": false,
-  "version": "4.0.0",
+  "version": "5.0.0",
   "codeowners": ["@danieldotnl"],
   "iot_class": "local_polling"
 }
