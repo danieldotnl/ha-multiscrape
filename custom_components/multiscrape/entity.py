@@ -72,6 +72,7 @@ class MultiscrapeEntity(RestEntity):
 
             _LOGGER.debug("Sensor %s selected: %s", self._name, value)
         except IndexError as exception:
+            self.rest.notify_scrape_exception()
             _LOGGER.error("Sensor %s was unable to extract data from HTML", self._name)
             _LOGGER.debug("Exception: %s", exception)
             return

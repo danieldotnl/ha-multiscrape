@@ -21,6 +21,12 @@ from homeassistant.const import CONF_UNIT_OF_MEASUREMENT
 from homeassistant.const import CONF_VALUE_TEMPLATE
 
 from .const import CONF_ATTR
+from .const import CONF_FORM_INPUT
+from .const import CONF_FORM_RESOURCE
+from .const import CONF_FORM_RESUBMIT_ERROR
+from .const import CONF_FORM_SELECT
+from .const import CONF_FORM_SUBMIT
+from .const import CONF_FORM_SUBMIT_ONCE
 from .const import CONF_INDEX
 from .const import CONF_PARSER
 from .const import CONF_SELECT
@@ -29,6 +35,14 @@ from .const import DEFAULT_BINARY_SENSOR_NAME
 from .const import DEFAULT_PARSER
 from .const import DEFAULT_SENSOR_NAME
 from .const import DOMAIN
+
+FORM_SUBMIT_SCHEMA = {
+    vol.Optional(CONF_FORM_RESOURCE): cv.string,
+    vol.Required(CONF_FORM_SELECT): cv.string,
+    vol.Optional(CONF_FORM_INPUT): vol.Schema({cv.string: cv.string}),
+    vol.Optional(CONF_FORM_SUBMIT_ONCE, default=False): cv.boolean,
+    vol.Optional(CONF_FORM_RESUBMIT_ERROR, default=True): cv.boolean,
+}
 
 RESOURCE_SCHEMA.update({vol.Optional(CONF_PARSER, default=DEFAULT_PARSER): cv.string})
 
@@ -76,6 +90,7 @@ COMBINED_SCHEMA = vol.Schema(
     {
         vol.Optional(CONF_SCAN_INTERVAL): cv.time_period,
         **RESOURCE_SCHEMA,
+        vol.Optional(CONF_FORM_SUBMIT): vol.Schema(FORM_SUBMIT_SCHEMA),
         vol.Optional(SENSOR_DOMAIN): vol.All(
             cv.ensure_list, [vol.Schema(SENSOR_SCHEMA)]
         ),
