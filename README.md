@@ -81,7 +81,7 @@ Based on latest (pre) release.
 | timeout           | Defines max time to wait data from the endpoint.                                                                          | False    | 10      | int           |
 | scan_interval     | Determines how often the url will be requested.                                                                           | False    | 60      | int           |
 | parser            | Determines the parser to be used with beautifulsoup. Either `lxml` or `html.parser`.                                      | False    | lxml    | string        |
-| form_submit | See [Form-submit](#form-submit)|False|||
+| form_submit       | See [Form-submit](#form-submit)                                                                                           | False    |         |               |
 | sensor            | See [Sensor](#sensorbinary-sensor)                                                                                        | False    |         | list          |
 | binary_sensor     | See [Binary sensor](#sensorbinary-sensor)                                                                                 | False    |         | list          |
 
@@ -119,13 +119,13 @@ Configure the attributes on the sensor that can be set with additional scraping 
 
 Configure the form-submit functionality which enables you to submit a (login) form before scraping a site. More details on how this works [can be found on the wiki.](https://github.com/danieldotnl/ha-multiscrape/wiki/Form-submit-functionality)
 
-| name           | description                                                                   | required | default | type            |
-| -------------- | ----------------------------------------------------------------------------- | -------- | ------- | --------------- |
-| resource           | The url for the site with the form                                    | False     |         | string          |
-| select | CSS selector used for selecting the form in the html | True ||string|
-| input | A dictionary with name/values which will be merged with the input fields on the form | False ||string - list |
-| submit_once | Submit the form only once on startup instead of each scan interval | False | False | boolean |
-| resubmit_on_error | Resubmit the form after a scraping error is encountered | False | True| boolean |
+| name              | description                                                                          | required | default | type          |
+| ----------------- | ------------------------------------------------------------------------------------ | -------- | ------- | ------------- |
+| resource          | The url for the site with the form                                                   | False    |         | string        |
+| select            | CSS selector used for selecting the form in the html                                 | True     |         | string        |
+| input             | A dictionary with name/values which will be merged with the input fields on the form | False    |         | string - list |
+| submit_once       | Submit the form only once on startup instead of each scan interval                   | False    | False   | boolean       |
+| resubmit_on_error | Resubmit the form after a scraping error is encountered                              | False    | True    | boolean       |
 
 ### Contributions are welcome!
 
