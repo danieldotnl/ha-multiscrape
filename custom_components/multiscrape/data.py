@@ -63,7 +63,7 @@ class ScrapedRestData(RestData):
             )
 
     def notify_scrape_exception(self):
-        if self._form_resubmit_error:
+        if self._form_submit_config and self._form_resubmit_error:
             self._skip_form = False
 
     async def async_update(self, log_errors=True):
