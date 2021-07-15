@@ -128,6 +128,11 @@ Configure the form-submit functionality which enables you to submit a (login) fo
 | submit_once       | Submit the form only once on startup instead of each scan interval                   | False    | False   | boolean       |
 | resubmit_on_error | Resubmit the form after a scraping error is encountered                              | False    | True    | boolean       |
 
+## Services
+
+For each integration instance, a service will be created to trigger a "manual" scrape run.
+The services are named `multiscrape.trigger_{name of integration}`.
+
 ### Contributions are welcome!
 
 If you want to contribute to this please read the [Contribution guidelines](CONTRIBUTING.md)
