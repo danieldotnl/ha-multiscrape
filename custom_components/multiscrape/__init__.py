@@ -8,8 +8,10 @@ import voluptuous as vol
 from homeassistant.components.binary_sensor import DOMAIN as BINARY_SENSOR_DOMAIN
 from homeassistant.components.sensor import DOMAIN as SENSOR_DOMAIN
 from homeassistant.const import CONF_AUTHENTICATION
+from homeassistant.const import CONF_DESCRIPTION
 from homeassistant.const import CONF_HEADERS
 from homeassistant.const import CONF_METHOD
+from homeassistant.const import CONF_NAME
 from homeassistant.const import CONF_PARAMS
 from homeassistant.const import CONF_PASSWORD
 from homeassistant.const import CONF_PAYLOAD
@@ -23,11 +25,14 @@ from homeassistant.const import HTTP_DIGEST_AUTHENTICATION
 from homeassistant.const import SERVICE_RELOAD
 from homeassistant.core import callback
 from homeassistant.core import HomeAssistant
+from homeassistant.core import ServiceCall
 from homeassistant.helpers import discovery
 from homeassistant.helpers.entity_component import EntityComponent
 from homeassistant.helpers.reload import async_reload_integration_platforms
+from homeassistant.helpers.service import async_set_service_schema
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
+from .const import CONF_FIELDS
 from .const import CONF_FORM_SUBMIT
 from .const import CONF_PARSER
 from .const import COORDINATOR
@@ -82,12 +87,20 @@ async def _async_process_config(hass, config) -> bool:
     refresh_tasks = []
     load_tasks = []
     for rest_idx, conf in enumerate(config[DOMAIN]):
+        name = conf.get(CONF_NAME)
         scan_interval = conf.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)
         resource_template = conf.get(CONF_RESOURCE_TEMPLATE)
         rest = create_rest_data_from_config(hass, conf)
         coordinator = _rest_coordinator(hass, rest, resource_template, scan_interval)
         refresh_tasks.append(coordinator.async_refresh())
         hass.data[DOMAIN][REST_DATA].append({REST: rest, COORDINATOR: coordinator})
+
+        if name:
+            target_name = name
+        else:
+            target_name = f"noname_{rest_idx}"
+
+        await _register_services(hass, target_name, coordinator)
 
         for platform_domain in COORDINATOR_AWARE_PLATFORMS:
             if platform_domain not in conf:
@@ -113,6 +126,27 @@ async def _async_process_config(hass, config) -> bool:
         await asyncio.gather(*load_tasks)
 
     return True
+
+
+async def _register_services(hass, target_name, coordinator):
+    async def _async_trigger_service(service: ServiceCall):
+        _LOGGER.info("Multiscrape triggered by service: %s", service.__repr__())
+        await coordinator.async_request_refresh()
+
+    hass.services.async_register(
+        DOMAIN,
+        target_name,
+        _async_trigger_service,
+        schema=vol.Schema({}),
+    )
+
+    # Register the service description
+    service_desc = {
+        CONF_NAME: f"Trigger an update of {target_name}",
+        CONF_DESCRIPTION: f"Triggers an update for the multiscrape {target_name} integration, independent of the scan interval.",
+        CONF_FIELDS: {},
+    }
+    async_set_service_schema(hass, DOMAIN, target_name, service_desc)
 
 
 async def async_get_config_and_coordinator(hass, platform_domain, discovery_info):

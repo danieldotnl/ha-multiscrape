@@ -21,6 +21,8 @@ CONF_FORM_SUBMIT_ONCE = "submit_once"
 CONF_FORM_RESUBMIT_ERROR = "resubmit_on_error"
 DEFAULT_PARSER = "lxml"
 
+CONF_FIELDS = "fields"
+
 REST_IDX = "rest_idx"
 PLATFORM_IDX = "platform_idx"
 

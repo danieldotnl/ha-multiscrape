@@ -1,3 +1,7 @@
 reload:
   name: Reload
   description: Reload all rest entities and notify services
+
+trigger:
+  name: Trigger
+  description: Trigger a scrape run independent of the scan interval
