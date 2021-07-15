@@ -68,6 +68,7 @@ Based on latest (pre) release.
 
 | name              | description                                                                                                               | required | default | type          |
 | ----------------- | ------------------------------------------------------------------------------------------------------------------------- | -------- | ------- | ------------- |
+| name              | The name for the integration.                                                                                             | False    |         | string        |
 | resource          | The url for retrieving the site or a template that will output an url. Not required when `resource_template` is provided. | True     |         | string        |
 | resource_template | A template that will output an url after being rendered. Only required when `resource` is not provided.                   | True     |         | template      |
 | authentication    | Configure HTTP authentication. `basic` or `digest`. Use this with username and password fields.                           | False    |         | string        |
