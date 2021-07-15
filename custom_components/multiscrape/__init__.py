@@ -31,6 +31,7 @@ from homeassistant.helpers.entity_component import EntityComponent
 from homeassistant.helpers.reload import async_reload_integration_platforms
 from homeassistant.helpers.service import async_set_service_schema
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
+from homeassistant.util import slugify
 
 from .const import CONF_FIELDS
 from .const import CONF_FORM_SUBMIT
@@ -96,7 +97,7 @@ async def _async_process_config(hass, config) -> bool:
         hass.data[DOMAIN][REST_DATA].append({REST: rest, COORDINATOR: coordinator})
 
         if name:
-            target_name = name
+            target_name = slugify(name)
         else:
             target_name = f"noname_{rest_idx}"
 
