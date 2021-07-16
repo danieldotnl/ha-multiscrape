@@ -101,8 +101,12 @@ class ScrapedRestData(RestData):
                 else:
                     await self._async_update_data()
 
-        self.soup = BeautifulSoup(self.data, self._parser)
-        self.soup.prettify()
+        try:
+            self.soup = BeautifulSoup(self.data, self._parser)
+            self.soup.prettify()
+        except Exception as e:
+            _LOGGER.error("Unable to parse response.")
+            _LOGGER.debug("Exception parsing resonse: %s", e)
 
     async def _submit_form(self, resource, method, form_data, log_errors=True):
 
@@ -163,8 +167,9 @@ class ScrapedRestData(RestData):
         return self._resource
 
     def _get_form_data(self, html):
-        soup = BeautifulSoup(html, self._parser)
+
         try:
+            soup = BeautifulSoup(html, self._parser)
             form = soup.select(self._form_select)[0]
             if not form:
                 return
