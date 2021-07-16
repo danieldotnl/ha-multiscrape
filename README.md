@@ -130,7 +130,7 @@ Configure the form-submit functionality which enables you to submit a (login) fo
 
 ## Services
 
-For each integration instance, a service will be created to trigger a "manual" scrape run.
+For each multiscrape instance, a service will be created to trigger a "manual" scrape run.
 The services are named `multiscrape.trigger_{name of integration}`.
 
 ### Contributions are welcome!
