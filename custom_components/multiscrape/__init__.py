@@ -144,7 +144,7 @@ async def _register_services(hass, target_name, coordinator):
     # Register the service description
     service_desc = {
         CONF_NAME: f"Trigger an update of {target_name}",
-        CONF_DESCRIPTION: f"Triggers an update for the multiscrape {target_name} integration, independent of the scan interval.",
+        CONF_DESCRIPTION: f"Triggers an update for the multiscrape {target_name} integration, independent of the update interval.",
         CONF_FIELDS: {},
     }
     async_set_service_schema(hass, DOMAIN, target_name, service_desc)

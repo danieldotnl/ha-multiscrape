@@ -4,4 +4,4 @@ reload:
 
 trigger:
   name: Trigger
-  description: Trigger a scrape run independent of the scan interval
+  description: Trigger a scrape run independent of the update interval
