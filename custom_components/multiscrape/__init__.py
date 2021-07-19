@@ -136,7 +136,7 @@ async def _register_services(hass, target_name, coordinator):
 
     hass.services.async_register(
         DOMAIN,
-        target_name,
+        f"trigger_{target_name}",
         _async_trigger_service,
         schema=vol.Schema({}),
     )
