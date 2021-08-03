@@ -78,6 +78,8 @@ class MultiscrapeEntity(RestEntity):
             return
 
         if value is not None and value_template is not None:
-            value = value_template.async_render_with_possible_json_value(value, None)
+            value = value_template.async_render(
+                variables={"value": value}, parse_result=False
+            )
 
         return value
