@@ -18,6 +18,7 @@ from . import async_get_config_and_coordinator
 from .const import CONF_ATTR
 from .const import CONF_INDEX
 from .const import CONF_SELECT
+from .const import CONF_SELECT_LIST
 from .const import CONF_SENSOR_ATTRS
 from .entity import MultiscrapeEntity
 
@@ -150,6 +151,7 @@ class MultiscrapeBinarySensor(MultiscrapeEntity, BinarySensorEntity):
         value = self._scrape(
             self.rest.soup,
             self._select,
+            None,
             self._attribute,
             self._index,
             self._value_template,
@@ -173,25 +175,39 @@ class MultiscrapeBinarySensor(MultiscrapeEntity, BinarySensorEntity):
                 name = slugify(sensor_attribute.get(CONF_NAME))
 
                 select = sensor_attribute.get(CONF_SELECT)
+                select_list = sensor_attribute.get(CONF_SELECT_LIST)
+
                 if select is not None:
                     select.hass = self._hass
                     select = select.render(parse_result=False)
-                _LOGGER.debug(
-                    "Parsed binary sensor attribute select template: %s", select
-                )
+                    _LOGGER.debug("Parsed sensor attribute select template: %s", select)
+
+                elif select_list is not None:
+                    select_list.hass = self._hass
+                    select_list = select_list.render(parse_result=False)
+                    _LOGGER.debug(
+                        "Parsed sensor attribute select template: %s", select_list
+                    )
+
+                else:
+                    raise ValueError(
+                        "Attribute selector error: either select or select_list should contain a selector."
+                    )
 
                 select_attr = sensor_attribute.get(CONF_ATTR)
                 index = sensor_attribute.get(CONF_INDEX)
-
                 value_template = sensor_attribute.get(CONF_VALUE_TEMPLATE)
                 if value_template:
                     value_template.hass = self._hass
                 attr_value = self._scrape(
-                    self.rest.soup, select, select_attr, index, value_template
+                    self.rest.soup,
+                    select,
+                    select_list,
+                    select_attr,
+                    index,
+                    value_template,
                 )
 
                 self._attributes[name] = attr_value
 
-                _LOGGER.debug(
-                    "Binary sensor attr %s scrape value: %s", name, attr_value
-                )
+                _LOGGER.debug("Sensor attr %s scrape value: %s", name, attr_value)
