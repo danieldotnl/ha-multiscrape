@@ -19,6 +19,7 @@ from . import async_get_config_and_coordinator
 from .const import CONF_ATTR
 from .const import CONF_INDEX
 from .const import CONF_SELECT
+from .const import CONF_SELECT_LIST
 from .const import CONF_SENSOR_ATTRS
 from .entity import MultiscrapeEntity
 
@@ -47,6 +48,7 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
     unit = conf.get(CONF_UNIT_OF_MEASUREMENT)
     device_class = conf.get(CONF_DEVICE_CLASS)
     select_template = conf.get(CONF_SELECT)
+    select_list_template = conf.get(CONF_SELECT_LIST)
     attribute = conf.get(CONF_ATTR)
     index = conf.get(CONF_INDEX)
     value_template = conf.get(CONF_VALUE_TEMPLATE)
@@ -72,6 +74,7 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
                 force_update,
                 resource_template,
                 select_template,
+                select_list_template,
                 attribute,
                 index,
                 sensor_attributes,
@@ -97,6 +100,7 @@ class MultiscrapeSensor(MultiscrapeEntity, SensorEntity):
         force_update,
         resource_template,
         select_template,
+        select_list_template,
         attribute,
         index,
         sensor_attributes,
@@ -119,9 +123,12 @@ class MultiscrapeSensor(MultiscrapeEntity, SensorEntity):
         self._value_template = value_template
         self._attributes = None
         self._select_template = select_template
+        self._select_list_template = select_list_template
         self._attribute = attribute
         self._index = index
         self._sensor_attributes = sensor_attributes
+        self._select = None
+        self._select_list = None
 
         self.entity_id = async_generate_entity_id(
             ENTITY_ID_FORMAT, unique_id or name, hass=hass
@@ -129,6 +136,8 @@ class MultiscrapeSensor(MultiscrapeEntity, SensorEntity):
 
         if self._select_template is not None:
             self._select_template.hass = self._hass
+        if self._select_list_template is not None:
+            self._select_list_template.hass = self._hass
 
     @property
     def unit_of_measurement(self):
@@ -148,12 +157,23 @@ class MultiscrapeSensor(MultiscrapeEntity, SensorEntity):
     def _update_from_rest_data(self):
         """Update state from the rest data."""
 
-        self._select = self._select_template.async_render(parse_result=True)
-        _LOGGER.debug("Rendered select template: %s", self._select)
+        if self._select_template:
+            self._select = self._select_template.async_render(parse_result=True)
+            _LOGGER.debug("Rendered select template: %s", self._select)
+        elif self._select_list_template:
+            self._select_list = self._select_list_template.async_render(
+                parse_result=True
+            )
+            _LOGGER.debug("Rendered select template: %s", self._select_list)
+        else:
+            raise ValueError(
+                "State selector error: either select or select_list should contain a selector."
+            )
 
         value = self._scrape(
             self.rest.soup,
             self._select,
+            self._select_list,
             self._attribute,
             self._index,
             self._value_template,
@@ -171,10 +191,24 @@ class MultiscrapeSensor(MultiscrapeEntity, SensorEntity):
                 name = slugify(sensor_attribute.get(CONF_NAME))
 
                 select = sensor_attribute.get(CONF_SELECT)
+                select_list = sensor_attribute.get(CONF_SELECT_LIST)
+
                 if select is not None:
                     select.hass = self._hass
                     select = select.render(parse_result=False)
-                _LOGGER.debug("Parsed sensor attribute select template: %s", select)
+                    _LOGGER.debug("Parsed sensor attribute select template: %s", select)
+
+                elif select_list is not None:
+                    select_list.hass = self._hass
+                    select_list = select_list.render(parse_result=False)
+                    _LOGGER.debug(
+                        "Parsed sensor attribute select template: %s", select_list
+                    )
+
+                else:
+                    raise ValueError(
+                        "Attribute selector error: either select or select_list should contain a selector."
+                    )
 
                 select_attr = sensor_attribute.get(CONF_ATTR)
                 index = sensor_attribute.get(CONF_INDEX)
@@ -182,7 +216,12 @@ class MultiscrapeSensor(MultiscrapeEntity, SensorEntity):
                 if value_template:
                     value_template.hass = self._hass
                 attr_value = self._scrape(
-                    self.rest.soup, select, select_attr, index, value_template
+                    self.rest.soup,
+                    select,
+                    select_list,
+                    select_attr,
+                    index,
+                    value_template,
                 )
 
                 self._attributes[name] = attr_value

@@ -30,6 +30,7 @@ from .const import CONF_FORM_SUBMIT_ONCE
 from .const import CONF_INDEX
 from .const import CONF_PARSER
 from .const import CONF_SELECT
+from .const import CONF_SELECT_LIST
 from .const import CONF_SENSOR_ATTRS
 from .const import DEFAULT_BINARY_SENSOR_NAME
 from .const import DEFAULT_PARSER
@@ -48,7 +49,8 @@ RESOURCE_SCHEMA.update({vol.Optional(CONF_PARSER, default=DEFAULT_PARSER): cv.st
 
 SENSOR_ATTRIBUTE_SCHEMA = {
     vol.Required(CONF_NAME): cv.string,
-    vol.Required(CONF_SELECT): cv.template,
+    vol.Optional(CONF_SELECT): cv.template,
+    vol.Optional(CONF_SELECT_LIST): cv.template,
     vol.Optional(CONF_ATTR): cv.string,
     vol.Optional(CONF_INDEX, default=0): cv.positive_int,
     vol.Optional(CONF_VALUE_TEMPLATE): cv.template,
@@ -62,7 +64,8 @@ SENSOR_SCHEMA = {
     vol.Optional(CONF_ICON): cv.template,
     vol.Optional(CONF_VALUE_TEMPLATE): cv.template,
     vol.Optional(CONF_FORCE_UPDATE, default=DEFAULT_FORCE_UPDATE): cv.boolean,
-    vol.Required(CONF_SELECT): cv.template,
+    vol.Optional(CONF_SELECT): cv.template,
+    vol.Optional(CONF_SELECT_LIST): cv.template,
     vol.Optional(CONF_ATTR): cv.string,
     vol.Optional(CONF_INDEX, default=0): cv.positive_int,
     vol.Optional(CONF_SENSOR_ATTRS): vol.All(
