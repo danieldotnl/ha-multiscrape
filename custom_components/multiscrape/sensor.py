@@ -167,6 +167,7 @@ class MultiscrapeSensor(MultiscrapeEntity, SensorEntity):
             _LOGGER.debug("Sensor %s selected: %s", self._name, value)
             self._attr_state = value
         except Exception as exception:
+            self._attr_state = None
             _LOGGER.error("Sensor %s was unable to extract data from HTML", self._name)
             _LOGGER.debug("Exception: %s", exception)
 
