@@ -160,7 +160,7 @@ class MultiscrapeBinarySensor(MultiscrapeEntity, BinarySensorEntity):
             }.get(value.lower(), False)
 
         if self._icon_template:
-            self._set_icon(self._is_on)
+            self._set_icon(self._attr_is_on)
 
         if self._sensor_attributes:
             self._attr_extra_state_attributes = {}
