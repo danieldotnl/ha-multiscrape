@@ -214,3 +214,33 @@ class ScrapedRestData(RestData):
                     self._resource,
                     ex,
                 )
+
+    def scrape(self, select, select_list, attribute, index, value_template):
+        try:
+            if select_list is not None:
+                tags = self.soup.select(select_list)
+                if attribute is not None:
+                    values = [tag[attribute] for tag in tags]
+                else:
+                    values = [tag.text for tag in tags]
+                value = ",".join(values)
+
+            else:
+                if attribute is not None:
+                    value = self.soup.select(select)[index][attribute]
+                else:
+                    tag = self.soup.select(select)[index]
+                    if tag.name in ("style", "script", "template"):
+                        value = tag.string
+                    else:
+                        value = tag.text
+
+            if value is not None and value_template is not None:
+                value = value_template.async_render(
+                    variables={"value": value}, parse_result=False
+                )
+
+            return value
+        except Exception:
+            self.notify_scrape_exception()
+            raise

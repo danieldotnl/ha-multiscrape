@@ -148,14 +148,19 @@ class MultiscrapeBinarySensor(MultiscrapeEntity, BinarySensorEntity):
         if self.rest.soup is None:
             self._is_on = False
 
-        value = self._scrape(
-            self.rest.soup,
-            self._select,
-            None,
-            self._attribute,
-            self._index,
-            self._value_template,
-        )
+        try:
+            value = self.rest.scrape(
+                self._select,
+                None,
+                self._attribute,
+                self._index,
+                self._value_template,
+            )
+            _LOGGER.debug("Sensor %s selected: %s", self._name, value)
+            self._state = value
+        except Exception as exception:
+            _LOGGER.error("Sensor %s was unable to extract data from HTML", self._name)
+            _LOGGER.debug("Exception: %s", exception)
 
         try:
             self._is_on = bool(int(value))
@@ -199,8 +204,7 @@ class MultiscrapeBinarySensor(MultiscrapeEntity, BinarySensorEntity):
                 value_template = sensor_attribute.get(CONF_VALUE_TEMPLATE)
                 if value_template:
                     value_template.hass = self._hass
-                attr_value = self._scrape(
-                    self.rest.soup,
+                attr_value = self.rest.scrape(
                     select,
                     select_list,
                     select_attr,

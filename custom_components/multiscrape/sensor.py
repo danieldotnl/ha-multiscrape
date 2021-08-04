@@ -170,15 +170,19 @@ class MultiscrapeSensor(MultiscrapeEntity, SensorEntity):
                 "State selector error: either select or select_list should contain a selector."
             )
 
-        value = self._scrape(
-            self.rest.soup,
-            self._select,
-            self._select_list,
-            self._attribute,
-            self._index,
-            self._value_template,
-        )
-        self._state = value
+        try:
+            value = self.rest.scrape(
+                self._select,
+                self._select_list,
+                self._attribute,
+                self._index,
+                self._value_template,
+            )
+            _LOGGER.debug("Sensor %s selected: %s", self._name, value)
+            self._state = value
+        except Exception as exception:
+            _LOGGER.error("Sensor %s was unable to extract data from HTML", self._name)
+            _LOGGER.debug("Exception: %s", exception)
 
         if self._icon_template:
             self._set_icon(value)
@@ -215,8 +219,8 @@ class MultiscrapeSensor(MultiscrapeEntity, SensorEntity):
                 value_template = sensor_attribute.get(CONF_VALUE_TEMPLATE)
                 if value_template:
                     value_template.hass = self._hass
-                attr_value = self._scrape(
-                    self.rest.soup,
+
+                attr_value = self.rest.scrape(
                     select,
                     select_list,
                     select_attr,

@@ -57,38 +57,3 @@ class MultiscrapeEntity(RestEntity):
             value, None
         )
         _LOGGER.debug("Icon template rendered and set to: %s", self._icon)
-
-    def _scrape(self, content, select, select_list, attribute, index, value_template):
-
-        try:
-            if select_list:
-                tags = content.select(select_list)
-                if attribute is not None:
-                    values = [tag[attribute] for tag in tags]
-                else:
-                    values = [tag.text for tag in tags]
-                value = ",".join(values)
-
-            else:
-                if attribute is not None:
-                    value = content.select(select)[index][attribute]
-                else:
-                    tag = content.select(select)[index]
-                    if tag.name in ("style", "script", "template"):
-                        value = tag.string
-                    else:
-                        value = tag.text
-
-            _LOGGER.debug("Sensor %s selected: %s", self._name, value)
-        except IndexError as exception:
-            self.rest.notify_scrape_exception()
-            _LOGGER.error("Sensor %s was unable to extract data from HTML", self._name)
-            _LOGGER.debug("Exception: %s", exception)
-            return
-
-        if value is not None and value_template is not None:
-            value = value_template.async_render(
-                variables={"value": value}, parse_result=False
-            )
-
-        return value
