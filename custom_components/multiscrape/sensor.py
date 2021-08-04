@@ -118,8 +118,7 @@ class MultiscrapeSensor(MultiscrapeEntity, SensorEntity):
             icon_template,
         )
         self._state = None
-        self._unique_id = unique_id
-        self._unit_of_measurement = unit_of_measurement
+        self._attr_unit_of_measurement = unit_of_measurement
         self._value_template = value_template
         self._attributes = None
         self._select_template = select_template
@@ -130,6 +129,8 @@ class MultiscrapeSensor(MultiscrapeEntity, SensorEntity):
         self._select = None
         self._select_list = None
 
+        self._attr_unique_id = unique_id
+
         self.entity_id = async_generate_entity_id(
             ENTITY_ID_FORMAT, unique_id or name, hass=hass
         )
@@ -138,21 +139,6 @@ class MultiscrapeSensor(MultiscrapeEntity, SensorEntity):
             self._select_template.hass = self._hass
         if self._select_list_template is not None:
             self._select_list_template.hass = self._hass
-
-    @property
-    def unit_of_measurement(self):
-        """Return the unit the value is expressed in."""
-        return self._unit_of_measurement
-
-    @property
-    def state(self):
-        """Return the state of the device."""
-        return self._state
-
-    @property
-    def extra_state_attributes(self):
-        """Return the state attributes."""
-        return self._attributes
 
     def _update_from_scraper_data(self):
         """Update state from the scraper data."""
@@ -179,7 +165,7 @@ class MultiscrapeSensor(MultiscrapeEntity, SensorEntity):
                 self._value_template,
             )
             _LOGGER.debug("Sensor %s selected: %s", self._name, value)
-            self._state = value
+            self._attr_state = value
         except Exception as exception:
             _LOGGER.error("Sensor %s was unable to extract data from HTML", self._name)
             _LOGGER.debug("Exception: %s", exception)
@@ -188,7 +174,7 @@ class MultiscrapeSensor(MultiscrapeEntity, SensorEntity):
             self._set_icon(value)
 
         if self._sensor_attributes:
-            self._attributes = {}
+            self._attr_extra_state_attributes = {}
 
             for idx, sensor_attribute in enumerate(self._sensor_attributes):
 
@@ -228,6 +214,6 @@ class MultiscrapeSensor(MultiscrapeEntity, SensorEntity):
                     value_template,
                 )
 
-                self._attributes[name] = attr_value
+                self._attr_extra_state_attributes[name] = attr_value
 
                 _LOGGER.debug("Sensor attr %s scrape value: %s", name, attr_value)

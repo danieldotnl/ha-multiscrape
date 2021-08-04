@@ -31,54 +31,25 @@ class MultiscrapeEntity(Entity):
         self.coordinator = coordinator
         self.scraper = scraper
         self._name = name
-        self._device_class = device_class
-        self._resource_template = resource_template
-        self._force_update = force_update
+
+        self._attr_name = name
+        self._attr_device_class = device_class
+        self._attr_force_update = force_update
+        self._attr_should_poll = False
 
         self._hass = hass
-        self._icon = None
+        self._resource_template = resource_template
         self._icon_template = icon_template
         if self._icon_template:
             self._icon_template.hass = hass
-        self._unique_id = None
 
         super().__init__()
 
-    @property
-    def unique_id(self):
-        """Return the unique id of this sensor."""
-        return self._unique_id
-
-    @property
-    def icon(self):
-        """Return the icon to use in the frontend, if any."""
-        return self._icon
-
     def _set_icon(self, value):
-        self._icon = self._icon_template.async_render_with_possible_json_value(
+        self._attr_icon = self._icon_template.async_render_with_possible_json_value(
             value, None
         )
-        _LOGGER.debug("Icon template rendered and set to: %s", self._icon)
-
-    @property
-    def name(self):
-        """Return the name of the sensor."""
-        return self._name
-
-    @property
-    def device_class(self):
-        """Return the class of this sensor."""
-        return self._device_class
-
-    @property
-    def force_update(self):
-        """Force update."""
-        return self._force_update
-
-    @property
-    def should_poll(self) -> bool:
-        """Poll only if we do noty have a coordinator."""
-        return not self.coordinator
+        _LOGGER.debug("Icon template rendered and set to: %s", self._attr_icon)
 
     @property
     def available(self):

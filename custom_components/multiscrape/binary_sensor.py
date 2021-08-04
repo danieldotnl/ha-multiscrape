@@ -111,16 +111,14 @@ class MultiscrapeBinarySensor(MultiscrapeEntity, BinarySensorEntity):
             force_update,
             icon_template,
         )
-        self._state = False
         self._previous_data = None
         self._value_template = value_template
-        self._is_on = None
-        self._unique_id = unique_id
         self._select_template = select_template
         self._attribute = attribute
         self._index = index
-        self._attributes = None
         self._sensor_attributes = sensor_attributes
+
+        self._attr_unique_id = unique_id
 
         self.entity_id = async_generate_entity_id(
             ENTITY_ID_FORMAT, unique_id or name, hass=hass
@@ -128,16 +126,6 @@ class MultiscrapeBinarySensor(MultiscrapeEntity, BinarySensorEntity):
 
         if self._select_template is not None:
             self._select_template.hass = self._hass
-
-    @property
-    def extra_state_attributes(self):
-        """Return the state attributes."""
-        return self._attributes
-
-    @property
-    def is_on(self):
-        """Return true if the binary sensor is on."""
-        return self._is_on
 
     def _update_from_scraper_data(self):
         """Update state from the scraped data."""
@@ -157,23 +145,25 @@ class MultiscrapeBinarySensor(MultiscrapeEntity, BinarySensorEntity):
                 self._value_template,
             )
             _LOGGER.debug("Sensor %s selected: %s", self._name, value)
-            self._state = value
         except Exception as exception:
             _LOGGER.error("Sensor %s was unable to extract data from HTML", self._name)
             _LOGGER.debug("Exception: %s", exception)
 
         try:
-            self._is_on = bool(int(value))
+            self._attr_is_on = bool(int(value))
         except ValueError:
-            self._is_on = {"true": True, "on": True, "open": True, "yes": True}.get(
-                value.lower(), False
-            )
+            self._attr_is_on = {
+                "true": True,
+                "on": True,
+                "open": True,
+                "yes": True,
+            }.get(value.lower(), False)
 
         if self._icon_template:
             self._set_icon(self._is_on)
 
         if self._sensor_attributes:
-            self._attributes = {}
+            self._attr_extra_state_attributes = {}
 
             for idx, sensor_attribute in enumerate(self._sensor_attributes):
 
@@ -212,6 +202,6 @@ class MultiscrapeBinarySensor(MultiscrapeEntity, BinarySensorEntity):
                     value_template,
                 )
 
-                self._attributes[name] = attr_value
+                self._attr_extra_state_attributes[name] = attr_value
 
                 _LOGGER.debug("Sensor attr %s scrape value: %s", name, attr_value)
