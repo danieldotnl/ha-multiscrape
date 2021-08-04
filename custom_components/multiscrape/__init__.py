@@ -39,11 +39,11 @@ from .const import CONF_PARSER
 from .const import COORDINATOR
 from .const import DOMAIN
 from .const import PLATFORM_IDX
-from .const import REST
-from .const import REST_DATA
-from .const import REST_IDX
-from .data import ScrapedRestData
+from .const import SCRAPER
+from .const import SCRAPER_DATA
+from .const import SCRAPER_IDX
 from .schema import CONFIG_SCHEMA  # noqa: F401
+from .scraper import Scraper
 
 _LOGGER = logging.getLogger(__name__)
 # we don't want to go with the default 15 seconds defined in helpers/entity_component
@@ -76,30 +76,36 @@ async def async_setup(hass: HomeAssistant, config: dict):
 
 @callback
 def _async_setup_shared_data(hass: HomeAssistant):
-    """Create shared data for platform config and rest coordinators."""
-    hass.data[DOMAIN] = {key: [] for key in [REST_DATA, *COORDINATOR_AWARE_PLATFORMS]}
+    """Create shared data for platform config and scraper coordinators."""
+    hass.data[DOMAIN] = {
+        key: [] for key in [SCRAPER_DATA, *COORDINATOR_AWARE_PLATFORMS]
+    }
 
 
 async def _async_process_config(hass, config) -> bool:
-    """Process rest configuration."""
+    """Process scraper configuration."""
     if DOMAIN not in config:
         return True
 
     refresh_tasks = []
     load_tasks = []
-    for rest_idx, conf in enumerate(config[DOMAIN]):
+    for scraper_idx, conf in enumerate(config[DOMAIN]):
         name = conf.get(CONF_NAME)
         scan_interval = conf.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)
         resource_template = conf.get(CONF_RESOURCE_TEMPLATE)
-        rest = create_rest_data_from_config(hass, conf)
-        coordinator = _rest_coordinator(hass, rest, resource_template, scan_interval)
+        scraper = create_scraper_data_from_config(hass, conf)
+        coordinator = _scraper_coordinator(
+            hass, scraper, resource_template, scan_interval
+        )
         refresh_tasks.append(coordinator.async_refresh())
-        hass.data[DOMAIN][REST_DATA].append({REST: rest, COORDINATOR: coordinator})
+        hass.data[DOMAIN][SCRAPER_DATA].append(
+            {SCRAPER: scraper, COORDINATOR: coordinator}
+        )
 
         if name:
             target_name = slugify(name)
         else:
-            target_name = f"noname_{rest_idx}"
+            target_name = f"noname_{scraper_idx}"
 
         await _register_services(hass, target_name, coordinator)
 
@@ -115,7 +121,7 @@ async def _async_process_config(hass, config) -> bool:
                     hass,
                     platform_domain,
                     DOMAIN,
-                    {REST_IDX: rest_idx, PLATFORM_IDX: platform_idx},
+                    {SCRAPER_IDX: scraper_idx, PLATFORM_IDX: platform_idx},
                     config,
                 )
                 load_tasks.append(load)
@@ -152,37 +158,37 @@ async def _register_services(hass, target_name, coordinator):
 
 async def async_get_config_and_coordinator(hass, platform_domain, discovery_info):
     """Get the config and coordinator for the platform from discovery."""
-    shared_data = hass.data[DOMAIN][REST_DATA][discovery_info[REST_IDX]]
+    shared_data = hass.data[DOMAIN][SCRAPER_DATA][discovery_info[SCRAPER_IDX]]
     conf = hass.data[DOMAIN][platform_domain][discovery_info[PLATFORM_IDX]]
     coordinator = shared_data[COORDINATOR]
-    rest = shared_data[REST]
-    if rest.data is None:
+    scraper = shared_data[SCRAPER]
+    if scraper.data is None:
         await coordinator.async_request_refresh()
-    return conf, coordinator, rest
+    return conf, coordinator, scraper
 
 
-def _rest_coordinator(hass, rest, resource_template, update_interval):
-    """Wrap a DataUpdateCoordinator around the rest object."""
+def _scraper_coordinator(hass, scraper, resource_template, update_interval):
+    """Wrap a DataUpdateCoordinator around the scraper object."""
     if resource_template:
 
         async def _async_refresh_with_resource_template():
-            rest.set_url(resource_template.async_render(parse_result=False))
-            await rest.async_update()
+            scraper.set_url(resource_template.async_render(parse_result=False))
+            await scraper.async_update()
 
         update_method = _async_refresh_with_resource_template
     else:
-        update_method = rest.async_update
+        update_method = scraper.async_update
 
     return DataUpdateCoordinator(
         hass,
         _LOGGER,
-        name="rest data",
+        name="scraper data",
         update_method=update_method,
         update_interval=update_interval,
     )
 
 
-def create_rest_data_from_config(hass, config):
+def create_scraper_data_from_config(hass, config):
     """Create RestData from config."""
     resource = config.get(CONF_RESOURCE)
     resource_template = config.get(CONF_RESOURCE_TEMPLATE)
@@ -209,7 +215,7 @@ def create_rest_data_from_config(hass, config):
     else:
         auth = None
 
-    return ScrapedRestData(
+    return Scraper(
         hass,
         method,
         resource,

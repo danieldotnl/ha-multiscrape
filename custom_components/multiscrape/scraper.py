@@ -4,7 +4,6 @@ from urllib.parse import urljoin
 
 import httpx
 from bs4 import BeautifulSoup
-from homeassistant.components.rest.data import RestData
 from homeassistant.helpers.httpx_client import get_async_client
 
 from .const import CONF_FORM_INPUT
@@ -18,8 +17,8 @@ DEFAULT_TIMEOUT = 10
 _LOGGER = logging.getLogger(__name__)
 
 
-class ScrapedRestData(RestData):
-    """Class for handling the data retrieval."""
+class Scraper:
+    """Class for handling the retrieval and scraping of data."""
 
     def __init__(
         self,
@@ -65,6 +64,10 @@ class ScrapedRestData(RestData):
     def notify_scrape_exception(self):
         if self._form_submit_config and self._form_resubmit_error:
             self._skip_form = False
+
+    def set_url(self, url):
+        """Set url."""
+        self._resource = url
 
     async def async_update(self, log_errors=True):
         """Get the latest data from REST service with provided method."""

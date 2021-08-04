@@ -29,18 +29,18 @@ ENTITY_ID_FORMAT = SENSOR_DOMAIN + ".{}"
 
 async def async_setup_platform(hass, config, async_add_entities, discovery_info=None):
     """Set up the multiscrape sensor."""
-    # Must update the sensor now (including fetching the rest resource) to
+    # Must update the sensor now (including fetching the scraper resource) to
     # ensure it's updating its state.
     if discovery_info is not None:
-        conf, coordinator, rest = await async_get_config_and_coordinator(
+        conf, coordinator, scraper = await async_get_config_and_coordinator(
             hass, SENSOR_DOMAIN, discovery_info
         )
     else:
         _LOGGER.error("Could not find sensor configuration")
 
-    if rest.data is None:
-        if rest.last_exception:
-            raise PlatformNotReady from rest.last_exception
+    if scraper.data is None:
+        if scraper.last_exception:
+            raise PlatformNotReady from scraper.last_exception
         raise PlatformNotReady
 
     name = conf.get(CONF_NAME)
@@ -65,7 +65,7 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
             MultiscrapeSensor(
                 hass,
                 coordinator,
-                rest,
+                scraper,
                 unique_id,
                 name,
                 unit,
@@ -91,7 +91,7 @@ class MultiscrapeSensor(MultiscrapeEntity, SensorEntity):
         self,
         hass,
         coordinator,
-        rest,
+        scraper,
         unique_id,
         name,
         unit_of_measurement,
@@ -110,7 +110,7 @@ class MultiscrapeSensor(MultiscrapeEntity, SensorEntity):
         super().__init__(
             hass,
             coordinator,
-            rest,
+            scraper,
             name,
             device_class,
             resource_template,
@@ -154,8 +154,8 @@ class MultiscrapeSensor(MultiscrapeEntity, SensorEntity):
         """Return the state attributes."""
         return self._attributes
 
-    def _update_from_rest_data(self):
-        """Update state from the rest data."""
+    def _update_from_scraper_data(self):
+        """Update state from the scraper data."""
 
         if self._select_template:
             self._select = self._select_template.async_render(parse_result=True)
@@ -171,7 +171,7 @@ class MultiscrapeSensor(MultiscrapeEntity, SensorEntity):
             )
 
         try:
-            value = self.rest.scrape(
+            value = self.scraper.scrape(
                 self._select,
                 self._select_list,
                 self._attribute,
@@ -220,7 +220,7 @@ class MultiscrapeSensor(MultiscrapeEntity, SensorEntity):
                 if value_template:
                     value_template.hass = self._hass
 
-                attr_value = self.rest.scrape(
+                attr_value = self.scraper.scrape(
                     select,
                     select_list,
                     select_attr,

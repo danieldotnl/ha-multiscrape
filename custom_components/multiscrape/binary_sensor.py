@@ -28,18 +28,18 @@ _LOGGER = logging.getLogger(__name__)
 
 async def async_setup_platform(hass, config, async_add_entities, discovery_info=None):
     """Set up the multiscrape binary sensor."""
-    # Must update the sensor now (including fetching the rest resource) to
+    # Must update the sensor now (including fetching the scraper resource) to
     # ensure it's updating its state.
     if discovery_info is not None:
-        conf, coordinator, rest = await async_get_config_and_coordinator(
+        conf, coordinator, scraper = await async_get_config_and_coordinator(
             hass, BINARY_SENSOR_DOMAIN, discovery_info
         )
     else:
         _LOGGER.error("Could not find sensor configuration")
 
-    if rest.data is None:
-        if rest.last_exception:
-            raise PlatformNotReady from rest.last_exception
+    if scraper.data is None:
+        if scraper.last_exception:
+            raise PlatformNotReady from scraper.last_exception
         raise PlatformNotReady
 
     name = conf.get(CONF_NAME)
@@ -62,7 +62,7 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
             MultiscrapeBinarySensor(
                 hass,
                 coordinator,
-                rest,
+                scraper,
                 unique_id,
                 name,
                 device_class,
@@ -86,7 +86,7 @@ class MultiscrapeBinarySensor(MultiscrapeEntity, BinarySensorEntity):
         self,
         hass,
         coordinator,
-        rest,
+        scraper,
         unique_id,
         name,
         device_class,
@@ -104,7 +104,7 @@ class MultiscrapeBinarySensor(MultiscrapeEntity, BinarySensorEntity):
         super().__init__(
             hass,
             coordinator,
-            rest,
+            scraper,
             name,
             device_class,
             resource_template,
@@ -139,17 +139,17 @@ class MultiscrapeBinarySensor(MultiscrapeEntity, BinarySensorEntity):
         """Return true if the binary sensor is on."""
         return self._is_on
 
-    def _update_from_rest_data(self):
+    def _update_from_scraper_data(self):
         """Update state from the scraped data."""
 
         self._select = self._select_template.async_render(parse_result=False)
         _LOGGER.debug("Parsed select template: %s", self._select)
 
-        if self.rest.soup is None:
+        if self.scraper.soup is None:
             self._is_on = False
 
         try:
-            value = self.rest.scrape(
+            value = self.scraper.scrape(
                 self._select,
                 None,
                 self._attribute,
@@ -204,7 +204,7 @@ class MultiscrapeBinarySensor(MultiscrapeEntity, BinarySensorEntity):
                 value_template = sensor_attribute.get(CONF_VALUE_TEMPLATE)
                 if value_template:
                     value_template.hass = self._hass
-                attr_value = self.rest.scrape(
+                attr_value = self.scraper.scrape(
                     select,
                     select_list,
                     select_attr,

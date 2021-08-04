@@ -1,4 +1,4 @@
-"""The rest component constants."""
+"""The scraper component constants."""
 
 DOMAIN = "multiscrape"
 
@@ -24,12 +24,12 @@ DEFAULT_PARSER = "lxml"
 
 CONF_FIELDS = "fields"
 
-REST_IDX = "rest_idx"
+SCRAPER_IDX = "scraper_idx"
 PLATFORM_IDX = "platform_idx"
 
 COORDINATOR = "coordinator"
-REST = "rest"
+SCRAPER = "scraper"
 
-REST_DATA = "rest_data"
+SCRAPER_DATA = "scraper_data"
 
 METHODS = ["POST", "GET"]
