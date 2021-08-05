@@ -46,8 +46,8 @@ class MultiscrapeEntity(Entity):
         super().__init__()
 
     def _set_icon(self, value):
-        self._attr_icon = self._icon_template.async_render_with_possible_json_value(
-            value, None
+        self._attr_icon = self._icon_template.async_render(
+            variables={"value": value}, parse_result=False
         )
         _LOGGER.debug("Icon template rendered and set to: %s", self._attr_icon)
 
