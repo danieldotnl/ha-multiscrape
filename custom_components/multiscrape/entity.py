@@ -25,6 +25,7 @@ class MultiscrapeEntity(Entity):
         resource_template,
         force_update,
         icon_template,
+        attribute_selectors,
     ) -> None:
         """Create the entity that may have a coordinator."""
 
@@ -38,6 +39,7 @@ class MultiscrapeEntity(Entity):
         self._attr_should_poll = False
 
         self._hass = hass
+        self._attribute_selectors = attribute_selectors
         self._resource_template = resource_template
         self._icon_template = icon_template
         if self._icon_template:
@@ -54,7 +56,8 @@ class MultiscrapeEntity(Entity):
     async def async_added_to_hass(self) -> None:
         """When entity is added to hass."""
         await super().async_added_to_hass()
-        self._update_from_scraper_data()
+        self._update_sensor()
+        self._update_attributes()
         if self.coordinator:
             self.async_on_remove(
                 self.coordinator.async_add_listener(self._handle_coordinator_update)
@@ -63,27 +66,34 @@ class MultiscrapeEntity(Entity):
     @callback
     def _handle_coordinator_update(self) -> None:
         """Handle updated data from the coordinator."""
-        self._update_from_scraper_data()
-        self.async_write_ha_state()
-
-    async def async_update(self):
-        """Get the latest data from scraper resource and update the state."""
-        if self.coordinator:
-            await self.coordinator.async_request_refresh()
-            return
-
-        if self._resource_template is not None:
-            self.scraper.set_url(
-                self._resource_template.async_render(parse_result=False)
-            )
-        await self.scraper.async_update()
-        self._update_from_scraper_data()
-
         if not self.coordinator.last_update_success:
             self._attr_available = False
         else:
             self._attr_available = self.scraper.data is not None
+            self._update_sensor()
+            self._update_attributes()
+        self.async_write_ha_state()
 
     @abstractmethod
-    def _update_from_scraper_data(self):
+    def _update_sensor(self):
         """Update state from the scraper data."""
+
+    def _update_attributes(self):
+        self._attr_extra_state_attributes = {}
+        for name, attr_selector in self._attribute_selectors.items():
+            try:
+                attr_value = self.scraper.scrape(attr_selector)
+                self._attr_extra_state_attributes[name] = attr_value
+                _LOGGER.debug(
+                    "Sensor %s attribute %s scraped value: %s",
+                    self._name,
+                    name,
+                    attr_value,
+                )
+            except Exception as exception:
+                _LOGGER.error(
+                    "Sensor %s attribute %s was unable to extract data from HTML",
+                    self._name,
+                    name,
+                )
+                _LOGGER.debug("Exception: %s", exception)

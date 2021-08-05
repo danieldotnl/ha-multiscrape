@@ -218,28 +218,30 @@ class Scraper:
                     ex,
                 )
 
-    def scrape(self, select, select_list, attribute, index, value_template):
+    def scrape(self, selector):
         try:
-            if select_list is not None:
-                tags = self.soup.select(select_list)
-                if attribute is not None:
-                    values = [tag[attribute] for tag in tags]
+            if selector.is_list:
+                tags = self.soup.select(selector.list)
+                if selector.attribute is not None:
+                    values = [tag[selector.attribute] for tag in tags]
                 else:
                     values = [tag.text for tag in tags]
                 value = ",".join(values)
 
             else:
-                if attribute is not None:
-                    value = self.soup.select(select)[index][attribute]
+                if selector.attribute is not None:
+                    value = self.soup.select(selector.element)[selector.index][
+                        selector.attribute
+                    ]
                 else:
-                    tag = self.soup.select(select)[index]
+                    tag = self.soup.select(selector.element)[selector.index]
                     if tag.name in ("style", "script", "template"):
                         value = tag.string
                     else:
                         value = tag.text
 
-            if value is not None and value_template is not None:
-                value = value_template.async_render(
+            if value is not None and selector.value_template is not None:
+                value = selector.value_template.async_render(
                     variables={"value": value}, parse_result=False
                 )
 
