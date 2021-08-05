@@ -65,7 +65,7 @@ FORM_SUBMIT_SCHEMA = {
     vol.Optional(CONF_FORM_RESUBMIT_ERROR, default=True): cv.boolean,
 }
 
-RESOURCE_SCHEMA = {
+INTEGRATION_SCHEMA = {
     vol.Exclusive(CONF_RESOURCE, CONF_RESOURCE): cv.url,
     vol.Exclusive(CONF_RESOURCE_TEMPLATE, CONF_RESOURCE): cv.template,
     vol.Optional(CONF_AUTHENTICATION): vol.In(
@@ -80,16 +80,19 @@ RESOURCE_SCHEMA = {
     vol.Optional(CONF_VERIFY_SSL, default=DEFAULT_VERIFY_SSL): cv.boolean,
     vol.Optional(CONF_TIMEOUT, default=DEFAULT_TIMEOUT): cv.positive_int,
     vol.Optional(CONF_PARSER, default=DEFAULT_PARSER): cv.string,
+    vol.Optional(CONF_NAME): cv.string,
+    vol.Optional(CONF_SCAN_INTERVAL): cv.time_period,
 }
 
-SENSOR_ATTRIBUTE_SCHEMA = {
-    vol.Required(CONF_NAME): cv.string,
+SELECTOR_SCHEMA = {
     vol.Optional(CONF_SELECT): cv.template,
     vol.Optional(CONF_SELECT_LIST): cv.template,
     vol.Optional(CONF_ATTR): cv.string,
     vol.Optional(CONF_INDEX, default=0): cv.positive_int,
     vol.Optional(CONF_VALUE_TEMPLATE): cv.template,
 }
+
+SENSOR_ATTRIBUTE_SCHEMA = {vol.Required(CONF_NAME): cv.string, **SELECTOR_SCHEMA}
 
 SENSOR_SCHEMA = {
     vol.Optional(CONF_NAME, default=DEFAULT_SENSOR_NAME): cv.string,
@@ -98,12 +101,8 @@ SENSOR_SCHEMA = {
     vol.Optional(CONF_DEVICE_CLASS): SENSOR_DEVICE_CLASSES_SCHEMA,
     vol.Optional(CONF_STATE_CLASS): SENSOR_STATE_CLASSES_SCHEMA,
     vol.Optional(CONF_ICON): cv.template,
-    vol.Optional(CONF_VALUE_TEMPLATE): cv.template,
     vol.Optional(CONF_FORCE_UPDATE, default=DEFAULT_FORCE_UPDATE): cv.boolean,
-    vol.Optional(CONF_SELECT): cv.template,
-    vol.Optional(CONF_SELECT_LIST): cv.template,
-    vol.Optional(CONF_ATTR): cv.string,
-    vol.Optional(CONF_INDEX, default=0): cv.positive_int,
+    **SELECTOR_SCHEMA,
     vol.Optional(CONF_SENSOR_ATTRS): vol.All(
         cv.ensure_list, [vol.Schema(SENSOR_ATTRIBUTE_SCHEMA)]
     ),
@@ -114,11 +113,8 @@ BINARY_SENSOR_SCHEMA = {
     vol.Optional(CONF_UNIQUE_ID): cv.string,
     vol.Optional(CONF_DEVICE_CLASS): BINARY_SENSOR_DEVICE_CLASSES_SCHEMA,
     vol.Optional(CONF_ICON): cv.template,
-    vol.Optional(CONF_VALUE_TEMPLATE): cv.template,
     vol.Optional(CONF_FORCE_UPDATE, default=DEFAULT_FORCE_UPDATE): cv.boolean,
-    vol.Required(CONF_SELECT): cv.template,
-    vol.Optional(CONF_ATTR): cv.string,
-    vol.Optional(CONF_INDEX, default=0): cv.positive_int,
+    **SELECTOR_SCHEMA,
     vol.Optional(CONF_SENSOR_ATTRS): vol.All(
         cv.ensure_list, [vol.Schema(SENSOR_ATTRIBUTE_SCHEMA)]
     ),
@@ -127,9 +123,7 @@ BINARY_SENSOR_SCHEMA = {
 
 COMBINED_SCHEMA = vol.Schema(
     {
-        vol.Optional(CONF_NAME): cv.string,
-        vol.Optional(CONF_SCAN_INTERVAL): cv.time_period,
-        **RESOURCE_SCHEMA,
+        **INTEGRATION_SCHEMA,
         vol.Optional(CONF_FORM_SUBMIT): vol.Schema(FORM_SUBMIT_SCHEMA),
         vol.Optional(SENSOR_DOMAIN): vol.All(
             cv.ensure_list, [vol.Schema(SENSOR_SCHEMA)]
