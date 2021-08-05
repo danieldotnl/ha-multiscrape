@@ -51,13 +51,6 @@ class MultiscrapeEntity(Entity):
         )
         _LOGGER.debug("Icon template rendered and set to: %s", self._attr_icon)
 
-    @property
-    def available(self):
-        """Return the availability of this sensor."""
-        if self.coordinator and not self.coordinator.last_update_success:
-            return False
-        return self.scraper.data is not None
-
     async def async_added_to_hass(self) -> None:
         """When entity is added to hass."""
         await super().async_added_to_hass()
@@ -85,6 +78,11 @@ class MultiscrapeEntity(Entity):
             )
         await self.scraper.async_update()
         self._update_from_scraper_data()
+
+        if not self.coordinator.last_update_success:
+            self._attr_available = False
+        else:
+            self._attr_available = self.scraper.data is not None
 
     @abstractmethod
     def _update_from_scraper_data(self):
