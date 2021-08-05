@@ -8,6 +8,8 @@ DEFAULT_FORCE_UPDATE = False
 
 DEFAULT_BINARY_SENSOR_NAME = "Multiscrape Binary Sensor"
 DEFAULT_SENSOR_NAME = "Multiscrape Sensor"
+
+CONF_STATE_CLASS = "state_class"
 CONF_PARSER = "parser"
 CONF_SELECT = "select"
 CONF_SELECT_LIST = "select_list"

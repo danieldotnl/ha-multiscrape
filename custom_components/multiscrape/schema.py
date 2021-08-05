@@ -9,6 +9,9 @@ from homeassistant.components.sensor import (
     DEVICE_CLASSES_SCHEMA as SENSOR_DEVICE_CLASSES_SCHEMA,
 )
 from homeassistant.components.sensor import DOMAIN as SENSOR_DOMAIN
+from homeassistant.components.sensor import (
+    STATE_CLASSES_SCHEMA as SENSOR_STATE_CLASSES_SCHEMA,
+)
 from homeassistant.const import CONF_AUTHENTICATION
 from homeassistant.const import CONF_DEVICE_CLASS
 from homeassistant.const import CONF_FORCE_UPDATE
@@ -43,6 +46,7 @@ from .const import CONF_PARSER
 from .const import CONF_SELECT
 from .const import CONF_SELECT_LIST
 from .const import CONF_SENSOR_ATTRS
+from .const import CONF_STATE_CLASS
 from .const import DEFAULT_BINARY_SENSOR_NAME
 from .const import DEFAULT_FORCE_UPDATE
 from .const import DEFAULT_METHOD
@@ -92,6 +96,7 @@ SENSOR_SCHEMA = {
     vol.Optional(CONF_UNIQUE_ID): cv.string,
     vol.Optional(CONF_UNIT_OF_MEASUREMENT): cv.string,
     vol.Optional(CONF_DEVICE_CLASS): SENSOR_DEVICE_CLASSES_SCHEMA,
+    vol.Optional(CONF_STATE_CLASS): SENSOR_STATE_CLASSES_SCHEMA,
     vol.Optional(CONF_ICON): cv.template,
     vol.Optional(CONF_VALUE_TEMPLATE): cv.template,
     vol.Optional(CONF_FORCE_UPDATE, default=DEFAULT_FORCE_UPDATE): cv.boolean,

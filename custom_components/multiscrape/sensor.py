@@ -21,6 +21,7 @@ from .const import CONF_INDEX
 from .const import CONF_SELECT
 from .const import CONF_SELECT_LIST
 from .const import CONF_SENSOR_ATTRS
+from .const import CONF_STATE_CLASS
 from .entity import MultiscrapeEntity
 
 _LOGGER = logging.getLogger(__name__)
@@ -47,6 +48,7 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
     unique_id = conf.get(CONF_UNIQUE_ID)
     unit = conf.get(CONF_UNIT_OF_MEASUREMENT)
     device_class = conf.get(CONF_DEVICE_CLASS)
+    state_class = conf.get(CONF_STATE_CLASS)
     select_template = conf.get(CONF_SELECT)
     select_list_template = conf.get(CONF_SELECT_LIST)
     attribute = conf.get(CONF_ATTR)
@@ -70,6 +72,7 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
                 name,
                 unit,
                 device_class,
+                state_class,
                 value_template,
                 force_update,
                 resource_template,
@@ -96,6 +99,7 @@ class MultiscrapeSensor(MultiscrapeEntity, SensorEntity):
         name,
         unit_of_measurement,
         device_class,
+        state_class,
         value_template,
         force_update,
         resource_template,
@@ -117,7 +121,7 @@ class MultiscrapeSensor(MultiscrapeEntity, SensorEntity):
             force_update,
             icon_template,
         )
-        self._state = None
+        self._attr_state_class = state_class
         self._attr_unit_of_measurement = unit_of_measurement
         self._value_template = value_template
         self._attributes = None
