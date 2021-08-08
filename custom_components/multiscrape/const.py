@@ -10,6 +10,13 @@ DEFAULT_BINARY_SENSOR_NAME = "Multiscrape Binary Sensor"
 DEFAULT_SENSOR_NAME = "Multiscrape Sensor"
 
 CONF_STATE_CLASS = "state_class"
+CONF_ON_ERROR = "on_error"
+CONF_ON_ERROR_LOG = "log"
+CONF_ON_ERROR_VALUE = "value"
+CONF_ON_ERROR_VALUE_LAST = "last"
+CONF_ON_ERROR_VALUE_NONE = "none"
+CONF_ON_ERROR_VALUE_DEFAULT = "default"
+CONF_ON_ERROR_DEFAULT = "default"
 CONF_PARSER = "parser"
 CONF_SELECT = "select"
 CONF_SELECT_LIST = "select_list"
@@ -35,3 +42,19 @@ SCRAPER = "scraper"
 SCRAPER_DATA = "scraper_data"
 
 METHODS = ["POST", "GET"]
+
+LOG_ERROR = "error"
+LOG_WARNING = "warning"
+LOG_INFO = "info"
+LOG_FALSE = False
+LOG_LEVELS = {
+    LOG_INFO: 20,
+    LOG_WARNING: 30,
+    LOG_ERROR: 40,
+    LOG_FALSE: False,
+    "false": False,
+    "False": False,
+}
+
+DEFAULT_ON_ERROR_LOG = LOG_ERROR
+DEFAULT_ON_ERROR_VALUE = CONF_ON_ERROR_VALUE_NONE

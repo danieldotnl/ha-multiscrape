@@ -42,6 +42,13 @@ from .const import CONF_FORM_SELECT
 from .const import CONF_FORM_SUBMIT
 from .const import CONF_FORM_SUBMIT_ONCE
 from .const import CONF_INDEX
+from .const import CONF_ON_ERROR
+from .const import CONF_ON_ERROR_DEFAULT
+from .const import CONF_ON_ERROR_LOG
+from .const import CONF_ON_ERROR_VALUE
+from .const import CONF_ON_ERROR_VALUE_DEFAULT
+from .const import CONF_ON_ERROR_VALUE_LAST
+from .const import CONF_ON_ERROR_VALUE_NONE
 from .const import CONF_PARSER
 from .const import CONF_SELECT
 from .const import CONF_SELECT_LIST
@@ -54,6 +61,8 @@ from .const import DEFAULT_PARSER
 from .const import DEFAULT_SENSOR_NAME
 from .const import DEFAULT_VERIFY_SSL
 from .const import DOMAIN
+from .const import LOG_ERROR
+from .const import LOG_LEVELS
 from .const import METHODS
 from .scraper import DEFAULT_TIMEOUT
 
@@ -84,12 +93,27 @@ INTEGRATION_SCHEMA = {
     vol.Optional(CONF_SCAN_INTERVAL): cv.time_period,
 }
 
+ON_ERROR_SCHEMA = {
+    vol.Optional(CONF_ON_ERROR_LOG, default=LOG_ERROR): vol.In(
+        [key for key in LOG_LEVELS.keys()]
+    ),
+    vol.Optional(CONF_ON_ERROR_VALUE, default=CONF_ON_ERROR_VALUE_NONE): vol.In(
+        [
+            CONF_ON_ERROR_VALUE_LAST,
+            CONF_ON_ERROR_VALUE_NONE,
+            CONF_ON_ERROR_VALUE_DEFAULT,
+        ]
+    ),
+    vol.Optional(CONF_ON_ERROR_DEFAULT): cv.template,
+}
+
 SELECTOR_SCHEMA = {
     vol.Optional(CONF_SELECT): cv.template,
     vol.Optional(CONF_SELECT_LIST): cv.template,
     vol.Optional(CONF_ATTR): cv.string,
     vol.Optional(CONF_INDEX, default=0): cv.positive_int,
     vol.Optional(CONF_VALUE_TEMPLATE): cv.template,
+    vol.Optional(CONF_ON_ERROR): vol.Schema(ON_ERROR_SCHEMA),
 }
 
 SENSOR_ATTRIBUTE_SCHEMA = {vol.Required(CONF_NAME): cv.string, **SELECTOR_SCHEMA}
@@ -119,7 +143,6 @@ BINARY_SENSOR_SCHEMA = {
         cv.ensure_list, [vol.Schema(SENSOR_ATTRIBUTE_SCHEMA)]
     ),
 }
-
 
 COMBINED_SCHEMA = vol.Schema(
     {

@@ -14,7 +14,11 @@ from homeassistant.helpers.entity import async_generate_entity_id
 from homeassistant.util import slugify
 
 from . import async_get_config_and_coordinator
+from .const import CONF_ON_ERROR_VALUE_DEFAULT
+from .const import CONF_ON_ERROR_VALUE_LAST
+from .const import CONF_ON_ERROR_VALUE_NONE
 from .const import CONF_SENSOR_ATTRS
+from .const import LOG_LEVELS
 from .entity import MultiscrapeEntity
 from .selector import Selector
 
@@ -31,7 +35,7 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
             hass, BINARY_SENSOR_DOMAIN, discovery_info
         )
     else:
-        _LOGGER.error("Could not find sensor configuration")
+        _LOGGER.info("Could not find binary_sensor configuration")
 
     if scraper.data is None:
         if scraper.last_exception:
@@ -129,6 +133,17 @@ class MultiscrapeBinarySensor(MultiscrapeEntity, BinarySensorEntity):
             if self._icon_template:
                 self._set_icon(value)
         except Exception as exception:
-            self._attr_state = None
-            _LOGGER.error("Sensor %s was unable to extract data from HTML", self._name)
-            _LOGGER.debug("Exception: %s", exception)
+            _LOGGER.debug("Exception selecting sensor data: %s", exception)
+
+            if self._sensor_selector.on_error.log in LOG_LEVELS.keys():
+                level = LOG_LEVELS[self._sensor_selector.on_error.log]
+                _LOGGER.log(
+                    level, "Sensor %s was unable to extract data from HTML", self._name
+                )
+
+            if self._sensor_selector.on_error.value == CONF_ON_ERROR_VALUE_NONE:
+                self._attr_state = None
+            elif self._sensor_selector.on_error.value == CONF_ON_ERROR_VALUE_LAST:
+                return
+            elif self._sensor_selector.on_error.value == CONF_ON_ERROR_VALUE_DEFAULT:
+                self._attr_state = self._sensor_selector.on_error_default
