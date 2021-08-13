@@ -106,6 +106,7 @@ Configure the sensors that will scrape the data.
 | state_class         | Defines the state class of the sensor, if any. Only possible value currently is `measurement`. Set this if your sensor represents a measurement of the current value (so not a daily aggregate etc). (not for binary_sensor) | False    | None    | string          |
 | icon                | Defines the icon or a template for the icon of the sensor. The value of the selector is provided as input for the template. For binary sensors, the value is parsed in a boolean.                                            | False    |         | string/template |
 | force_update        | Sends update events even if the value hasn’t changed. Useful if you want to have meaningful value graphs in history.                                                                                                         | False    | False   | boolean         |
+| on_error            | See [On-error](#on-error)                                                                                                                                                                                                    | False    |         |                 |
 
 ### Sensor attributes
 
@@ -119,6 +120,7 @@ Configure the attributes on the sensor that can be set with additional scraping 
 | attribute      | Attribute from the selected element to read as value                                                                              | False    |         | string          |
 | index          | The occurence to read when the selector returns multiple results                                                                  | False    | 0       | int             |
 | value_template | Defines a template applied on the result of the selector to extract the value                                                     | False    |         | string/template |
+| on_error       | See [On-error](#on-error)                                                                                                         | False    |         |                 |
 
 ### Form-submit
 
@@ -131,6 +133,16 @@ Configure the form-submit functionality which enables you to submit a (login) fo
 | input             | A dictionary with name/values which will be merged with the input fields on the form | False    |         | string - list |
 | submit_once       | Submit the form only once on startup instead of each scan interval                   | False    | False   | boolean       |
 | resubmit_on_error | Resubmit the form after a scraping error is encountered                              | False    | True    | boolean       |
+
+### On-error
+
+Configure what should happen in case of a scraping error (the css selector does not return a value).
+
+| name    | description                                                                                                                                                                                                                                                             | required | default | type   |
+| ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- | ------- | ------ |
+| log     | Determines if and how something should be logged in case of a scraping error. Value can be either 'false', 'info', 'warning' or 'error'.                                                                                                                                | False    | error   | string |
+| value   | Determines what value the sensor/attribute should get in case of a scraping error. The value can be 'last' meaning that the value does not change, 'none' which results in HA showing 'Unkown' on the sensor, or 'default' which will show the specified default value. | False    | none    | string |
+| default | The default value to be used when the on-error value is set to 'default'.                                                                                                                                                                                               | False    |         | string |
 
 ## Services
 
