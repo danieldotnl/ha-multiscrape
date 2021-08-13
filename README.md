@@ -13,9 +13,10 @@
 [![Discord][discord-shield]][discord]
 [![Community Forum][forum-shield]][forum]
 
-## BREAKING CHANGE in release 4.0.0
+## Important note
 
-If you are upgrading to release 4.0.0, see the [upgrade notes](https://github.com/danieldotnl/ha-multiscrape/wiki/Upgrade-notes-for-3.x-to-4.x).
+If you don't manage to scrape the value you are looking for, please use the home assistant forum. I cannot give everyone personal assistance and please don't create github issues unless you are sure there is a bug.
+Check the [wiki](https://github.com/danieldotnl/ha-multiscrape/wiki) for a scraping guide and other details on the functionality of this component.
 
 # HA MultiScrape custom component
 
