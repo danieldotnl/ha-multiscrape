@@ -127,7 +127,7 @@ class MultiscrapeSensor(MultiscrapeEntity, SensorEntity):
         try:
             value = self.scraper.scrape(self._sensor_selector)
             _LOGGER.debug("Sensor %s selected: %s", self._name, value)
-            self._attr_state = value
+            self._attr_native_value = value
 
             if self._icon_template:
                 self._set_icon(value)
@@ -141,8 +141,8 @@ class MultiscrapeSensor(MultiscrapeEntity, SensorEntity):
                 )
 
             if self._sensor_selector.on_error.value == CONF_ON_ERROR_VALUE_NONE:
-                self._attr_state = None
+                self._attr_native_value = None
             elif self._sensor_selector.on_error.value == CONF_ON_ERROR_VALUE_LAST:
                 return
             elif self._sensor_selector.on_error.value == CONF_ON_ERROR_VALUE_DEFAULT:
-                self._attr_state = self._sensor_selector.on_error_default
+                self._attr_native_value = self._sensor_selector.on_error_default
