@@ -8,6 +8,7 @@ DEFAULT_FORCE_UPDATE = False
 
 DEFAULT_BINARY_SENSOR_NAME = "Multiscrape Binary Sensor"
 DEFAULT_SENSOR_NAME = "Multiscrape Sensor"
+DEFAULT_BUTTON_NAME = "Multiscrape Refresh Button"
 
 CONF_STATE_CLASS = "state_class"
 CONF_ON_ERROR = "on_error"

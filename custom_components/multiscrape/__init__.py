@@ -6,7 +6,9 @@ from datetime import timedelta
 import httpx
 import voluptuous as vol
 from homeassistant.components.binary_sensor import DOMAIN as BINARY_SENSOR_DOMAIN
+from homeassistant.components.button import DOMAIN as BUTTON_DOMAIN
 from homeassistant.components.sensor import DOMAIN as SENSOR_DOMAIN
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_AUTHENTICATION
 from homeassistant.const import CONF_DESCRIPTION
 from homeassistant.const import CONF_HEADERS
@@ -49,11 +51,11 @@ _LOGGER = logging.getLogger(__name__)
 # we don't want to go with the default 15 seconds defined in helpers/entity_component
 DEFAULT_SCAN_INTERVAL = timedelta(seconds=60)
 
-PLATFORMS = ["binary_sensor", "sensor"]
-COORDINATOR_AWARE_PLATFORMS = [SENSOR_DOMAIN, BINARY_SENSOR_DOMAIN]
+PLATFORMS = ["binary_sensor", "sensor", "button"]
+COORDINATOR_AWARE_PLATFORMS = [SENSOR_DOMAIN, BINARY_SENSOR_DOMAIN, BUTTON_DOMAIN]
 
 
-async def async_setup(hass: HomeAssistant, config: dict):
+async def async_setup(hass: HomeAssistant, entry: ConfigEntry):
     """Set up the multiscrape platforms."""
     component = EntityComponent(_LOGGER, DOMAIN, hass)
     _async_setup_shared_data(hass)
@@ -71,7 +73,7 @@ async def async_setup(hass: HomeAssistant, config: dict):
         DOMAIN, SERVICE_RELOAD, reload_service_handler, schema=vol.Schema({})
     )
 
-    return await _async_process_config(hass, config)
+    return await _async_process_config(hass, entry)
 
 
 @callback
