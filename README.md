@@ -86,6 +86,7 @@ Based on latest (pre) release.
 | form_submit       | See [Form-submit](#form-submit)                                                                                           | False    |         |               |
 | sensor            | See [Sensor](#sensorbinary-sensor)                                                                                        | False    |         | list          |
 | binary_sensor     | See [Binary sensor](#sensorbinary-sensor)                                                                                 | False    |         | list          |
+| button            | See [Refresh button](#refresh-button)                                                                                     | False    |         | list          |
 
 ### Sensor/Binary Sensor
 
@@ -107,6 +108,15 @@ Configure the sensors that will scrape the data.
 | icon                | Defines the icon or a template for the icon of the sensor. The value of the selector is provided as input for the template. For binary sensors, the value is parsed in a boolean. | False    |         | string/template |
 | force_update        | Sends update events even if the value hasn’t changed. Useful if you want to have meaningful value graphs in history.                                                              | False    | False   | boolean         |
 | on_error            | See [On-error](#on-error)                                                                                                                                                         | False    |         |                 |
+
+### Refresh button
+
+Configure a refresh button to manually trigger scraping.
+
+| name      | description                                                        | required | default | type   |
+| --------- | ------------------------------------------------------------------ | -------- | ------- | ------ |
+| unique_id | Will be used as entity_id and enables editing the entity in the UI | False    |         | string |
+| name      | Friendly name for the button                                       | False    |         | string |
 
 ### Sensor attributes
 
@@ -146,7 +156,7 @@ Configure what should happen in case of a scraping error (the css selector does 
 
 ## Services
 
-For each multiscrape instance, a service will be created to trigger a "manual" scrape run.
+For each multiscrape instance, a service will be created to trigger a scrape run through an automation. (For manual triggering, the button entity can now be configured.)
 The services are named `multiscrape.trigger_{name of integration}`.
 
 ### Contributions are welcome!
