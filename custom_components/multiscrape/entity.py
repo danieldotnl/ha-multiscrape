@@ -29,6 +29,7 @@ class MultiscrapeEntity(Entity):
         resource_template,
         force_update,
         icon_template,
+        picture,
         attribute_selectors,
     ) -> None:
         """Create the entity that may have a coordinator."""
@@ -42,6 +43,7 @@ class MultiscrapeEntity(Entity):
         self._attr_force_update = force_update
         self._attr_should_poll = False
         self._attr_extra_state_attributes = {}
+        self._attr_entity_picture = picture
 
         self._hass = hass
         self._attribute_selectors = attribute_selectors

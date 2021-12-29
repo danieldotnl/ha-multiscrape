@@ -17,6 +17,7 @@ from . import async_get_config_and_coordinator
 from .const import CONF_ON_ERROR_VALUE_DEFAULT
 from .const import CONF_ON_ERROR_VALUE_LAST
 from .const import CONF_ON_ERROR_VALUE_NONE
+from .const import CONF_PICTURE
 from .const import CONF_SENSOR_ATTRS
 from .const import LOG_LEVELS
 from .entity import MultiscrapeEntity
@@ -48,6 +49,7 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
     force_update = conf.get(CONF_FORCE_UPDATE)
     resource_template = conf.get(CONF_RESOURCE_TEMPLATE)
     icon_template = conf.get(CONF_ICON)
+    picture = conf.get(CONF_PICTURE)
 
     sensor_selector = Selector(hass, conf)
     attribute_selectors = {}
@@ -67,6 +69,7 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
                 force_update,
                 resource_template,
                 icon_template,
+                picture,
                 sensor_selector,
                 attribute_selectors,
             )
@@ -88,6 +91,7 @@ class MultiscrapeBinarySensor(MultiscrapeEntity, BinarySensorEntity):
         force_update,
         resource_template,
         icon_template,
+        picture,
         sensor_selector,
         attribute_selectors,
     ):
@@ -102,6 +106,7 @@ class MultiscrapeBinarySensor(MultiscrapeEntity, BinarySensorEntity):
             resource_template,
             force_update,
             icon_template,
+            picture,
             attribute_selectors,
         )
 
