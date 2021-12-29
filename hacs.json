@@ -1,5 +1,5 @@
 {
-  "name": "Multiscrape - A Home Assistant custom scraping component",
+  "name": "Multiscrape",
   "hacs": "1.6.0",
   "domains": ["sensor", "binary_sensor", "button"],
   "iot_class": "Local Polling",
