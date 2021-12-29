@@ -106,7 +106,7 @@ Configure the sensors that will scrape the data.
 | device_class        | Sets the device_class for [sensors](https://www.home-assistant.io/integrations/sensor/) or [binary sensors](https://www.home-assistant.io/integrations/binary_sensor/)            | False    |         | string          |
 | state_class         | Defines the state class of the sensor, if any. (measurement, total or total_increasing) (not for binary_sensor)                                                                   | False    | None    | string          |
 | icon                | Defines the icon or a template for the icon of the sensor. The value of the selector is provided as input for the template. For binary sensors, the value is parsed in a boolean. | False    |         | string/template |
-| picture             | Contains a path to a local image and will set it as entity picture                                                                                                                | False    | None    | string          |
+| picture             | Contains a path to a local image and will set it as entity picture                                                                                                                | False    |         | string          |
 | force_update        | Sends update events even if the value hasn’t changed. Useful if you want to have meaningful value graphs in history.                                                              | False    | False   | boolean         |
 | on_error            | See [On-error](#on-error)                                                                                                                                                         | False    |         |                 |
 
