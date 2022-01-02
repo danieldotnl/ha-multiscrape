@@ -29,7 +29,7 @@ class Selector:
             and not self.value_template
         ):
             raise ValueError(
-                "Selector error: either select, select_list or a value template should be provided."
+                "Selector error: either select, select_list or a value_template should be provided."
             )
 
         if self.value_template is not None:

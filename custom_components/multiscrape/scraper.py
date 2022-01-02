@@ -221,7 +221,10 @@ class Scraper:
     def scrape(self, selector):
         try:
             if selector.just_value:
-                return selector.value_template.async_render(parse_result=False)
+                _LOGGER.debug("Applying value_template only.")
+                return selector.value_template.async_render_with_possible_json_value(
+                    self.data, None
+                )
 
             if selector.is_list:
                 tags = self.soup.select(selector.list)
