@@ -194,7 +194,7 @@ def create_scraper_data_from_config(hass, config):
     """Create RestData from config."""
     resource = config.get(CONF_RESOURCE)
     resource_template = config.get(CONF_RESOURCE_TEMPLATE)
-    method = config.get(CONF_METHOD)
+    method = config.get(CONF_METHOD).lower()
     payload = config.get(CONF_PAYLOAD)
     verify_ssl = config.get(CONF_VERIFY_SSL)
     username = config.get(CONF_USERNAME)

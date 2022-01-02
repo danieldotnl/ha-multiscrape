@@ -43,7 +43,7 @@ SCRAPER = "scraper"
 
 SCRAPER_DATA = "scraper_data"
 
-METHODS = ["POST", "GET"]
+METHODS = ["POST", "GET", "post", "get"]
 
 LOG_ERROR = "error"
 LOG_WARNING = "warning"
