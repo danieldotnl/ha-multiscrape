@@ -25,7 +25,6 @@ from homeassistant.const import CONF_USERNAME
 from homeassistant.const import CONF_VERIFY_SSL
 from homeassistant.const import HTTP_DIGEST_AUTHENTICATION
 from homeassistant.const import SERVICE_RELOAD
-from homeassistant.core import callback
 from homeassistant.core import HomeAssistant
 from homeassistant.core import ServiceCall
 from homeassistant.helpers import discovery
@@ -57,6 +56,7 @@ COORDINATOR_AWARE_PLATFORMS = [SENSOR_DOMAIN, BINARY_SENSOR_DOMAIN, BUTTON_DOMAI
 
 async def async_setup(hass: HomeAssistant, entry: ConfigEntry):
     """Set up the multiscrape platforms."""
+    _LOGGER.debug("# Start loading multiscrape")
     component = EntityComponent(_LOGGER, DOMAIN, hass)
     _async_setup_shared_data(hass)
 
@@ -72,11 +72,11 @@ async def async_setup(hass: HomeAssistant, entry: ConfigEntry):
     hass.services.async_register(
         DOMAIN, SERVICE_RELOAD, reload_service_handler, schema=vol.Schema({})
     )
+    _LOGGER.debug("# Reload service registered")
 
     return await _async_process_config(hass, entry)
 
 
-@callback
 def _async_setup_shared_data(hass: HomeAssistant):
     """Create shared data for platform config and scraper coordinators."""
     hass.data[DOMAIN] = {
@@ -86,19 +86,24 @@ def _async_setup_shared_data(hass: HomeAssistant):
 
 async def _async_process_config(hass, config) -> bool:
     """Process scraper configuration."""
+
+    _LOGGER.debug("# Start processing config from configuration.yaml")
     if DOMAIN not in config:
+        _LOGGER.debug("# Multiscrape not found in config")
         return True
 
     refresh_tasks = []
     load_tasks = []
     for scraper_idx, conf in enumerate(config[DOMAIN]):
         name = conf.get(CONF_NAME)
+        _LOGGER.debug("%s # Setting up multiscrape with config:\n %s", name, conf)
         scan_interval = conf.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)
         resource_template = conf.get(CONF_RESOURCE_TEMPLATE)
         scraper = create_scraper_data_from_config(hass, conf)
-        coordinator = _scraper_coordinator(
-            hass, scraper, resource_template, scan_interval
+        coordinator = _create_scraper_coordinator(
+            hass, name, scraper, resource_template, scan_interval
         )
+
         refresh_tasks.append(coordinator.async_refresh())
         hass.data[DOMAIN][SCRAPER_DATA].append(
             {SCRAPER: scraper, COORDINATOR: coordinator}
@@ -169,12 +174,18 @@ async def async_get_config_and_coordinator(hass, platform_domain, discovery_info
     return conf, coordinator, scraper
 
 
-def _scraper_coordinator(hass, scraper, resource_template, update_interval):
+def _create_scraper_coordinator(
+    hass, name, scraper, resource_template, update_interval
+):
     """Wrap a DataUpdateCoordinator around the scraper object."""
+
     if resource_template:
+        _LOGGER.debug("%s # Setup coordinator", name)
 
         async def _async_refresh_with_resource_template():
-            scraper.set_url(resource_template.async_render(parse_result=False))
+            resource = resource_template.async_render(parse_result=False)
+            _LOGGER.debug("%s # Rendered resource template into: %s", name, resource)
+            scraper.set_url(resource)
             await scraper.async_update()
 
         update_method = _async_refresh_with_resource_template
@@ -192,6 +203,7 @@ def _scraper_coordinator(hass, scraper, resource_template, update_interval):
 
 def create_scraper_data_from_config(hass, config):
     """Create RestData from config."""
+    name = config.get(CONF_NAME)
     resource = config.get(CONF_RESOURCE)
     resource_template = config.get(CONF_RESOURCE_TEMPLATE)
     method = config.get(CONF_METHOD).lower()
@@ -208,17 +220,20 @@ def create_scraper_data_from_config(hass, config):
     if resource_template is not None:
         resource_template.hass = hass
         resource = resource_template.async_render(parse_result=False)
+        _LOGGER.debug("%s # Rendered resource template into: %s", name, resource)
 
     if username and password:
         if config.get(CONF_AUTHENTICATION) == HTTP_DIGEST_AUTHENTICATION:
             auth = httpx.DigestAuth(username, password)
         else:
             auth = (username, password)
+        _LOGGER.debug("%s # Authentication configuration processed", name)
     else:
         auth = None
 
     return Scraper(
         hass,
+        name,
         method,
         resource,
         auth,

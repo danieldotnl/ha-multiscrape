@@ -23,10 +23,11 @@ class Scraper:
     def __init__(
         self,
         hass,
+        name,
         method,
         resource,
         auth,
-        headers,
+        request_headers,
         params,
         data,
         verify_ssl,
@@ -35,11 +36,14 @@ class Scraper:
         timeout=DEFAULT_TIMEOUT,
     ):
         """Initialize the data object."""
+        _LOGGER.debug("%s # Initializing scraper", name)
+
         self._hass = hass
+        self._name = name
         self._method = method
         self._resource = resource
         self._auth = auth
-        self._headers = headers
+        self._request_headers = request_headers
         self._params = params
         self._request_data = data
         self._timeout = timeout
@@ -49,10 +53,12 @@ class Scraper:
         self._form_submit_config = form_submit_config
         self.data = None
         self.last_exception = None
-        self.headers = None
+        self.response_headers = None
         self._skip_form = False
+        self._log_response = False
 
         if form_submit_config:
+            _LOGGER.debug("%s # Found form-submit config", self._name)
             self._form_resource = self._form_submit_config.get(CONF_FORM_RESOURCE)
             self._form_select = self._form_submit_config.get(CONF_FORM_SELECT)
             self._form_input = self._form_submit_config.get(CONF_FORM_INPUT)
@@ -71,6 +77,7 @@ class Scraper:
 
     async def async_update(self, log_errors=True):
         """Get the latest data from REST service with provided method."""
+        _LOGGER.debug("%s # Update triggered", self._name)
         if not self._async_client:
             self._async_client = get_async_client(
                 self._hass, verify_ssl=self._verify_ssl
@@ -78,14 +85,25 @@ class Scraper:
 
         if self._form_submit_config is None or self._skip_form:
             if self._skip_form:
-                _LOGGER.debug("Skip submitting form for resource: %s", self._resource)
+                _LOGGER.debug(
+                    "%s # Skip submitting form for resource: %s because it was already submitted and submit_once is True",
+                    self._name,
+                    self._resource,
+                )
+
             await self._async_update_data()
 
         else:
+            _LOGGER.debug("%s # Continuing with form-submit functionality", self._name)
             page = await self._async_get_form_page()
+            _LOGGER.debug("%s # Loaded page with form: %s", self._name, page)
             form = self._get_form_data(page)
 
             if not form:
+                _LOGGER.debug(
+                    "%s # Could not find form. Continue trying to load target page",
+                    self._name,
+                )
                 await self._async_update_data()
             else:
                 form_action = form[0]
@@ -121,7 +139,7 @@ class Scraper:
             response = await self._async_client.request(
                 method,
                 resource,
-                headers=self._headers,
+                headers=self._request_headers,
                 params=self._params,
                 auth=self._auth,
                 data=form_data,
@@ -138,27 +156,42 @@ class Scraper:
                 )
 
     async def _async_update_data(self, log_errors=True):
-        _LOGGER.debug("Updating from %s", self._resource)
+        _LOGGER.debug("%s # Updating from %s", self._name, self._resource)
         try:
             response = await self._async_client.request(
                 self._method,
                 self._resource,
-                headers=self._headers,
+                headers=self._request_headers,
                 params=self._params,
                 auth=self._auth,
                 data=self._request_data,
                 timeout=self._timeout,
             )
             self.data = response.text
-            self.headers = response.headers
+            self.response_headers = response.headers
+            _LOGGER.debug(
+                "%s # Response status code received: %s",
+                self._name,
+                response.status_code,
+            )
+            if self._log_response:
+                _LOGGER.debug(
+                    "%s # Response headers received %s",
+                    self._name,
+                    self.response_headers,
+                )
+                _LOGGER.debug("%s # Response data received:%s", self._name, self.data)
         except httpx.RequestError as ex:
             if log_errors:
                 _LOGGER.error(
-                    "Error fetching data: %s failed with %s", self._resource, ex
+                    "%s # Error fetching data: %s failed with %s",
+                    self._name,
+                    self._resource,
+                    ex,
                 )
             self.last_exception = ex
             self.data = None
-            self.headers = None
+            self.response_headers = None
 
     def _determine_submit_resource(self, action):
         if action and self._form_resource:
@@ -198,12 +231,12 @@ class Scraper:
 
         resource = self._form_resource if self._form_resource else self._resource
 
-        _LOGGER.debug("Updating from %s", resource)
+        _LOGGER.debug("%s # Fetching page with form, from %s", self._name, resource)
         try:
             return await self._async_client.request(
                 "GET",
                 resource,
-                headers=self._headers,
+                headers=self._request_headers,
                 params=self._params,
                 auth=self._auth,
                 data=self._request_data,
@@ -213,7 +246,8 @@ class Scraper:
         except httpx.RequestError as ex:
             if log_errors:
                 _LOGGER.error(
-                    "Error fetching form resource: %s failed with %s",
+                    "%s # Error fetching form page form url: %s.\n Error message: %s",
+                    self._name,
                     self._resource,
                     ex,
                 )
