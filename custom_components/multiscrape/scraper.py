@@ -67,8 +67,17 @@ class Scraper:
                 CONF_FORM_RESUBMIT_ERROR
             )
 
+        if not self._async_client:
+            self._async_client = get_async_client(
+                self._hass, verify_ssl=self._verify_ssl
+            )
+
     def notify_scrape_exception(self):
         if self._form_submit_config and self._form_resubmit_error:
+            _LOGGER.debug(
+                "%s # Exception occurred, will resubmit the form next interval.",
+                self._name,
+            )
             self._skip_form = False
 
     def set_url(self, url):
@@ -78,10 +87,6 @@ class Scraper:
     async def async_update(self, log_errors=True):
         """Get the latest data from REST service with provided method."""
         _LOGGER.debug("%s # Update triggered", self._name)
-        if not self._async_client:
-            self._async_client = get_async_client(
-                self._hass, verify_ssl=self._verify_ssl
-            )
 
         if self._form_submit_config is None or self._skip_form:
             if self._skip_form:

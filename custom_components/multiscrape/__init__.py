@@ -92,14 +92,23 @@ async def _async_process_config(hass, config) -> bool:
         _LOGGER.debug("# Multiscrape not found in config")
         return True
 
+    noname_counter = 0
     refresh_tasks = []
     load_tasks = []
+
     for scraper_idx, conf in enumerate(config[DOMAIN]):
         name = conf.get(CONF_NAME)
+        if name is None:
+            name = f"Scraper_noname_{noname_counter}"
+            noname_counter += 1
+            _LOGGER.debug(
+                "# Found no name for scraper, generated a temporary name: %s", name
+            )
+
         _LOGGER.debug("%s # Setting up multiscrape with config:\n %s", name, conf)
         scan_interval = conf.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)
         resource_template = conf.get(CONF_RESOURCE_TEMPLATE)
-        scraper = create_scraper_data_from_config(hass, conf)
+        scraper = create_scraper_data_from_config(hass, name, conf)
         coordinator = _create_scraper_coordinator(
             hass, name, scraper, resource_template, scan_interval
         )
@@ -201,9 +210,8 @@ def _create_scraper_coordinator(
     )
 
 
-def create_scraper_data_from_config(hass, config):
+def create_scraper_data_from_config(hass, name, config):
     """Create RestData from config."""
-    name = config.get(CONF_NAME)
     resource = config.get(CONF_RESOURCE)
     resource_template = config.get(CONF_RESOURCE_TEMPLATE)
     method = config.get(CONF_METHOD).lower()
