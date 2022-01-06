@@ -31,6 +31,7 @@ CONF_FORM_INPUT = "input"
 CONF_FORM_RESOURCE = "resource"
 CONF_FORM_SUBMIT_ONCE = "submit_once"
 CONF_FORM_RESUBMIT_ERROR = "resubmit_on_error"
+CONF_LOG_RESPONSE = "log_response"
 DEFAULT_PARSER = "lxml"
 
 CONF_FIELDS = "fields"
@@ -57,6 +58,7 @@ LOG_LEVELS = {
     "false": False,
     "False": False,
 }
+
 
 DEFAULT_ON_ERROR_LOG = LOG_ERROR
 DEFAULT_ON_ERROR_VALUE = CONF_ON_ERROR_VALUE_NONE

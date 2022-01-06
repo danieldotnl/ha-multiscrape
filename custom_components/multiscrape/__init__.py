@@ -36,6 +36,7 @@ from homeassistant.util import slugify
 
 from .const import CONF_FIELDS
 from .const import CONF_FORM_SUBMIT
+from .const import CONF_LOG_RESPONSE
 from .const import CONF_PARSER
 from .const import COORDINATOR
 from .const import DOMAIN
@@ -224,6 +225,7 @@ def create_scraper_data_from_config(hass, name, config):
     parser = config.get(CONF_PARSER)
     timeout = config.get(CONF_TIMEOUT)
     form_submit = config.get(CONF_FORM_SUBMIT)
+    log_response = config.get(CONF_LOG_RESPONSE)
 
     if resource_template is not None:
         resource_template.hass = hass
@@ -252,4 +254,5 @@ def create_scraper_data_from_config(hass, name, config):
         parser,
         form_submit,
         timeout,
+        log_response,
     )
