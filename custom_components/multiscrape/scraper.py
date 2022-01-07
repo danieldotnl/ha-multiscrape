@@ -193,7 +193,8 @@ class Scraper:
             )
             self.data = response.text
             _LOGGER.debug(
-                "%s # Data succesfully refreshed. Sensors will now start scraping to update."
+                "%s # Data succesfully refreshed. Sensors will now start scraping to update.",
+                self._name,
             )
         except Exception as ex:
             _LOGGER.error(
