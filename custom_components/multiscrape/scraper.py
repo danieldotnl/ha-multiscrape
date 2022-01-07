@@ -54,7 +54,6 @@ class Scraper:
         self._form_submit_config = form_submit_config
         self.data = None
         self.last_exception = None
-        self.response_headers = None
         self._skip_form = False
         self._log_response = log_response
 
@@ -76,7 +75,7 @@ class Scraper:
     def notify_scrape_exception(self):
         if self._form_submit_config and self._form_resubmit_error:
             _LOGGER.debug(
-                "%s # Exception occurred, will resubmit the form next interval.",
+                "%s # Exception occurred while scraping, will try to resubmit the form next interval.",
                 self._name,
             )
             self._skip_form = False
@@ -151,14 +150,17 @@ class Scraper:
                     self._timeout,
                 )
                 _LOGGER.debug(
-                    "%s # Form seems being submitted succesfully! Now continuing to scrape data for sensors",
+                    "%s # Form seems to be submitted succesfully! Now continuing to update data for sensors",
                     self._name,
                 )
                 if self._form_submit_once:
                     self._skip_form = True
 
                 if not self._form_resource:
-                    _LOGGER.debug("%s # Data now ready to be scraped.", self._name)
+                    _LOGGER.debug(
+                        "%s # Using response from form-submit as data. Now ready to be scraped by sensors.",
+                        self._name,
+                    )
                     self.data = response.data
                     return
             except Exception:
@@ -177,42 +179,29 @@ class Scraper:
             _LOGGER.error("Unable to parse response.")
             _LOGGER.debug("Exception parsing resonse: %s", e)
 
-    async def _async_update_data(self, log_errors=True):
-        _LOGGER.debug("%s # Updating from %s", self._name, self._resource)
+    async def _async_update_data(self):
+        _LOGGER.debug("%s # Updating data from %s", self._name, self._resource)
         try:
-            response = await self._async_client.request(
+            response = await self._async_request(
                 self._method,
                 self._resource,
-                headers=self._request_headers,
-                params=self._params,
-                auth=self._auth,
-                data=self._request_data,
-                timeout=self._timeout,
+                self._request_headers,
+                self._params,
+                self._auth,
+                self._request_data,
+                self._timeout,
             )
             self.data = response.text
-            self.response_headers = response.headers
             _LOGGER.debug(
-                "%s # Response status code received: %s",
-                self._name,
-                response.status_code,
+                "%s # Data succesfully refreshed. Sensors will now start scraping to update."
             )
-            if self._log_response:
-                _LOGGER.debug(
-                    "%s # Response headers received %s",
-                    self._name,
-                    self.response_headers,
-                )
-                _LOGGER.debug("%s # Response data received:%s", self._name, self.data)
-        except httpx.RequestError as ex:
+        except Exception as ex:
             _LOGGER.error(
-                "%s # Error fetching data: %s failed with %s",
+                "%s # Error! Updating failed with %s",
                 self._name,
-                self._resource,
                 ex,
             )
-            self.last_exception = ex
             self.data = None
-            self.response_headers = None
 
     def _determine_submit_resource(self, action):
         if action and self._form_resource:
@@ -267,7 +256,7 @@ class Scraper:
         self, method, resource, headers, params, auth, request_data, timeout
     ):
         _LOGGER.debug(
-            "%s # executing a %s request to url: %s.", self._name, method, resource
+            "%s # Executing a %s request to url: %s.", self._name, method, resource
         )
         try:
             response = await self._async_client.request(
@@ -310,7 +299,7 @@ class Scraper:
     def scrape(self, selector):
         try:
             if selector.just_value:
-                _LOGGER.debug("Applying value_template only.")
+                _LOGGER.debug("%s # Applying value_template only.", self._name)
                 return selector.value_template.async_render_with_possible_json_value(
                     self.data, None
                 )
