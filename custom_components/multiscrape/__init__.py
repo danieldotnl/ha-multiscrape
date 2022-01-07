@@ -93,17 +93,15 @@ async def _async_process_config(hass, config) -> bool:
         _LOGGER.debug("# Multiscrape not found in config")
         return True
 
-    noname_counter = 0
     refresh_tasks = []
     load_tasks = []
 
     for scraper_idx, conf in enumerate(config[DOMAIN]):
         name = conf.get(CONF_NAME)
         if name is None:
-            name = f"Scraper_noname_{noname_counter}"
-            noname_counter += 1
+            name = f"Scraper_noname_{scraper_idx}"
             _LOGGER.debug(
-                "# Found no name for scraper, generated a temporary name: %s", name
+                "# Found no name for scraper, generated a unique name: %s", name
             )
 
         _LOGGER.debug("%s # Setting up multiscrape with config:\n %s", name, conf)
@@ -119,11 +117,7 @@ async def _async_process_config(hass, config) -> bool:
             {SCRAPER: scraper, COORDINATOR: coordinator}
         )
 
-        if name:
-            target_name = slugify(name)
-        else:
-            target_name = f"noname_{scraper_idx}"
-
+        target_name = slugify(name)
         await _register_services(hass, target_name, coordinator)
 
         for platform_domain in COORDINATOR_AWARE_PLATFORMS:
