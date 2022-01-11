@@ -15,7 +15,7 @@
 
 ## Important note
 
-If you don't manage to scrape the value you are looking for, please use the home assistant forum. I cannot give everyone personal assistance and please don't create github issues unless you are sure there is a bug.
+If you don't manage to scrape the value you are looking for, please [enable debug logging](#debug-logging) and try to investigate it. If that doesn't help, use the home assistant forum. I cannot give everyone personal assistance and please don't create github issues unless you are sure there is a bug.
 Check the [wiki](https://github.com/danieldotnl/ha-multiscrape/wiki) for a scraping guide and other details on the functionality of this component.
 
 # HA MultiScrape custom component
@@ -80,7 +80,7 @@ Based on latest (pre) release.
 | method            | The method for the request. Either `POST` or `GET`.                                                                       | False    | GET     | string        |
 | payload           | Optional payload to send with a POST request.                                                                             | False    |         | string        |
 | verify_ssl        | Verify the SSL certificate of the endpoint.                                                                               | False    | True    | boolean       |
-| log_response      | Log the HTTP responses and HTML parsed by BeautifulSoup                                                                   | False    | False   | boolean       |
+| log_response      | Log the HTTP responses and HTML parsed by BeautifulSoup. Either 'none', 'logs', 'file'.                                   | False    | None    | string        |
 | timeout           | Defines max time to wait data from the endpoint.                                                                          | False    | 10      | int           |
 | scan_interval     | Determines how often the url will be requested.                                                                           | False    | 60      | int           |
 | parser            | Determines the parser to be used with beautifulsoup. Either `lxml` or `html.parser`.                                      | False    | lxml    | string        |
@@ -160,6 +160,15 @@ Configure what should happen in case of a scraping error (the css selector does 
 
 For each multiscrape instance, a service will be created to trigger a scrape run through an automation. (For manual triggering, the button entity can now be configured.)
 The services are named `multiscrape.trigger_{name of integration}`.
+
+## Debug logging
+
+```yaml
+logger:
+  default: info
+  logs:
+    custom_components.multiscrape: debug
+```
 
 ### Contributions are welcome!
 
