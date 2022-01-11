@@ -319,11 +319,9 @@ class Scraper:
 
             else:
                 if selector.attribute is not None:
-                    value = self.soup.select(selector.element)[selector.index][
-                        selector.attribute
-                    ]
+                    value = self.soup.select_one(selector.element)[selector.attribute]
                 else:
-                    tag = self.soup.select(selector.element)[selector.index]
+                    tag = self.soup.select_one(selector.element)
                     if tag.name in ("style", "script", "template"):
                         value = tag.string
                     else:

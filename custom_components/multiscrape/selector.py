@@ -3,7 +3,6 @@ from collections import namedtuple
 from homeassistant.const import CONF_VALUE_TEMPLATE
 
 from .const import CONF_ATTR
-from .const import CONF_INDEX
 from .const import CONF_ON_ERROR
 from .const import CONF_ON_ERROR_DEFAULT
 from .const import CONF_ON_ERROR_LOG
@@ -19,7 +18,6 @@ class Selector:
         self.select_template = conf.get(CONF_SELECT)
         self.select_list_template = conf.get(CONF_SELECT_LIST)
         self.attribute = conf.get(CONF_ATTR)
-        self.index = conf.get(CONF_INDEX)
         self.value_template = conf.get(CONF_VALUE_TEMPLATE)
         self.on_error = self.create_on_error(conf.get(CONF_ON_ERROR), hass)
 
