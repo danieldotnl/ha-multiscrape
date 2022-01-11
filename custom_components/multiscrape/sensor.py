@@ -38,14 +38,15 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
             hass, SENSOR_DOMAIN, discovery_info
         )
     else:
-        _LOGGER.info("Could not find sensor configuration")
+        _LOGGER.info("%s # Could not find sensor configuration", scraper.name)
 
     if scraper.data is None:
         if scraper.last_exception:
             raise PlatformNotReady from scraper.last_exception
         raise PlatformNotReady
 
-    name = conf.get(CONF_NAME)
+    sensor_name = conf.get(CONF_NAME)
+    _LOGGER.debug("%s # %s # Setting up sensor", scraper.name, sensor_name)
     unique_id = conf.get(CONF_UNIQUE_ID)
     unit = conf.get(CONF_UNIT_OF_MEASUREMENT)
     device_class = conf.get(CONF_DEVICE_CLASS)
@@ -68,7 +69,7 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
                 coordinator,
                 scraper,
                 unique_id,
-                name,
+                sensor_name,
                 unit,
                 device_class,
                 state_class,
@@ -128,26 +129,56 @@ class MultiscrapeSensor(MultiscrapeEntity, SensorEntity):
 
     def _update_sensor(self):
         """Update state from the scraper data."""
+        _LOGGER.debug(
+            "%s # %s # Start scraping to update sensor", self.scraper.name, self._name
+        )
 
         try:
             value = self.scraper.scrape(self._sensor_selector)
-            _LOGGER.debug("Sensor %s selected: %s", self._name, value)
+            _LOGGER.debug(
+                "%s # %s # Selected: %s", self.scraper.name, self._name, value
+            )
             self._attr_native_value = value
 
             if self._icon_template:
                 self._set_icon(value)
         except Exception as exception:
-            _LOGGER.debug("Exception selecting sensor data: %s", exception)
+            _LOGGER.debug(
+                "%s # %s # Exception selecting sensor data: %s",
+                self.scraper.name,
+                self._name,
+                exception,
+            )
 
             if self._sensor_selector.on_error.log not in [False, "false", "False"]:
                 level = LOG_LEVELS[self._sensor_selector.on_error.log]
                 _LOGGER.log(
-                    level, "Sensor %s was unable to extract data from HTML", self._name
+                    level,
+                    "%s # %s # Unable to extract data",
+                    self.scraper.name,
+                    self._name,
                 )
 
             if self._sensor_selector.on_error.value == CONF_ON_ERROR_VALUE_NONE:
                 self._attr_native_value = None
+                _LOGGER.debug(
+                    "%s # %s # On-error, set value to None",
+                    self.scraper.name,
+                    self._name,
+                )
             elif self._sensor_selector.on_error.value == CONF_ON_ERROR_VALUE_LAST:
+                _LOGGER.debug(
+                    "%s # %s # On-error, keep old value: %s",
+                    self.scraper.name,
+                    self._name,
+                    self._attr_native_value,
+                )
                 return
             elif self._sensor_selector.on_error.value == CONF_ON_ERROR_VALUE_DEFAULT:
                 self._attr_native_value = self._sensor_selector.on_error_default
+                _LOGGER.debug(
+                    "%s # %s # On-error, set default value: %s",
+                    self.scraper.name,
+                    self._name,
+                    self._sensor_selector.on_error_default,
+                )

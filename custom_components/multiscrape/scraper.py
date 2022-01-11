@@ -72,6 +72,10 @@ class Scraper:
                 self._hass, verify_ssl=self._verify_ssl
             )
 
+    @property
+    def name(self):
+        return self._name
+
     def notify_scrape_exception(self):
         if self._form_submit_config and self._form_resubmit_error:
             _LOGGER.debug(
