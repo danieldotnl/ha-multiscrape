@@ -134,7 +134,7 @@ class MultiscrapeSensor(MultiscrapeEntity, SensorEntity):
         )
 
         try:
-            value = self.scraper.scrape(self._sensor_selector)
+            value = self.scraper.scrape(self._sensor_selector, self._name)
             _LOGGER.debug(
                 "%s # %s # Selected: %s", self.scraper.name, self._name, value
             )
@@ -144,7 +144,7 @@ class MultiscrapeSensor(MultiscrapeEntity, SensorEntity):
                 self._set_icon(value)
         except Exception as exception:
             _LOGGER.debug(
-                "%s # %s # Exception selecting sensor data: %s",
+                "%s # %s # Exception selecting sensor data: %s\nHINT: Use debug logging and log_response for further investigation!",
                 self.scraper.name,
                 self._name,
                 exception,

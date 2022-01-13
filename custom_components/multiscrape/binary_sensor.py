@@ -126,7 +126,7 @@ class MultiscrapeBinarySensor(MultiscrapeEntity, BinarySensorEntity):
         #     self._is_on = False
 
         try:
-            value = self.scraper.scrape(self._sensor_selector)
+            value = self.scraper.scrape(self._sensor_selector, self._name)
             try:
                 self._attr_is_on = bool(int(value))
             except ValueError:

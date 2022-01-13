@@ -116,7 +116,7 @@ class MultiscrapeEntity(Entity):
     def _update_attributes(self):
         if self._attribute_selectors:
             _LOGGER.debug(
-                "%s # %s # Start scraping attributes values",
+                "%s # %s # Start scraping attributes",
                 self.scraper.name,
                 self._name,
             )
@@ -126,15 +126,8 @@ class MultiscrapeEntity(Entity):
             )
             for name, attr_selector in self._attribute_selectors.items():
                 try:
-                    attr_value = self.scraper.scrape(attr_selector)
+                    attr_value = self.scraper.scrape(attr_selector, self._name, name)
                     self._attr_extra_state_attributes[name] = attr_value
-                    _LOGGER.debug(
-                        "%s # %s # %s # Scraped value: %s",
-                        self.scraper.name,  # scraper name
-                        self._name,  # sensor name
-                        name,  # attribute name
-                        attr_value,
-                    )
                 except Exception as exception:
                     _LOGGER.debug(
                         "%s # %s # %s # Exception selecting attribute data: %s",
