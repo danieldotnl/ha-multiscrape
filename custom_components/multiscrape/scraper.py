@@ -1,10 +1,12 @@
 """Support for multiscrape requests."""
 import logging
+import os
 from urllib.parse import urljoin
 
 import httpx
 from bs4 import BeautifulSoup
 from homeassistant.helpers.httpx_client import get_async_client
+from homeassistant.util import slugify
 
 from .const import CONF_FORM_INPUT
 from .const import CONF_FORM_RESOURCE
@@ -115,6 +117,7 @@ class Scraper:
                     "%s # Requesting page with form from: %s", self._name, resource
                 )
                 response = await self._async_request(
+                    "form_page",
                     "GET",
                     resource,
                     self._request_headers,
@@ -125,7 +128,7 @@ class Scraper:
                 )
                 page = response.text
 
-                form = self._get_form_data(page)
+                form = await self._get_form_data(page)
                 form_action = form[0]
                 form_method = form[1] if form[1] else "POST"
                 form_data = form[2]
@@ -145,6 +148,7 @@ class Scraper:
 
                 _LOGGER.debug("%s # Going now to submit the form", self._name)
                 response = await self._async_request(
+                    "form_submit",
                     form_method,
                     submit_resource,
                     self._request_headers,
@@ -176,17 +180,32 @@ class Scraper:
             # If anything goes wrong, still try to continue without submitting the form
             await self._async_update_data()
 
-        try:
-            self.soup = BeautifulSoup(self.data, self._parser)
-            self.soup.prettify()
-        except Exception as e:
-            _LOGGER.error("Unable to parse response.")
-            _LOGGER.debug("Exception parsing resonse: %s", e)
+        if not self.data.startswith("{"):
+            try:
+                _LOGGER.debug(
+                    "%s # Start loading the response in BeautifulSoup.", self._name
+                )
+                self.soup = BeautifulSoup(self.data, self._parser)
+                self.soup.prettify()
+                if self._log_response:
+                    filename = self._create_filename("page_soup")
+                    await self._hass.async_add_executor_job(
+                        self._write_file, filename, self.soup
+                    )
+                    _LOGGER.debug(
+                        "%s # Response headers written to file: %s",
+                        self._name,
+                        filename,
+                    )
+
+            except Exception as ex:
+                _LOGGER.error("%s # Unable to parse response: %s", self._name, ex)
 
     async def _async_update_data(self):
         _LOGGER.debug("%s # Updating data from %s", self._name, self._resource)
         try:
             response = await self._async_request(
+                "page",
                 self._method,
                 self._resource,
                 self._request_headers,
@@ -217,16 +236,23 @@ class Scraper:
             return self._form_resource
         return self._resource
 
-    def _get_form_data(self, html):
+    async def _get_form_data(self, html):
         _LOGGER.debug("%s # Start trying to capture the form in the page", self._name)
         try:
             _LOGGER.debug(
                 "%s # Parse HTML with BeautifulSoup parser %s", self._name, self._parser
             )
             soup = BeautifulSoup(html, self._parser)
+            soup.prettify()
             if self._log_response:
+                filename = self._create_filename("form_page_soup")
+                await self._hass.async_add_executor_job(
+                    self._write_file, filename, soup
+                )
                 _LOGGER.debug(
-                    "%s # HTML parsed by BeautifulSoup:\n %s", self._name, soup
+                    "%s # The page with the form parsed by BeautifulSoup has been written to file: %s",
+                    self._name,
+                    filename,
                 )
 
             _LOGGER.debug(
@@ -257,11 +283,40 @@ class Scraper:
             )
             raise
 
+    def _write_file(self, filename, content):
+        try:
+            if not os.path.exists(os.path.dirname(filename)):
+                try:
+                    os.makedirs(os.path.dirname(filename))
+                except OSError as exc:  # Guard against race condition
+                    if exc.errno != errno.EEXIST:  # noqa: F821
+                        raise
+
+            with open(filename, "w", encoding="utf8") as file:
+                file.write(str(content))
+        except Exception as ex:
+            _LOGGER.error(
+                "%s # Unable to write response to file: %s. \nException: %s",
+                self._name,
+                filename,
+                ex,
+            )
+
+    def _create_filename(self, context):
+        folder = slugify(self._name)
+        return os.path.join(
+            self._hass.config.config_dir, f"multiscrape/{folder}/{context}.txt"
+        )
+
     async def _async_request(
-        self, method, resource, headers, params, auth, request_data, timeout
+        self, context, method, resource, headers, params, auth, request_data, timeout
     ):
         _LOGGER.debug(
-            "%s # Executing a %s request to url: %s.", self._name, method, resource
+            "%s # Executing %s-request with a %s to url: %s.",
+            self._name,
+            context,
+            method,
+            resource,
         )
         try:
             response = await self._async_client.request(
@@ -280,13 +335,25 @@ class Scraper:
                 response.status_code,
             )
             if self._log_response:
-                _LOGGER.debug(
-                    "%s # Response headers received %s",
-                    self._name,
-                    response.headers,
+
+                filename = self._create_filename(f"{context}_response_headers")
+                await self._hass.async_add_executor_job(
+                    self._write_file, filename, response.headers
                 )
                 _LOGGER.debug(
-                    "%s # Response data received: %s", self._name, response.text
+                    "%s # Response headers written to file: %s",
+                    self._name,
+                    filename,
+                )
+
+                filename = self._create_filename(f"{context}_response_body")
+                await self._hass.async_add_executor_job(
+                    self._write_file, filename, response.text
+                )
+                _LOGGER.debug(
+                    "%s # Response headers written to file: %s",
+                    self._name,
+                    filename,
                 )
 
             return response
