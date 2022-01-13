@@ -41,7 +41,7 @@ PLATFORM_IDX = "platform_idx"
 COORDINATOR = "coordinator"
 SCRAPER = "scraper"
 
-SCRAPER_DATA = "scraper_data"
+SCRAPER_DATA = "scraper"
 
 METHODS = ["POST", "GET", "post", "get"]
 
