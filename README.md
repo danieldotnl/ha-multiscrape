@@ -13,9 +13,11 @@
 [![Discord][discord-shield]][discord]
 [![Community Forum][forum-shield]][forum]
 
-## Important note
+## Important note: troubleshooting
 
-If you don't manage to scrape the value you are looking for, please [enable debug logging](#debug-logging) and try to investigate it. If that doesn't help, use the home assistant forum. I cannot give everyone personal assistance and please don't create github issues unless you are sure there is a bug.
+If you don't manage to scrape the value you are looking for, please [enable debug logging](#debug-logging) and `log_response`. This will provide you with a lot of information for continued investigation. `log_response` will write all responses to files. If the value you want to scrape is not in the files with the output from BeautifulSoup (\*-soup.txt), Multiscrape will not be able to scrape it. Most likely it is retrieved in the background by javascript. Your best chance in this case, is to investigate the network traffic in de developer tools of your browser, and try to find a json response containing the value you are looking for.
+
+If all of this doesn't help, use the home assistant forum. I cannot give everyone personal assistance and please don't create github issues unless you are sure there is a bug.
 Check the [wiki](https://github.com/danieldotnl/ha-multiscrape/wiki) for a scraping guide and other details on the functionality of this component.
 
 # HA MultiScrape custom component
@@ -162,12 +164,16 @@ The services are named `multiscrape.trigger_{name of integration}`.
 
 ## Debug logging
 
+Debug logging can be enabled as follows:
+
 ```yaml
 logger:
   default: info
   logs:
     custom_components.multiscrape: debug
 ```
+
+Depending on your issue, also consider enabling `log_response`.
 
 ### Contributions are welcome!
 
