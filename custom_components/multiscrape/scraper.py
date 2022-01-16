@@ -180,7 +180,7 @@ class Scraper:
             # If anything goes wrong, still try to continue without submitting the form
             await self._async_update_data()
 
-        if not self.data.startswith("{"):
+        if self.data and not self.data.startswith("{"):
             try:
                 _LOGGER.debug(
                     "%s # Start loading the response in BeautifulSoup.", self._name
@@ -221,7 +221,7 @@ class Scraper:
             )
         except Exception as ex:
             _LOGGER.error(
-                "%s # Error! Updating failed with %s",
+                "%s # Updating failed with exception: %s",
                 self._name,
                 ex,
             )
