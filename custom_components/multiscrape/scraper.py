@@ -3,7 +3,6 @@ import logging
 import os
 from urllib.parse import urljoin
 
-import httpx
 from bs4 import BeautifulSoup
 from homeassistant.helpers.httpx_client import get_async_client
 from homeassistant.util import slugify
@@ -226,6 +225,7 @@ class Scraper:
                 ex,
             )
             self.data = None
+            self.soup = None
 
     def _determine_submit_resource(self, action):
         if action and self._form_resource:
@@ -358,13 +358,13 @@ class Scraper:
 
             return response
 
-        except httpx.RequestError as ex:
+        except Exception as ex:
             _LOGGER.error(
                 "%s # Error executing %s request to url: %s.\n Error message:\n %s",
                 self._name,
                 method,
                 resource,
-                ex,
+                repr(ex),
             )
             raise
 
