@@ -12,6 +12,7 @@ from .const import CONF_FORM_RESOURCE
 from .const import CONF_FORM_RESUBMIT_ERROR
 from .const import CONF_FORM_SELECT
 from .const import CONF_FORM_SUBMIT_ONCE
+from .utils import write_file
 
 DEFAULT_TIMEOUT = 10
 
@@ -157,7 +158,7 @@ class Scraper:
                     self._timeout,
                 )
                 _LOGGER.debug(
-                    "%s # Form seems to be submitted succesfully! Now continuing to update data for sensors",
+                    "%s # Form seems to be submitted succesfully (to be sure, use log_response and check file). Now continuing to retrieve target page.",
                     self._name,
                 )
                 if self._form_submit_once:
@@ -188,9 +189,17 @@ class Scraper:
                 self.soup.prettify()
                 if self._log_response:
                     filename = self._create_filename("page_soup")
-                    await self._hass.async_add_executor_job(
-                        self._write_file, filename, self.soup
-                    )
+                    try:
+                        await self._hass.async_add_executor_job(
+                            write_file, filename, self.soup
+                        )
+                    except Exception as ex:
+                        _LOGGER.error(
+                            "%s # Unable to write BeautifulSoup result to file: %s. \nException: %s",
+                            self._name,
+                            filename,
+                            ex,
+                        )
                     _LOGGER.debug(
                         "%s # Response headers written to file: %s",
                         self._name,
@@ -246,9 +255,15 @@ class Scraper:
             soup.prettify()
             if self._log_response:
                 filename = self._create_filename("form_page_soup")
-                await self._hass.async_add_executor_job(
-                    self._write_file, filename, soup
-                )
+                try:
+                    await self._hass.async_add_executor_job(write_file, filename, soup)
+                except Exception as ex:
+                    _LOGGER.error(
+                        "%s # Unable to write BeautifulSoup form-page result to file: %s. \nException: %s",
+                        self._name,
+                        filename,
+                        ex,
+                    )
                 _LOGGER.debug(
                     "%s # The page with the form parsed by BeautifulSoup has been written to file: %s",
                     self._name,
@@ -282,25 +297,6 @@ class Scraper:
                 "%s # Exception extracing form data: %s", self._name, exception
             )
             raise
-
-    def _write_file(self, filename, content):
-        try:
-            if not os.path.exists(os.path.dirname(filename)):
-                try:
-                    os.makedirs(os.path.dirname(filename))
-                except OSError as exc:  # Guard against race condition
-                    if exc.errno != errno.EEXIST:  # noqa: F821
-                        raise
-
-            with open(filename, "w", encoding="utf8") as file:
-                file.write(str(content))
-        except Exception as ex:
-            _LOGGER.error(
-                "%s # Unable to write response to file: %s. \nException: %s",
-                self._name,
-                filename,
-                ex,
-            )
 
     def _create_filename(self, context):
         folder = slugify(self._name)
@@ -337,9 +333,17 @@ class Scraper:
             if self._log_response:
 
                 filename = self._create_filename(f"{context}_response_headers")
-                await self._hass.async_add_executor_job(
-                    self._write_file, filename, response.headers
-                )
+                try:
+                    await self._hass.async_add_executor_job(
+                        write_file, filename, response.headers
+                    )
+                except Exception as ex:
+                    _LOGGER.error(
+                        "%s # Unable to write response headers to file: %s. \nException: %s",
+                        self._name,
+                        filename,
+                        ex,
+                    )
                 _LOGGER.debug(
                     "%s # Response headers written to file: %s",
                     self._name,
@@ -347,9 +351,17 @@ class Scraper:
                 )
 
                 filename = self._create_filename(f"{context}_response_body")
-                await self._hass.async_add_executor_job(
-                    self._write_file, filename, response.text
-                )
+                try:
+                    await self._hass.async_add_executor_job(
+                        write_file, filename, response.text
+                    )
+                except Exception as ex:
+                    _LOGGER.error(
+                        "%s # Unable to write response body to file: %s. \nException: %s",
+                        self._name,
+                        filename,
+                        ex,
+                    )
                 _LOGGER.debug(
                     "%s # Response headers written to file: %s",
                     self._name,
