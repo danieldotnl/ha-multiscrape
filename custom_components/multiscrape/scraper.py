@@ -3,7 +3,6 @@ import logging
 from urllib.parse import urljoin
 
 from bs4 import BeautifulSoup
-from homeassistant.helpers.httpx_client import get_async_client
 
 from .const import CONF_FORM_INPUT
 from .const import CONF_FORM_RESOURCE
@@ -23,41 +22,36 @@ class Scraper:
         self,
         hass,
         file_manager,
-        name,
+        http,
+        config_name,
         method,
         resource,
-        auth,
         request_headers,
         params,
         data,
-        verify_ssl,
         parser,
         form_submit_config,
-        timeout=DEFAULT_TIMEOUT,
     ):
         """Initialize the data object."""
-        _LOGGER.debug("%s # Initializing scraper", name)
+        _LOGGER.debug("%s # Initializing scraper", config_name)
 
         self._hass = hass
         self._file_manager = file_manager
-        self._name = name
+        self._http = http
+        self._config_name = config_name
         self._method = method
         self._resource = resource
-        self._auth = auth
         self._request_headers = request_headers
         self._params = params
         self._request_data = data
-        self._timeout = timeout
-        self._verify_ssl = verify_ssl
         self._parser = parser
         self._async_client = None
         self._form_submit_config = form_submit_config
         self.data = None
-        self.last_exception = None
         self._skip_form = False
 
         if form_submit_config:
-            _LOGGER.debug("%s # Found form-submit config", self._name)
+            _LOGGER.debug("%s # Found form-submit config", self._config_name)
             self._form_resource = self._form_submit_config.get(CONF_FORM_RESOURCE)
             self._form_select = self._form_submit_config.get(CONF_FORM_SELECT)
             self._form_input = self._form_submit_config.get(CONF_FORM_INPUT)
@@ -66,20 +60,15 @@ class Scraper:
                 CONF_FORM_RESUBMIT_ERROR
             )
 
-        if not self._async_client:
-            self._async_client = get_async_client(
-                self._hass, verify_ssl=self._verify_ssl
-            )
-
     @property
     def name(self):
-        return self._name
+        return self._config_name
 
     def notify_scrape_exception(self):
         if self._form_submit_config and self._form_resubmit_error:
             _LOGGER.debug(
                 "%s # Exception occurred while scraping, will try to resubmit the form next interval.",
-                self._name,
+                self._config_name,
             )
             self._skip_form = False
 
@@ -89,15 +78,19 @@ class Scraper:
 
     async def async_update(self):
         """Get the latest data from REST service with provided method."""
-        _LOGGER.debug("%s # Refresh triggered", self._name)
+        _LOGGER.debug("%s # Refresh triggered", self._config_name)
 
         if self._file_manager:
-            _LOGGER.debug("%s # Deleting logging files from previous run", self._name)
+            _LOGGER.debug(
+                "%s # Deleting logging files from previous run", self._config_name
+            )
             try:
                 await self._hass.async_add_executor_job(self._file_manager.empty_folder)
             except Exception as ex:
                 _LOGGER.error(
-                    "%s # Error deleting files from previous run: %s", self._name, ex
+                    "%s # Error deleting files from previous run: %s",
+                    self._config_name,
+                    ex,
                 )
 
         # Do we need to submit a form?
@@ -106,7 +99,7 @@ class Scraper:
             if self._skip_form:
                 _LOGGER.debug(
                     "%s # Skip submitting form for resource: %s because it was already submitted and submit_once is True",
-                    self._name,
+                    self._config_name,
                     self._resource,
                 )
 
@@ -114,23 +107,23 @@ class Scraper:
 
         # Yes we do
         else:
-            _LOGGER.debug("%s # Continue with form-submit", self._name)
+            _LOGGER.debug("%s # Continue with form-submit", self._config_name)
             try:
                 resource = (
                     self._form_resource if self._form_resource else self._resource
                 )
                 _LOGGER.debug(
-                    "%s # Requesting page with form from: %s", self._name, resource
+                    "%s # Requesting page with form from: %s",
+                    self._config_name,
+                    resource,
                 )
-                response = await self._async_request(
+                response = await self._http.async_request(
                     "form_page",
                     "GET",
                     resource,
                     self._request_headers,
                     self._params,
-                    self._auth,
                     self._request_data,
-                    self._timeout,
                 )
                 page = response.text
 
@@ -142,30 +135,28 @@ class Scraper:
                 submit_resource = self._determine_submit_resource(form_action)
                 _LOGGER.debug(
                     "%s # Determined the url to submit the form to: %s",
-                    self._name,
+                    self._config_name,
                     submit_resource,
                 )
                 form_data.update(self._form_input)
                 _LOGGER.debug(
                     "%s # Merged input fields with input data in config. Result: %s",
-                    self._name,
+                    self._config_name,
                     form_data,
                 )
 
-                _LOGGER.debug("%s # Going now to submit the form", self._name)
-                response = await self._async_request(
+                _LOGGER.debug("%s # Going now to submit the form", self._config_name)
+                response = await self._http.async_request(
                     "form_submit",
                     form_method,
                     submit_resource,
                     self._request_headers,
                     self._params,
-                    self._auth,
                     form_data,
-                    self._timeout,
                 )
                 _LOGGER.debug(
                     "%s # Form seems to be submitted succesfully (to be sure, use log_response and check file). Now continuing to retrieve target page.",
-                    self._name,
+                    self._config_name,
                 )
                 if self._form_submit_once:
                     self._skip_form = True
@@ -173,14 +164,14 @@ class Scraper:
                 if not self._form_resource:
                     _LOGGER.debug(
                         "%s # Using response from form-submit as data. Now ready to be scraped by sensors.",
-                        self._name,
+                        self._config_name,
                     )
                     self.data = response.data
                     return
             except Exception:
                 _LOGGER.error(
                     "%s # Exception in form-submit feature. Will continue trying to scrape target page",
-                    self._name,
+                    self._config_name,
                 )
 
             # If anything goes wrong, still try to continue without submitting the form
@@ -189,7 +180,8 @@ class Scraper:
         if self.data and not self.data.startswith("{"):
             try:
                 _LOGGER.debug(
-                    "%s # Start loading the response in BeautifulSoup.", self._name
+                    "%s # Start loading the response in BeautifulSoup.",
+                    self._config_name,
                 )
                 self.soup = BeautifulSoup(self.data, self._parser)
                 self.soup.prettify()
@@ -202,41 +194,41 @@ class Scraper:
                     except Exception as ex:
                         _LOGGER.error(
                             "%s # Unable to write BeautifulSoup result to file: %s. \nException: %s",
-                            self._name,
+                            self._config_name,
                             filename,
                             ex,
                         )
                     _LOGGER.debug(
                         "%s # Response headers written to file: %s",
-                        self._name,
+                        self._config_name,
                         filename,
                     )
 
             except Exception as ex:
-                _LOGGER.error("%s # Unable to parse response: %s", self._name, ex)
+                _LOGGER.error(
+                    "%s # Unable to parse response: %s", self._config_name, ex
+                )
 
     async def _async_update_data(self):
-        _LOGGER.debug("%s # Updating data from %s", self._name, self._resource)
+        _LOGGER.debug("%s # Updating data from %s", self._config_name, self._resource)
         try:
-            response = await self._async_request(
+            response = await self._http.async_request(
                 "page",
                 self._method,
                 self._resource,
                 self._request_headers,
                 self._params,
-                self._auth,
                 self._request_data,
-                self._timeout,
             )
             self.data = response.text
             _LOGGER.debug(
                 "%s # Data succesfully refreshed. Sensors will now start scraping to update.",
-                self._name,
+                self._config_name,
             )
         except Exception as ex:
             _LOGGER.error(
                 "%s # Updating failed with exception: %s",
-                self._name,
+                self._config_name,
                 ex,
             )
             self.data = None
@@ -252,10 +244,14 @@ class Scraper:
         return self._resource
 
     async def _get_form_data(self, html):
-        _LOGGER.debug("%s # Start trying to capture the form in the page", self._name)
+        _LOGGER.debug(
+            "%s # Start trying to capture the form in the page", self._config_name
+        )
         try:
             _LOGGER.debug(
-                "%s # Parse HTML with BeautifulSoup parser %s", self._name, self._parser
+                "%s # Parse HTML with BeautifulSoup parser %s",
+                self._config_name,
+                self._parser,
             )
             soup = BeautifulSoup(html, self._parser)
             soup.prettify()
@@ -268,122 +264,54 @@ class Scraper:
                 except Exception as ex:
                     _LOGGER.error(
                         "%s # Unable to write BeautifulSoup form-page result to file: %s. \nException: %s",
-                        self._name,
+                        self._config_name,
                         filename,
                         ex,
                     )
                 _LOGGER.debug(
                     "%s # The page with the form parsed by BeautifulSoup has been written to file: %s",
-                    self._name,
+                    self._config_name,
                     filename,
                 )
 
             _LOGGER.debug(
-                "%s # Try to find form with selector %s", self._name, self._form_select
+                "%s # Try to find form with selector %s",
+                self._config_name,
+                self._form_select,
             )
             form = soup.select(self._form_select)[0]
             _LOGGER.debug(
-                "%s # Found the form, now finding all input fields", self._name
+                "%s # Found the form, now finding all input fields", self._config_name
             )
             elements = form.findAll("input")
             formdata = dict(
                 (element.get("name"), element.get("value")) for element in elements
             )
-            _LOGGER.debug("%s # Found the following fields: %s", self._name, formdata)
+            _LOGGER.debug(
+                "%s # Found the following fields: %s", self._config_name, formdata
+            )
 
             action = form.get("action")
             method = form.get("method")
             _LOGGER.debug(
-                "%s # Found form action %s and method %s", self._name, action, method
+                "%s # Found form action %s and method %s",
+                self._config_name,
+                action,
+                method,
             )
 
             return (action, method, formdata)
 
         except IndexError as exception:
-            _LOGGER.info("%s # Unable to extract form data from.", self._name)
+            _LOGGER.info("%s # Unable to extract form data from.", self._config_name)
             _LOGGER.debug(
-                "%s # Exception extracing form data: %s", self._name, exception
-            )
-            raise
-
-    async def _async_request(
-        self, context, method, resource, headers, params, auth, request_data, timeout
-    ):
-        _LOGGER.debug(
-            "%s # Executing %s-request with a %s to url: %s.",
-            self._name,
-            context,
-            method,
-            resource,
-        )
-        try:
-            response = await self._async_client.request(
-                method,
-                resource,
-                headers=headers,
-                params=params,
-                auth=auth,
-                data=request_data,
-                timeout=self._timeout,
-            )
-
-            _LOGGER.debug(
-                "%s # Response status code received: %s",
-                self._name,
-                response.status_code,
-            )
-            if self._file_manager:
-                try:
-                    filename = f"{context}_response_headers.txt"
-                    await self._hass.async_add_executor_job(
-                        self._file_manager.write, filename, response.headers
-                    )
-                except Exception as ex:
-                    _LOGGER.error(
-                        "%s # Unable to write response headers to file: %s. \nException: %s",
-                        self._name,
-                        filename,
-                        ex,
-                    )
-                _LOGGER.debug(
-                    "%s # Response headers written to file: %s",
-                    self._name,
-                    filename,
-                )
-
-                try:
-                    filename = f"{context}_response_body.txt"
-                    await self._hass.async_add_executor_job(
-                        self._file_manager.write, filename, response.text
-                    )
-                except Exception as ex:
-                    _LOGGER.error(
-                        "%s # Unable to write response body to file: %s. \nException: %s",
-                        self._name,
-                        filename,
-                        ex,
-                    )
-                _LOGGER.debug(
-                    "%s # Response headers written to file: %s",
-                    self._name,
-                    filename,
-                )
-
-            return response
-
-        except Exception as ex:
-            _LOGGER.error(
-                "%s # Error executing %s request to url: %s.\n Error message:\n %s",
-                self._name,
-                method,
-                resource,
-                repr(ex),
+                "%s # Exception extracing form data: %s", self._config_name, exception
             )
             raise
 
     def scrape(self, selector, sensor, attribute=None):
         # This is required as this function is called separately for sensors and attributes
-        log_prefix = f"{self._name} # {sensor}"
+        log_prefix = f"{self._config_name} # {sensor}"
         if attribute:
             log_prefix = log_prefix + f"# {attribute}"
 
