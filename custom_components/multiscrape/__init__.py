@@ -1,6 +1,7 @@
 """The multiscrape component."""
 import asyncio
 import logging
+import os
 from datetime import timedelta
 
 import httpx
@@ -44,6 +45,7 @@ from .const import PLATFORM_IDX
 from .const import SCRAPER
 from .const import SCRAPER_DATA
 from .const import SCRAPER_IDX
+from .file import LoggingFileManager
 from .schema import CONFIG_SCHEMA  # noqa: F401
 from .scraper import Scraper
 
@@ -105,9 +107,21 @@ async def _async_process_config(hass, config) -> bool:
             )
 
         _LOGGER.debug("%s # Setting up multiscrape with config:\n %s", name, conf)
+
+        file_manager = None
+        log_response = conf.get(CONF_LOG_RESPONSE)
+        if log_response:
+            folder = os.path.join(
+                hass.config.config_dir, f"multiscrape/{slugify(name)}/"
+            )
+            _LOGGER.debug(
+                "%s # Log responses enabled, creating logging folder: %s", name, folder
+            )
+            file_manager = LoggingFileManager(folder)
+            await hass.async_add_executor_job(file_manager.create_folders)
         scan_interval = conf.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)
         resource_template = conf.get(CONF_RESOURCE_TEMPLATE)
-        scraper = create_scraper_data_from_config(hass, name, conf)
+        scraper = create_scraper_data_from_config(hass, name, conf, file_manager)
         coordinator = _create_scraper_coordinator(
             hass, name, scraper, resource_template, scan_interval
         )
@@ -205,8 +219,7 @@ def _create_scraper_coordinator(
     )
 
 
-def create_scraper_data_from_config(hass, name, config):
-    """Create RestData from config."""
+def create_scraper_data_from_config(hass, name, config, file_manager):
     resource = config.get(CONF_RESOURCE)
     resource_template = config.get(CONF_RESOURCE_TEMPLATE)
     method = config.get(CONF_METHOD).lower()
@@ -219,7 +232,6 @@ def create_scraper_data_from_config(hass, name, config):
     parser = config.get(CONF_PARSER)
     timeout = config.get(CONF_TIMEOUT)
     form_submit = config.get(CONF_FORM_SUBMIT)
-    log_response = config.get(CONF_LOG_RESPONSE)
 
     if resource_template is not None:
         resource_template.hass = hass
@@ -237,6 +249,7 @@ def create_scraper_data_from_config(hass, name, config):
 
     return Scraper(
         hass,
+        file_manager,
         name,
         method,
         resource,
@@ -248,5 +261,4 @@ def create_scraper_data_from_config(hass, name, config):
         parser,
         form_submit,
         timeout,
-        log_response,
     )

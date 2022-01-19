@@ -1,18 +1,15 @@
 """Support for multiscrape requests."""
 import logging
-import os
 from urllib.parse import urljoin
 
 from bs4 import BeautifulSoup
 from homeassistant.helpers.httpx_client import get_async_client
-from homeassistant.util import slugify
 
 from .const import CONF_FORM_INPUT
 from .const import CONF_FORM_RESOURCE
 from .const import CONF_FORM_RESUBMIT_ERROR
 from .const import CONF_FORM_SELECT
 from .const import CONF_FORM_SUBMIT_ONCE
-from .utils import write_file
 
 DEFAULT_TIMEOUT = 10
 
@@ -25,6 +22,7 @@ class Scraper:
     def __init__(
         self,
         hass,
+        file_manager,
         name,
         method,
         resource,
@@ -36,12 +34,12 @@ class Scraper:
         parser,
         form_submit_config,
         timeout=DEFAULT_TIMEOUT,
-        log_response=False,
     ):
         """Initialize the data object."""
         _LOGGER.debug("%s # Initializing scraper", name)
 
         self._hass = hass
+        self._file_manager = file_manager
         self._name = name
         self._method = method
         self._resource = resource
@@ -57,7 +55,6 @@ class Scraper:
         self.data = None
         self.last_exception = None
         self._skip_form = False
-        self._log_response = log_response
 
         if form_submit_config:
             _LOGGER.debug("%s # Found form-submit config", self._name)
@@ -93,6 +90,15 @@ class Scraper:
     async def async_update(self):
         """Get the latest data from REST service with provided method."""
         _LOGGER.debug("%s # Refresh triggered", self._name)
+
+        if self._file_manager:
+            _LOGGER.debug("%s # Deleting logging files from previous run", self._name)
+            try:
+                await self._hass.async_add_executor_job(self._file_manager.empty_folder)
+            except Exception as ex:
+                _LOGGER.error(
+                    "%s # Error deleting files from previous run: %s", self._name, ex
+                )
 
         # Do we need to submit a form?
         if self._form_submit_config is None or self._skip_form:
@@ -187,11 +193,11 @@ class Scraper:
                 )
                 self.soup = BeautifulSoup(self.data, self._parser)
                 self.soup.prettify()
-                if self._log_response:
-                    filename = self._create_filename("page_soup")
+                if self._file_manager:
+                    filename = "page_soup.txt"
                     try:
                         await self._hass.async_add_executor_job(
-                            write_file, filename, self.soup
+                            self._file_manager.write, filename, self.soup
                         )
                     except Exception as ex:
                         _LOGGER.error(
@@ -253,10 +259,12 @@ class Scraper:
             )
             soup = BeautifulSoup(html, self._parser)
             soup.prettify()
-            if self._log_response:
-                filename = self._create_filename("form_page_soup")
+            if self._file_manager:
+                filename = "form_page_soup.txt"
                 try:
-                    await self._hass.async_add_executor_job(write_file, filename, soup)
+                    await self._hass.async_add_executor_job(
+                        self._file_manager.write, filename, soup
+                    )
                 except Exception as ex:
                     _LOGGER.error(
                         "%s # Unable to write BeautifulSoup form-page result to file: %s. \nException: %s",
@@ -298,12 +306,6 @@ class Scraper:
             )
             raise
 
-    def _create_filename(self, context):
-        folder = slugify(self._name)
-        return os.path.join(
-            self._hass.config.config_dir, f"multiscrape/{folder}/{context}.txt"
-        )
-
     async def _async_request(
         self, context, method, resource, headers, params, auth, request_data, timeout
     ):
@@ -330,12 +332,11 @@ class Scraper:
                 self._name,
                 response.status_code,
             )
-            if self._log_response:
-
-                filename = self._create_filename(f"{context}_response_headers")
+            if self._file_manager:
                 try:
+                    filename = f"{context}_response_headers.txt"
                     await self._hass.async_add_executor_job(
-                        write_file, filename, response.headers
+                        self._file_manager.write, filename, response.headers
                     )
                 except Exception as ex:
                     _LOGGER.error(
@@ -350,10 +351,10 @@ class Scraper:
                     filename,
                 )
 
-                filename = self._create_filename(f"{context}_response_body")
                 try:
+                    filename = f"{context}_response_body.txt"
                     await self._hass.async_add_executor_job(
-                        write_file, filename, response.text
+                        self._file_manager.write, filename, response.text
                     )
                 except Exception as ex:
                     _LOGGER.error(
