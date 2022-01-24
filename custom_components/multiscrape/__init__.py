@@ -35,7 +35,12 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from homeassistant.util import slugify
 
 from .const import CONF_FIELDS
+from .const import CONF_FORM_INPUT
+from .const import CONF_FORM_RESOURCE
+from .const import CONF_FORM_RESUBMIT_ERROR
+from .const import CONF_FORM_SELECT
 from .const import CONF_FORM_SUBMIT
+from .const import CONF_FORM_SUBMIT_ONCE
 from .const import CONF_LOG_RESPONSE
 from .const import CONF_PARSER
 from .const import COORDINATOR
@@ -45,6 +50,7 @@ from .const import SCRAPER
 from .const import SCRAPER_DATA
 from .const import SCRAPER_IDX
 from .file import LoggingFileManager
+from .form import FormSubmitter
 from .http import HttpWrapper
 from .schema import CONFIG_SCHEMA  # noqa: F401
 from .scraper import Scraper
@@ -127,9 +133,16 @@ async def _async_process_config(hass, config) -> bool:
         scan_interval = conf.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)
         resource_template = conf.get(CONF_RESOURCE_TEMPLATE)
 
-        http = _create_http_wrapper(config_name, config, hass, file_manager)
+        http = _create_http_wrapper(config_name, conf, hass, file_manager)
+        form_submit_config = conf.get(CONF_FORM_SUBMIT)
+        submitter = None
+        if form_submit_config:
+            parser = conf.get(CONF_PARSER)
+            submitter = _create_form_submitter(
+                config_name, form_submit_config, hass, http, file_manager, parser
+            )
         scraper = create_scraper_data_from_config(
-            config_name, hass, http, conf, file_manager
+            config_name, conf, hass, http, file_manager, submitter
         )
         coordinator = _create_scraper_coordinator(
             hass, config_name, scraper, resource_template, scan_interval
@@ -215,13 +228,35 @@ def _create_http_wrapper(config_name, config, hass, file_manager):
     return http
 
 
+def _create_form_submitter(config_name, config, hass, http, file_manager, parser):
+    resource = config.get(CONF_FORM_RESOURCE)
+    select = config.get(CONF_FORM_SELECT)
+    input_values = config.get(CONF_FORM_INPUT)
+    resubmit_error = config.get(CONF_FORM_RESUBMIT_ERROR)
+    submit_once = config.get(CONF_FORM_SUBMIT_ONCE)
+
+    return FormSubmitter(
+        config_name,
+        hass,
+        http,
+        file_manager,
+        resource,
+        select,
+        input_values,
+        submit_once,
+        resubmit_error,
+        parser,
+    )
+
+
 def _create_scraper_coordinator(
     hass, name, scraper, resource_template, update_interval
 ):
     """Wrap a DataUpdateCoordinator around the scraper object."""
 
+    _LOGGER.debug("%s # Initializing coordinator", name)
+
     if resource_template:
-        _LOGGER.debug("%s # Setup coordinator", name)
 
         async def _async_refresh_with_resource_template():
             resource = resource_template.async_render(parse_result=False)
@@ -242,7 +277,9 @@ def _create_scraper_coordinator(
     )
 
 
-def create_scraper_data_from_config(config_name, hass, http, config, file_manager):
+def create_scraper_data_from_config(
+    config_name, config, hass, http, file_manager, form_submitter
+):
     resource = config.get(CONF_RESOURCE)
     resource_template = config.get(CONF_RESOURCE_TEMPLATE)
     method = config.get(CONF_METHOD).lower()
@@ -251,7 +288,6 @@ def create_scraper_data_from_config(config_name, hass, http, config, file_manage
     headers = config.get(CONF_HEADERS)
     params = config.get(CONF_PARAMS)
     parser = config.get(CONF_PARSER)
-    form_submit = config.get(CONF_FORM_SUBMIT)
 
     if resource_template is not None:
         resource_template.hass = hass
@@ -262,6 +298,7 @@ def create_scraper_data_from_config(config_name, hass, http, config, file_manage
         hass,
         file_manager,
         http,
+        form_submitter,
         config_name,
         method,
         resource,
@@ -269,5 +306,4 @@ def create_scraper_data_from_config(config_name, hass, http, config, file_manage
         params,
         payload,
         parser,
-        form_submit,
     )

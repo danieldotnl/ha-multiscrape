@@ -8,6 +8,7 @@ _LOGGER = logging.getLogger(__name__)
 
 class HttpWrapper:
     def __init__(self, config_name, hass, client, file_manager, timeout):
+        _LOGGER.debug("%s # Initializing http wrapper", config_name)
         self._client = client
         self._file_manager = file_manager
         self._config_name = config_name
@@ -23,7 +24,13 @@ class HttpWrapper:
         _LOGGER.debug("%s # Authentication configuration processed", self._config_name)
 
     async def async_request(
-        self, context, method, resource, headers, params, request_data
+        self,
+        context,
+        method,
+        resource,
+        request_data=None,
+        headers=None,
+        params=None,
     ):
         _LOGGER.debug(
             "%s # Executing %s-request with a %s to url: %s.",
@@ -54,12 +61,15 @@ class HttpWrapper:
                 )
                 await self._async_file_log("response_body", context, response.text)
 
+            # bit of a hack since httpx also raises an exception for redirects: https://github.com/encode/httpx/blob/c6c8cb1fe2da9380f8046a19cdd5aade586f69c8/CHANGELOG.md#0200-13th-october-2021
+            if 400 <= response.status_code <= 599:
+                response.raise_for_status()
             return response
 
         except Exception as ex:
             _LOGGER.error(
                 "%s # Error executing %s request to url: %s.\n Error message:\n %s",
-                self._name,
+                self._config_name,
                 method,
                 resource,
                 repr(ex),

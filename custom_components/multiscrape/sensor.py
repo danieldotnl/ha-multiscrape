@@ -40,9 +40,7 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
     else:
         _LOGGER.info("%s # Could not find sensor configuration", scraper.name)
 
-    if scraper.data is None:
-        if scraper.last_exception:
-            raise PlatformNotReady from scraper.last_exception
+    if not coordinator.last_update_success:
         raise PlatformNotReady
 
     sensor_name = conf.get(CONF_NAME)
