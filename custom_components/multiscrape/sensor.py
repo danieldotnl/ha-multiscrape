@@ -121,7 +121,7 @@ class MultiscrapeSensor(MultiscrapeEntity, SensorEntity):
         )
         self._attr_unique_id = unique_id
         self._attr_state_class = state_class
-        self._attr_unit_of_measurement = unit_of_measurement
+        self._attr_native_unit_of_measurement = unit_of_measurement
 
         self._sensor_selector = sensor_selector
 
