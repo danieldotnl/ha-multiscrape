@@ -36,12 +36,13 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
             hass, BINARY_SENSOR_DOMAIN, discovery_info
         )
     else:
-        _LOGGER.info("Could not find binary_sensor configuration")
+        _LOGGER.info("?? # Could not find binary_sensor configuration")
 
     if not coordinator.last_update_success:
         raise PlatformNotReady
 
-    name = conf.get(CONF_NAME)
+    sensor_name = conf.get(CONF_NAME)
+    _LOGGER.debug("%s # %s # Setting up binary sensor", scraper.name, sensor_name)
     unique_id = conf.get(CONF_UNIQUE_ID)
     device_class = conf.get(CONF_DEVICE_CLASS)
     force_update = conf.get(CONF_FORCE_UPDATE)
@@ -62,7 +63,7 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
                 coordinator,
                 scraper,
                 unique_id,
-                name,
+                sensor_name,
                 device_class,
                 force_update,
                 resource_template,

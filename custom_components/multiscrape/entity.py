@@ -93,13 +93,13 @@ class MultiscrapeEntity(Entity):
         """Handle updated data from the coordinator."""
         if not self.coordinator.last_update_success:
             _LOGGER.debug(
-                "%s # %s # Last update of the resource was not succesful. Setting sensor availability to False",
+                "%s # %s # Last update of the resource was not successful. Setting sensor availability to False",
                 self.scraper.name,
                 self._name,
             )
             self._attr_available = False
         else:
-            self._attr_available = self.scraper.data is not None
+            self._attr_available = True
             self._update_sensor()
             self._update_attributes()
         self.async_write_ha_state()

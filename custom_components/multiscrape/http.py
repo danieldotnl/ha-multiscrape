@@ -7,7 +7,17 @@ _LOGGER = logging.getLogger(__name__)
 
 
 class HttpWrapper:
-    def __init__(self, config_name, hass, client, file_manager, timeout):
+    def __init__(
+        self,
+        config_name,
+        hass,
+        client,
+        file_manager,
+        timeout,
+        params=None,
+        request_headers=None,
+        data=None,
+    ):
         _LOGGER.debug("%s # Initializing http wrapper", config_name)
         self._client = client
         self._file_manager = file_manager
@@ -15,6 +25,8 @@ class HttpWrapper:
         self._timeout = timeout
         self._hass = hass
         self._auth = None
+        self._params = params
+        self._request_headers = request_headers
 
     def set_authentication(self, username, password, auth_type):
         if auth_type == HTTP_DIGEST_AUTHENTICATION:
@@ -23,15 +35,7 @@ class HttpWrapper:
             self._auth = (username, password)
         _LOGGER.debug("%s # Authentication configuration processed", self._config_name)
 
-    async def async_request(
-        self,
-        context,
-        method,
-        resource,
-        request_data=None,
-        headers=None,
-        params=None,
-    ):
+    async def async_request(self, context, method, resource, request_data=None):
         _LOGGER.debug(
             "%s # Executing %s-request with a %s to url: %s.",
             self._config_name,
@@ -43,8 +47,8 @@ class HttpWrapper:
             response = await self._client.request(
                 method,
                 resource,
-                headers=headers,
-                params=params,
+                headers=self._request_headers,
+                params=self._params,
                 auth=self._auth,
                 data=request_data,
                 timeout=self._timeout,
