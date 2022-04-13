@@ -35,6 +35,10 @@ class MultiscrapeDataUpdateCoordinator(DataUpdateCoordinator):
 
         super().__init__(hass, _LOGGER, name=DOMAIN, update_interval=update_interval)
 
+    def notify_scrape_exception(self):
+        if self._form_submitter:
+            self._form_submitter.notify_scrape_exception()
+
     async def _async_update_data(self):
         _LOGGER.debug(
             "%s # New run: start (re)loading data from resource", self._config_name
@@ -51,7 +55,7 @@ class MultiscrapeDataUpdateCoordinator(DataUpdateCoordinator):
                         "%s # Using response from form-submit as data. Now ready to be scraped by sensors.",
                         self._config_name,
                     )
-                    await self.scraper.set_content(result)
+                    await self._scraper.set_content(result)
                     return
             except Exception as ex:
                 _LOGGER.error(

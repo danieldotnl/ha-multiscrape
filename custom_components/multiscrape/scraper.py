@@ -24,6 +24,8 @@ class Scraper:
         self._file_manager = file_manager
         self._config_name = config_name
         self._parser = parser
+        self._soup = None
+        self._data = None
         self.reset()
 
     @property
@@ -67,57 +69,53 @@ class Scraper:
         if attribute:
             log_prefix = log_prefix + f"# {attribute}"
 
-        try:
-            if selector.just_value:
-                _LOGGER.debug("%s # Applying value_template only.", log_prefix)
-                return selector.value_template.async_render_with_possible_json_value(
-                    self._data, None
-                )
+        if selector.just_value:
+            _LOGGER.debug("%s # Applying value_template only.", log_prefix)
+            return selector.value_template.async_render_with_possible_json_value(
+                self._data, None
+            )
 
-            if selector.is_list:
-                tags = self._soup.select(selector.list)
-                _LOGGER.debug("%s # List selector selected tags: %s", log_prefix, tags)
-                if selector.attribute is not None:
-                    _LOGGER.debug(
-                        "%s # Try to find attributes: %s",
-                        log_prefix,
-                        selector.attribute,
-                    )
-                    values = [tag[selector.attribute] for tag in tags]
-                else:
-                    values = [tag.text for tag in tags]
-                value = ",".join(values)
-                _LOGGER.debug("%s # List selector csv: %s", log_prefix, value)
-
-            else:
-                tag = self._soup.select_one(selector.element)
-                _LOGGER.debug("%s # Tag selected: %s", log_prefix, tag)
-                if selector.attribute is not None:
-                    _LOGGER.debug(
-                        "%s # Try to find attribute: %s", log_prefix, selector.attribute
-                    )
-                    value = tag[selector.attribute]
-                else:
-                    if tag.name in ("style", "script", "template"):
-                        value = tag.string
-                    else:
-                        value = tag.text
-                _LOGGER.debug("%s # Selector result: %s", log_prefix, value)
-
-            if value is not None and selector.value_template is not None:
+        if selector.is_list:
+            tags = self._soup.select(selector.list)
+            _LOGGER.debug("%s # List selector selected tags: %s", log_prefix, tags)
+            if selector.attribute is not None:
                 _LOGGER.debug(
-                    "%s # Applying value_template on selector result", log_prefix
+                    "%s # Try to find attributes: %s",
+                    log_prefix,
+                    selector.attribute,
                 )
-                value = selector.value_template.async_render(
-                    variables={"value": value}, parse_result=False
-                )
+                values = [tag[selector.attribute] for tag in tags]
+            else:
+                values = [tag.text for tag in tags]
+            value = ",".join(values)
+            _LOGGER.debug("%s # List selector csv: %s", log_prefix, value)
 
-            _LOGGER.debug("%s # Final selector value: %s", log_prefix, value)
-            return value
-        except Exception:
-            if self._form_submitter:
-                self._form_submitter.notify_scrape_exception()
-            raise
+        else:
+            tag = self._soup.select_one(selector.element)
+            _LOGGER.debug("%s # Tag selected: %s", log_prefix, tag)
+            if tag is None:
+                raise ValueError("Could not find a tag for given selector")
+
+            if selector.attribute is not None:
+                _LOGGER.debug(
+                    "%s # Try to find attribute: %s", log_prefix, selector.attribute
+                )
+                value = tag[selector.attribute]
+            else:
+                if tag.name in ("style", "script", "template"):
+                    value = tag.string
+                else:
+                    value = tag.text
+            _LOGGER.debug("%s # Selector result: %s", log_prefix, value)
+
+        if value is not None and selector.value_template is not None:
+            _LOGGER.debug("%s # Applying value_template on selector result", log_prefix)
+            value = selector.value_template.async_render(
+                variables={"value": value}, parse_result=False
+            )
+
+        _LOGGER.debug("%s # Final selector value: %s", log_prefix, value)
+        return value
 
     async def _async_file_log(self, content_name, content):
         try:

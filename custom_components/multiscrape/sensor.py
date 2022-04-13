@@ -141,20 +141,16 @@ class MultiscrapeSensor(MultiscrapeEntity, SensorEntity):
             if self._icon_template:
                 self._set_icon(value)
         except Exception as exception:
-            _LOGGER.debug(
-                "%s # %s # Exception selecting sensor data: %s\nHINT: Use debug logging and log_response for further investigation!",
-                self.scraper.name,
-                self._name,
-                exception,
-            )
+            self.coordinator.notify_scrape_exception()
 
             if self._sensor_selector.on_error.log not in [False, "false", "False"]:
                 level = LOG_LEVELS[self._sensor_selector.on_error.log]
                 _LOGGER.log(
                     level,
-                    "%s # %s # Unable to extract data",
+                    "%s # %s # Unable to scrape data: %s. \nConsider using debug logging and log_response for further investigation.",
                     self.scraper.name,
                     self._name,
+                    exception,
                 )
 
             if self._sensor_selector.on_error.value == CONF_ON_ERROR_VALUE_NONE:
