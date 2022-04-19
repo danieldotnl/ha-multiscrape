@@ -25,6 +25,7 @@ class HttpWrapper:
         self._timeout = timeout
         self._hass = hass
         self._auth = None
+        self._data = data
         self._params = params
         self._request_headers = request_headers
 
@@ -36,6 +37,10 @@ class HttpWrapper:
         _LOGGER.debug("%s # Authentication configuration processed", self._config_name)
 
     async def async_request(self, context, method, resource, request_data=None):
+
+        if not request_data:
+            request_data = self._data
+
         _LOGGER.debug(
             "%s # Executing %s-request with a %s to url: %s.",
             self._config_name,
