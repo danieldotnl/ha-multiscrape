@@ -131,7 +131,6 @@ Configure the attributes on the sensor that can be set with additional scraping 
 | select         | CSS selector used for retrieving the value of the attribute. Only required when `select_list` is not provided.                    | True     |         | string/template |
 | select_list    | CSS selector for multiple values of multiple elements which will be returned as csv. Only required when `select` is not provided. | True     |         | string/template |
 | attribute      | Attribute from the selected element to read as value                                                                              | False    |         | string          |
-| index          | The occurence to read when the selector returns multiple results                                                                  | False    | 0       | int             |
 | value_template | Defines a template applied on the result of the selector to extract the value                                                     | False    |         | string/template |
 | on_error       | See [On-error](#on-error)                                                                                                         | False    |         |                 |
 
