@@ -83,7 +83,7 @@ class MultiscrapeDataUpdateCoordinator(DataUpdateCoordinator):
                 ex,
             )
             self._scraper.reset()
-            raise UpdateFailed("Unable to update data from resource")
+            raise UpdateFailed("Unable to update data from resource") from ex
 
     async def _prepare_new_run(self):
         if self._file_manager:
