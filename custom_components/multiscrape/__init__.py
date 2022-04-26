@@ -56,7 +56,6 @@ from .scraper import Scraper
 _LOGGER = logging.getLogger(__name__)
 # we don't want to go with the default 15 seconds defined in helpers/entity_component
 DEFAULT_SCAN_INTERVAL = timedelta(seconds=60)
-
 PLATFORMS = [Platform.SENSOR, Platform.BINARY_SENSOR, Platform.BUTTON]
 
 

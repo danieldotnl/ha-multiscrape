@@ -3,12 +3,14 @@ import logging
 
 from homeassistant.components.button import ButtonEntity
 from homeassistant.components.button import DOMAIN as BUTTON_DOMAIN
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_NAME
 from homeassistant.const import CONF_UNIQUE_ID
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import async_generate_entity_id
 from homeassistant.helpers.entity import EntityCategory
+from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.typing import ConfigType
+from homeassistant.helpers.typing import DiscoveryInfoType
 
 from . import async_get_config_and_coordinator
 
@@ -17,8 +19,11 @@ _LOGGER = logging.getLogger(__name__)
 
 
 async def async_setup_platform(
-    hass: HomeAssistant, config: ConfigEntry, async_add_entities, discovery_info=None
-):
+    hass: HomeAssistant,
+    config: ConfigType,
+    async_add_entities: AddEntitiesCallback,
+    discovery_info: DiscoveryInfoType | None = None,
+) -> None:
     """Set up the multiscrape refresh button"""
 
     conf, coordinator, scraper = await async_get_config_and_coordinator(
