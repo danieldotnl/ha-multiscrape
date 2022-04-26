@@ -2,13 +2,13 @@
 import logging
 
 from homeassistant.components.binary_sensor import BinarySensorEntity
-from homeassistant.components.binary_sensor import DOMAIN as BINARY_SENSOR_DOMAIN
 from homeassistant.const import CONF_DEVICE_CLASS
 from homeassistant.const import CONF_FORCE_UPDATE
 from homeassistant.const import CONF_ICON
 from homeassistant.const import CONF_NAME
 from homeassistant.const import CONF_RESOURCE_TEMPLATE
 from homeassistant.const import CONF_UNIQUE_ID
+from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import PlatformNotReady
 from homeassistant.helpers.entity import async_generate_entity_id
@@ -27,7 +27,7 @@ from .const import LOG_LEVELS
 from .entity import MultiscrapeEntity
 from .selector import Selector
 
-ENTITY_ID_FORMAT = BINARY_SENSOR_DOMAIN + ".{}"
+ENTITY_ID_FORMAT = Platform.BINARY_SENSOR + ".{}"
 _LOGGER = logging.getLogger(__name__)
 
 
@@ -42,7 +42,7 @@ async def async_setup_platform(
     # ensure it's updating its state.
     if discovery_info is not None:
         conf, coordinator, scraper = await async_get_config_and_coordinator(
-            hass, BINARY_SENSOR_DOMAIN, discovery_info
+            hass, Platform.BINARY_SENSOR, discovery_info
         )
     else:
         _LOGGER.info("?? # Could not find binary_sensor configuration")
