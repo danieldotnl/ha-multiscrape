@@ -5,9 +5,6 @@ import os
 from datetime import timedelta
 
 import voluptuous as vol
-from homeassistant.components.binary_sensor import DOMAIN as BINARY_SENSOR_DOMAIN
-from homeassistant.components.button import DOMAIN as BUTTON_DOMAIN
-from homeassistant.components.sensor import DOMAIN as SENSOR_DOMAIN
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_AUTHENTICATION
 from homeassistant.const import CONF_DESCRIPTION
@@ -23,6 +20,7 @@ from homeassistant.const import CONF_SCAN_INTERVAL
 from homeassistant.const import CONF_TIMEOUT
 from homeassistant.const import CONF_USERNAME
 from homeassistant.const import CONF_VERIFY_SSL
+from homeassistant.const import Platform
 from homeassistant.const import SERVICE_RELOAD
 from homeassistant.core import HomeAssistant
 from homeassistant.core import ServiceCall
@@ -59,8 +57,7 @@ _LOGGER = logging.getLogger(__name__)
 # we don't want to go with the default 15 seconds defined in helpers/entity_component
 DEFAULT_SCAN_INTERVAL = timedelta(seconds=60)
 
-PLATFORMS = ["binary_sensor", "sensor", "button"]
-COORDINATOR_AWARE_PLATFORMS = [SENSOR_DOMAIN, BINARY_SENSOR_DOMAIN, BUTTON_DOMAIN]
+PLATFORMS = [Platform.SENSOR, Platform.BINARY_SENSOR, Platform.BUTTON]
 
 
 async def async_setup(hass: HomeAssistant, entry: ConfigEntry):
@@ -88,9 +85,7 @@ async def async_setup(hass: HomeAssistant, entry: ConfigEntry):
 
 def _async_setup_shared_data(hass: HomeAssistant):
     """Create shared data for platform config and scraper coordinators."""
-    hass.data[DOMAIN] = {
-        key: [] for key in [SCRAPER_DATA, *COORDINATOR_AWARE_PLATFORMS]
-    }
+    hass.data[DOMAIN] = {key: [] for key in [SCRAPER_DATA, *PLATFORMS]}
 
 
 async def _async_process_config(hass, config) -> bool:
@@ -160,7 +155,7 @@ async def _async_process_config(hass, config) -> bool:
         target_name = slugify(config_name)
         await _register_services(hass, target_name, coordinator)
 
-        for platform_domain in COORDINATOR_AWARE_PLATFORMS:
+        for platform_domain in PLATFORMS:
             if platform_domain not in conf:
                 continue
 
