@@ -57,6 +57,7 @@ class HttpWrapper:
                 auth=self._auth,
                 data=request_data,
                 timeout=self._timeout,
+                follow_redirects=True,
             )
 
             _LOGGER.debug(
