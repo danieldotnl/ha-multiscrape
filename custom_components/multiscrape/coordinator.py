@@ -1,10 +1,8 @@
 import logging
 
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
-from homeassistant.helpers.update_coordinator import UpdateFailed
 
 from .const import DOMAIN
-
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -32,6 +30,7 @@ class MultiscrapeDataUpdateCoordinator(DataUpdateCoordinator):
         self._resource = resource
         self._resource_template = resource_template
         self._method = method
+        self.update_error = False
 
         super().__init__(hass, _LOGGER, name=DOMAIN, update_interval=update_interval)
 
@@ -83,9 +82,10 @@ class MultiscrapeDataUpdateCoordinator(DataUpdateCoordinator):
                 ex,
             )
             self._scraper.reset()
-            raise UpdateFailed("Unable to update data from resource") from ex
+            self.update_error = True
 
     async def _prepare_new_run(self):
+        self.update_error = False
         if self._file_manager:
             _LOGGER.debug(
                 "%s # Deleting logging files from previous run", self._config_name

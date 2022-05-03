@@ -12,6 +12,7 @@ from homeassistant.const import CONF_RESOURCE_TEMPLATE
 from homeassistant.const import CONF_UNIQUE_ID
 from homeassistant.const import CONF_UNIT_OF_MEASUREMENT
 from homeassistant.const import Platform
+from homeassistant.const import STATE_UNAVAILABLE
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import PlatformNotReady
 from homeassistant.helpers.entity import async_generate_entity_id
@@ -143,6 +144,9 @@ class MultiscrapeSensor(MultiscrapeEntity, SensorEntity):
         )
 
         try:
+            if self.coordinator.update_error is True:
+                raise ValueError("Skipped scraping because data couldn't be updated")
+
             value = self.scraper.scrape(self._sensor_selector, self._name)
             _LOGGER.debug(
                 "%s # %s # Selected: %s", self.scraper.name, self._name, value
@@ -165,7 +169,7 @@ class MultiscrapeSensor(MultiscrapeEntity, SensorEntity):
                 )
 
             if self._sensor_selector.on_error.value == CONF_ON_ERROR_VALUE_NONE:
-                self._attr_native_value = None
+                self._attr_native_value = STATE_UNAVAILABLE
                 _LOGGER.debug(
                     "%s # %s # On-error, set value to None",
                     self.scraper.name,

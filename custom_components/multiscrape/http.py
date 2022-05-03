@@ -77,7 +77,7 @@ class HttpWrapper:
             return response
 
         except Exception as ex:
-            _LOGGER.error(
+            _LOGGER.debug(
                 "%s # Error executing %s request to url: %s.\n Error message:\n %s",
                 self._config_name,
                 method,
