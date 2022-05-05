@@ -52,6 +52,9 @@ class FormSubmitter:
         else:
             page = await self._fetch_form_page(main_resource)
         form = await self._async_substract_form(page)
+
+        _LOGGER.debug("%s # Form looks like this: \n%s", self._config_name, form)
+
         input_fields = self._get_input_fields(form)
         input_fields.update(self._input_values)
 
@@ -171,6 +174,9 @@ class FormSubmitter:
                 self._select,
             )
             form = soup.select_one(self._select)
+
+            if not form:
+                raise ValueError("Could not find form")
             _LOGGER.debug(
                 "%s # Found the form, now finding all input fields", self._config_name
             )
