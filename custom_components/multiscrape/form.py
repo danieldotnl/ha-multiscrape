@@ -102,9 +102,9 @@ class FormSubmitter:
         resource = main_resource
         if action and self._form_resource:
             resource = urljoin(self._form_resource, action)
-        if action:
+        elif action:
             resource = urljoin(main_resource, action)
-        if self._form_resource:
+        elif self._form_resource:
             resource = self._form_resource
 
         _LOGGER.debug(
