@@ -1,7 +1,6 @@
 {
   "name": "Multiscrape",
   "hacs": "1.6.0",
-  "iot_class": "Local Polling",
   "homeassistant": "2021.9.0",
   "render_readme": true
 }
