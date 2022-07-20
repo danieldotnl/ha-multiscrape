@@ -2,4 +2,4 @@ pip==22.1.2
 pre-commit==2.20.0
 black==22.6.0
 flake8==4.0.1
-reorder-python-imports==3.8.1
+reorder-python-imports==3.8.2
