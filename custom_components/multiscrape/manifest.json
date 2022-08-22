@@ -3,7 +3,7 @@
   "name": "Multiscrape scraping component",
   "documentation": "https://github.com/danieldotnl/ha-multiscrape",
   "issue_tracker": "https://github.com/danieldotnl/ha-multiscrape/issues",
-  "requirements": ["lxml", "beautifulsoup4==4.10.0"],
+  "requirements": ["lxml==4.9.1", "beautifulsoup4==4.11.1"],
   "dependencies": [],
   "config_flow": false,
   "version": "6.3.1",
