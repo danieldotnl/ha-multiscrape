@@ -84,6 +84,21 @@ class HttpWrapper:
                 resource,
                 repr(ex),
             )
+            try:
+                if self._file_manager:
+                    await self._async_file_log(
+                        "response_headers_error", context, response.headers
+                    )
+                    await self._async_file_log(
+                        "response_body_error", context, response.text
+                    )
+            except Exception as exc:
+                _LOGGER.debug(
+                    "%s # Unable to write headers and body to files during handling of exception.\n Error message:\n %s",
+                    self._config_name,
+                    repr(exc),
+                )
+
             raise
 
     async def _async_file_log(self, content_name, context, content):
