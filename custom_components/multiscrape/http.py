@@ -48,6 +48,12 @@ class HttpWrapper:
             method,
             resource,
         )
+        if self._file_manager:
+            await self._async_file_log(
+                "request_headers", context, self._request_headers
+            )
+            await self._async_file_log("request_body", context, request_data)
+
         try:
             response = await self._client.request(
                 method,
