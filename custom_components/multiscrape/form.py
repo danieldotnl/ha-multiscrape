@@ -16,6 +16,7 @@ class FormSubmitter:
         form_resource,
         select,
         input_values,
+        input_filter,
         submit_once,
         resubmit_error,
         parser,
@@ -28,6 +29,7 @@ class FormSubmitter:
         self._form_resource = form_resource
         self._select = select
         self._input_values = input_values
+        self._input_filter = input_filter
         self._submit_once = submit_once
         self._resubmit_error = resubmit_error
         self._parser = parser
@@ -56,6 +58,8 @@ class FormSubmitter:
         _LOGGER.debug("%s # Form looks like this: \n%s", self._config_name, form)
 
         input_fields = self._get_input_fields(form)
+        for field in self._input_filter:
+            input_fields.pop(field, None)
         input_fields.update(self._input_values)
 
         _LOGGER.debug(

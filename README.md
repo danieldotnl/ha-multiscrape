@@ -138,13 +138,14 @@ Configure the attributes on the sensor that can be set with additional scraping 
 
 Configure the form-submit functionality which enables you to submit a (login) form before scraping a site. More details on how this works [can be found on the wiki.](https://github.com/danieldotnl/ha-multiscrape/wiki/Form-submit-functionality)
 
-| name              | description                                                                          | required | default | type          |
-| ----------------- | ------------------------------------------------------------------------------------ | -------- | ------- | ------------- |
-| resource          | The url for the site with the form                                                   | False    |         | string        |
-| select            | CSS selector used for selecting the form in the html                                 | True     |         | string        |
-| input             | A dictionary with name/values which will be merged with the input fields on the form | False    |         | string - list |
-| submit_once       | Submit the form only once on startup instead of each scan interval                   | False    | False   | boolean       |
-| resubmit_on_error | Resubmit the form after a scraping error is encountered                              | False    | True    | boolean       |
+| name              | description                                                                          | required | default | type                |
+| ----------------- | ------------------------------------------------------------------------------------ | -------- | ------- | ------------------- |
+| resource          | The url for the site with the form                                                   | False    |         | string              |
+| select            | CSS selector used for selecting the form in the html                                 | True     |         | string              |
+| input             | A dictionary with name/values which will be merged with the input fields on the form | False    |         | string - dictionary |
+| input_filter      | A list of input fields that should not be submitted with the form                    | False    |         | string - list       |
+| submit_once       | Submit the form only once on startup instead of each scan interval                   | False    | False   | boolean             |
+| resubmit_on_error | Resubmit the form after a scraping error is encountered                              | False    | True    | boolean             |
 
 ### On-error
 

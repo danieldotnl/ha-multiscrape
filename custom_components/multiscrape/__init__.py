@@ -33,6 +33,7 @@ from homeassistant.util import slugify
 
 from .const import CONF_FIELDS
 from .const import CONF_FORM_INPUT
+from .const import CONF_FORM_INPUT_FILTER
 from .const import CONF_FORM_RESOURCE
 from .const import CONF_FORM_RESUBMIT_ERROR
 from .const import CONF_FORM_SELECT
@@ -261,6 +262,7 @@ def _create_form_submitter(config_name, config, hass, http, file_manager, parser
     resource = config.get(CONF_FORM_RESOURCE)
     select = config.get(CONF_FORM_SELECT)
     input_values = config.get(CONF_FORM_INPUT)
+    input_filter = config.get(CONF_FORM_INPUT_FILTER)
     resubmit_error = config.get(CONF_FORM_RESUBMIT_ERROR)
     submit_once = config.get(CONF_FORM_SUBMIT_ONCE)
 
@@ -272,6 +274,7 @@ def _create_form_submitter(config_name, config, hass, http, file_manager, parser
         resource,
         select,
         input_values,
+        input_filter,
         submit_once,
         resubmit_error,
         parser,
