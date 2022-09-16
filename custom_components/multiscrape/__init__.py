@@ -292,7 +292,9 @@ def _create_multiscrape_coordinator(
     data_renderer = create_renderer(hass, conf.get(CONF_PAYLOAD))
 
     if resource_template is not None:
-        resource_template.hass = hass
+        resource_renderer = create_renderer(hass, resource_template)
+    else:
+        resource_renderer = create_renderer(hass, resource)
 
     return MultiscrapeDataUpdateCoordinator(
         config_name,
@@ -302,8 +304,7 @@ def _create_multiscrape_coordinator(
         form_submitter,
         scraper,
         scan_interval,
-        resource,
-        resource_template,
+        resource_renderer,
         method,
         data_renderer,
     )

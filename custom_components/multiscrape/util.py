@@ -20,7 +20,9 @@ def create_renderer(hass, value_template):
         try:
             return value_template.async_render({"value": value}, parse_result=False)
         except TemplateError:
-            _LOGGER.exception("Error parsing value of template")
+            _LOGGER.exception(
+                "Error rendering template: %s with value %s", value_template, value
+            )
             return value
 
     return _render

@@ -17,8 +17,7 @@ class MultiscrapeDataUpdateCoordinator(DataUpdateCoordinator):
         form_submitter,
         scraper,
         update_interval,
-        resource,
-        resource_template,
+        resource_renderer,
         method,
         data_renderer,
     ):
@@ -28,11 +27,11 @@ class MultiscrapeDataUpdateCoordinator(DataUpdateCoordinator):
         self._file_manager = file_manager
         self._scraper = scraper
         self._form_submitter = form_submitter
-        self._resource = resource
-        self._resource_template = resource_template
+        self._resource_renderer = resource_renderer
         self._method = method
         self._data_renderer = data_renderer
         self.update_error = False
+        self._resource = None
 
         super().__init__(hass, _LOGGER, name=DOMAIN, update_interval=update_interval)
 
@@ -99,13 +98,12 @@ class MultiscrapeDataUpdateCoordinator(DataUpdateCoordinator):
                     ex,
                 )
 
-        if self._resource_template:
-            self._resource = self._resource_template.async_render(parse_result=False)
-            _LOGGER.debug(
-                "%s # Rendered resource template into: %s",
-                self._config_name,
-                self._resource,
-            )
+        self._resource = self._resource_renderer(None)
+        _LOGGER.debug(
+            "%s # Rendered resource template into: %s",
+            self._config_name,
+            self._resource,
+        )
 
         self._scraper.reset()
 
