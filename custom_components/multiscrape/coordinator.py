@@ -20,6 +20,7 @@ class MultiscrapeDataUpdateCoordinator(DataUpdateCoordinator):
         resource,
         resource_template,
         method,
+        data_renderer,
     ):
         self._hass = hass
         self._config_name = config_name
@@ -30,6 +31,7 @@ class MultiscrapeDataUpdateCoordinator(DataUpdateCoordinator):
         self._resource = resource
         self._resource_template = resource_template
         self._method = method
+        self._data_renderer = data_renderer
         self.update_error = False
 
         super().__init__(hass, _LOGGER, name=DOMAIN, update_interval=update_interval)
@@ -66,9 +68,7 @@ class MultiscrapeDataUpdateCoordinator(DataUpdateCoordinator):
         _LOGGER.debug("%s # Request data from %s", self._config_name, self._resource)
         try:
             response = await self._http.async_request(
-                "page",
-                self._method,
-                self._resource,
+                "page", self._method, self._resource, self._data_renderer(None)
             )
             await self._scraper.set_content(response.text)
             _LOGGER.debug(
