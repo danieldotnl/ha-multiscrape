@@ -24,13 +24,11 @@ from homeassistant.const import Platform
 from homeassistant.const import SERVICE_RELOAD
 from homeassistant.core import HomeAssistant
 from homeassistant.core import ServiceCall
-from homeassistant.exceptions import TemplateError
 from homeassistant.helpers import discovery
 from homeassistant.helpers.entity_component import EntityComponent
 from homeassistant.helpers.httpx_client import get_async_client
 from homeassistant.helpers.reload import async_reload_integration_platforms
 from homeassistant.helpers.service import async_set_service_schema
-from homeassistant.helpers.template import Template
 from homeassistant.util import slugify
 
 from .const import CONF_FIELDS
@@ -55,6 +53,7 @@ from .form import FormSubmitter
 from .http import HttpWrapper
 from .schema import CONFIG_SCHEMA  # noqa: F401
 from .scraper import Scraper
+from .util import create_renderer
 
 _LOGGER = logging.getLogger(__name__)
 # we don't want to go with the default 15 seconds defined in helpers/entity_component
@@ -320,23 +319,3 @@ def _create_scraper(config_name, config, hass, file_manager):
         file_manager,
         parser,
     )
-
-
-def create_renderer(hass, value_template):
-    """Create a renderer based on variable_template value."""
-    if value_template is None:
-        return lambda value: value
-
-    if not isinstance(value_template, Template):
-        value_template = Template(value_template, hass)
-    else:
-        value_template.hass = hass
-
-    def _render(value):
-        try:
-            return value_template.async_render({"value": value}, parse_result=False)
-        except TemplateError:
-            _LOGGER.exception("Error parsing value of template")
-            return value
-
-    return _render
