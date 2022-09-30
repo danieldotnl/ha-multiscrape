@@ -43,7 +43,12 @@ class Scraper:
     async def set_content(self, content):
         self._data = content
 
-        if content[0] not in ["{", "["]:
+        if content[0] in ["{", "["]:
+            _LOGGER.debug(
+                "%s # Response seems to be json. Skip parsing with BeautifulSoup.",
+                self._config_name,
+            )
+        else:
             try:
                 _LOGGER.debug(
                     "%s # Loading the content in BeautifulSoup.",
@@ -73,6 +78,11 @@ class Scraper:
             _LOGGER.debug("%s # Applying value_template only.", log_prefix)
             return selector.value_template.async_render_with_possible_json_value(
                 self._data, None
+            )
+
+        if self._data[0] in ["{", "["]:
+            raise ValueError(
+                "JSON cannot be scraped. Please provide a value template to parse JSON response."
             )
 
         if selector.is_list:

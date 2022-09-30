@@ -162,7 +162,7 @@ class MultiscrapeSensor(MultiscrapeEntity, SensorEntity):
                 level = LOG_LEVELS[self._sensor_selector.on_error.log]
                 _LOGGER.log(
                     level,
-                    "%s # %s # Unable to scrape data: %s. \nConsider using debug logging and log_response for further investigation.",
+                    "%s # %s # Unable to scrape data: %s \nConsider using debug logging and log_response for further investigation.",
                     self.scraper.name,
                     self._name,
                     exception,
