@@ -49,17 +49,35 @@ class FormSubmitter:
 
     async def async_submit(self, main_resource):
         _LOGGER.debug("%s # Starting with form-submit", self._config_name)
-        if self._form_resource:
-            page = await self._fetch_form_page(self._form_resource)
+        input_fields = {}
+        action, method = None, None
+
+        if self._select:
+            if self._form_resource:
+                page = await self._fetch_form_page(self._form_resource)
+            else:
+                page = await self._fetch_form_page(main_resource)
+            form = await self._async_substract_form(page)
+
+            input_fields = self._get_input_fields(form)
+            for field in self._input_filter:
+                input_fields.pop(field, None)
+
+            action = form.get("action")
+            method = form.get("method")
+
+            _LOGGER.debug(
+                "%s # Found form action %s and method %s",
+                self._config_name,
+                action,
+                method,
+            )
         else:
-            page = await self._fetch_form_page(main_resource)
-        form = await self._async_substract_form(page)
+            _LOGGER.debug(
+                "%s # Skip scraping form, assuming all input is given in config.",
+                self._config_name,
+            )
 
-        _LOGGER.debug("%s # Form looks like this: \n%s", self._config_name, form)
-
-        input_fields = self._get_input_fields(form)
-        for field in self._input_filter:
-            input_fields.pop(field, None)
         input_fields.update(self._input_values)
 
         _LOGGER.debug(
@@ -68,17 +86,8 @@ class FormSubmitter:
             input_fields,
         )
 
-        action = form.get("action")
-        method = form.get("method")
         if not method:
             method = "POST"
-
-        _LOGGER.debug(
-            "%s # Found form action %s and method %s",
-            self._config_name,
-            action,
-            method,
-        )
 
         submit_resource = self._determine_submit_resource(action, main_resource)
 
@@ -132,6 +141,7 @@ class FormSubmitter:
         return response.text
 
     def _get_input_fields(self, form):
+        _LOGGER.debug("%s # Finding all input fields in form", self._config_name)
         elements = form.findAll("input")
         input_fields = dict(
             (element.get("name"), element.get("value")) for element in elements
@@ -181,9 +191,8 @@ class FormSubmitter:
 
             if not form:
                 raise ValueError("Could not find form")
-            _LOGGER.debug(
-                "%s # Found the form, now finding all input fields", self._config_name
-            )
+
+            _LOGGER.debug("%s # Form looks like this: \n%s", self._config_name, form)
             return form
 
         except IndexError as exception:

@@ -72,7 +72,7 @@ from .scraper import DEFAULT_TIMEOUT
 
 FORM_SUBMIT_SCHEMA = {
     vol.Optional(CONF_FORM_RESOURCE): cv.string,
-    vol.Required(CONF_FORM_SELECT): cv.string,
+    vol.Optional(CONF_FORM_SELECT): cv.string,
     vol.Optional(CONF_FORM_INPUT): vol.Schema({cv.string: cv.string}),
     vol.Optional(CONF_FORM_INPUT_FILTER, default=[]): cv.ensure_list,
     vol.Optional(CONF_FORM_SUBMIT_ONCE, default=False): cv.boolean,
