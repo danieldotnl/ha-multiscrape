@@ -38,7 +38,8 @@ Install via HACS (default store) or install manually by copying the files in a n
 
 ```yaml
 multiscrape:
-  - resource: https://www.home-assistant.io
+  - name: HA scraper
+    resource: https://www.home-assistant.io
     scan_interval: 3600
     sensor:
       - unique_id: ha_latest_version
