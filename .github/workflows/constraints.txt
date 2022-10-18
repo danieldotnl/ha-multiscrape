@@ -1,4 +1,4 @@
-pip==22.2.2
+pip==22.3
 pre-commit==2.20.0
 black==22.10.0
 flake8==5.0.4
