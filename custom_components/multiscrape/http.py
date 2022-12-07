@@ -14,7 +14,7 @@ class HttpWrapper:
         client,
         file_manager,
         timeout,
-        params=None,
+        params_renderer=None,
         request_headers=None,
     ):
         _LOGGER.debug("%s # Initializing http wrapper", config_name)
@@ -24,7 +24,7 @@ class HttpWrapper:
         self._timeout = timeout
         self._hass = hass
         self._auth = None
-        self._params = params
+        self._params_renderer = params_renderer
         self._request_headers = request_headers
 
     def set_authentication(self, username, password, auth_type):
@@ -54,7 +54,7 @@ class HttpWrapper:
                 method,
                 resource,
                 headers=self._request_headers,
-                params=self._params,
+                params=self._params_renderer(None),
                 auth=self._auth,
                 data=request_data,
                 timeout=self._timeout,

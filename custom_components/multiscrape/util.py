@@ -26,3 +26,16 @@ def create_renderer(hass, value_template):
             return value
 
     return _render
+
+
+def create_dict_renderer(hass, templates_dict):
+    if templates_dict is None:
+        return lambda value: {}
+
+    for item in templates_dict:
+        templates_dict[item] = create_renderer(hass, templates_dict[item])
+
+    def _render(value):
+        return {item: templates_dict[item](value) for item in templates_dict}
+
+    return _render
