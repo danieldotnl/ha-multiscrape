@@ -22,6 +22,7 @@ CONF_PICTURE = "picture"
 CONF_PARSER = "parser"
 CONF_SELECT = "select"
 CONF_SELECT_LIST = "select_list"
+CONF_SEPARATOR = "list_separator"
 CONF_ATTR = "attribute"
 CONF_SENSOR_ATTRS = "attributes"
 CONF_FORM_SUBMIT = "form_submit"
@@ -45,6 +46,7 @@ SCRAPER = "scraper"
 SCRAPER_DATA = "scraper"
 
 METHODS = ["POST", "GET", "post", "get"]
+DEFAULT_SEPARATOR = ","
 
 LOG_ERROR = "error"
 LOG_WARNING = "warning"

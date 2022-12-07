@@ -16,6 +16,7 @@ class Scraper:
         hass,
         file_manager,
         parser,
+        separator,
     ):
         """Initialize the data object."""
         _LOGGER.debug("%s # Initializing scraper", config_name)
@@ -26,6 +27,7 @@ class Scraper:
         self._parser = parser
         self._soup = None
         self._data = None
+        self._separator = separator
         self.reset()
 
     @property
@@ -97,7 +99,7 @@ class Scraper:
                 values = [tag[selector.attribute] for tag in tags]
             else:
                 values = [tag.text for tag in tags]
-            value = ",".join(values)
+            value = self._separator.join(values)
             _LOGGER.debug("%s # List selector csv: %s", log_prefix, value)
 
         else:

@@ -56,6 +56,7 @@ from .const import CONF_PICTURE
 from .const import CONF_SELECT
 from .const import CONF_SELECT_LIST
 from .const import CONF_SENSOR_ATTRS
+from .const import CONF_SEPARATOR
 from .const import CONF_STATE_CLASS
 from .const import DEFAULT_BINARY_SENSOR_NAME
 from .const import DEFAULT_BUTTON_NAME
@@ -63,6 +64,7 @@ from .const import DEFAULT_FORCE_UPDATE
 from .const import DEFAULT_METHOD
 from .const import DEFAULT_PARSER
 from .const import DEFAULT_SENSOR_NAME
+from .const import DEFAULT_SEPARATOR
 from .const import DEFAULT_VERIFY_SSL
 from .const import DOMAIN
 from .const import LOG_ERROR
@@ -97,6 +99,7 @@ INTEGRATION_SCHEMA = {
     vol.Optional(CONF_NAME): cv.string,
     vol.Optional(CONF_SCAN_INTERVAL): cv.time_period,
     vol.Optional(CONF_LOG_RESPONSE, default=False): cv.boolean,
+    vol.Optional(CONF_SEPARATOR, default=DEFAULT_SEPARATOR): cv.string,
 }
 
 ON_ERROR_SCHEMA = {

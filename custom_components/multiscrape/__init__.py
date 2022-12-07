@@ -5,6 +5,7 @@ import os
 from datetime import timedelta
 
 import voluptuous as vol
+from custom_components.multiscrape.const import CONF_SEPARATOR
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_AUTHENTICATION
 from homeassistant.const import CONF_DESCRIPTION
@@ -314,10 +315,12 @@ def _create_multiscrape_coordinator(
 def _create_scraper(config_name, config, hass, file_manager):
     _LOGGER.debug("%s # Initializing scraper", config_name)
     parser = config.get(CONF_PARSER)
+    separator = config.get(CONF_SEPARATOR)
 
     return Scraper(
         config_name,
         hass,
         file_manager,
         parser,
+        separator,
     )
