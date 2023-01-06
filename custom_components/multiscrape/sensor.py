@@ -3,7 +3,9 @@ from __future__ import annotations
 
 import logging
 
+from homeassistant.components.sensor import SensorDeviceClass
 from homeassistant.components.sensor import SensorEntity
+from homeassistant.components.sensor.helpers import async_parse_date_datetime
 from homeassistant.const import CONF_DEVICE_CLASS
 from homeassistant.const import CONF_FORCE_UPDATE
 from homeassistant.const import CONF_ICON
@@ -151,7 +153,17 @@ class MultiscrapeSensor(MultiscrapeEntity, SensorEntity):
             _LOGGER.debug(
                 "%s # %s # Selected: %s", self.scraper.name, self._name, value
             )
-            self._attr_native_value = value
+
+            if self.device_class not in {
+                SensorDeviceClass.DATE,
+                SensorDeviceClass.TIMESTAMP,
+            }:
+                self._attr_native_value = value
+
+            else:
+                self._attr_native_value = async_parse_date_datetime(
+                    value, self.entity_id, self.device_class
+                )
 
             if self._icon_template:
                 self._set_icon(value)
