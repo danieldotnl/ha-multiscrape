@@ -1,5 +1,6 @@
 """The multiscrape component."""
 import asyncio
+import contextlib
 import logging
 import os
 from datetime import timedelta
@@ -25,10 +26,10 @@ from homeassistant.const import Platform
 from homeassistant.const import SERVICE_RELOAD
 from homeassistant.core import HomeAssistant
 from homeassistant.core import ServiceCall
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import discovery
-from homeassistant.helpers.entity import Entity
-from homeassistant.helpers.entity_component import EntityComponent
 from homeassistant.helpers.httpx_client import get_async_client
+from homeassistant.helpers.reload import async_integration_yaml_config
 from homeassistant.helpers.reload import async_reload_integration_platforms
 from homeassistant.helpers.service import async_set_service_schema
 from homeassistant.util import slugify
@@ -67,12 +68,13 @@ PLATFORMS = [Platform.SENSOR, Platform.BINARY_SENSOR, Platform.BUTTON]
 async def async_setup(hass: HomeAssistant, entry: ConfigEntry):
     """Set up the multiscrape platforms."""
     _LOGGER.debug("# Start loading multiscrape")
-    component = EntityComponent[Entity](_LOGGER, DOMAIN, hass)
     _async_setup_shared_data(hass)
 
     async def reload_service_handler(service):
         """Remove all user-defined groups and load new ones from config."""
-        conf = await component.async_prepare_reload()
+        conf = None
+        with contextlib.suppress(HomeAssistantError):
+            conf = await async_integration_yaml_config(hass, DOMAIN)
         if conf is None:
             return
         await async_reload_integration_platforms(hass, DOMAIN, PLATFORMS)
