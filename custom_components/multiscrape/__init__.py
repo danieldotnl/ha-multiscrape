@@ -26,6 +26,7 @@ from homeassistant.const import SERVICE_RELOAD
 from homeassistant.core import HomeAssistant
 from homeassistant.core import ServiceCall
 from homeassistant.helpers import discovery
+from homeassistant.helpers.entity import Entity
 from homeassistant.helpers.entity_component import EntityComponent
 from homeassistant.helpers.httpx_client import get_async_client
 from homeassistant.helpers.reload import async_reload_integration_platforms
@@ -66,7 +67,7 @@ PLATFORMS = [Platform.SENSOR, Platform.BINARY_SENSOR, Platform.BUTTON]
 async def async_setup(hass: HomeAssistant, entry: ConfigEntry):
     """Set up the multiscrape platforms."""
     _LOGGER.debug("# Start loading multiscrape")
-    component = EntityComponent(_LOGGER, DOMAIN, hass)
+    component = EntityComponent[Entity](_LOGGER, DOMAIN, hass)
     _async_setup_shared_data(hass)
 
     async def reload_service_handler(service):
