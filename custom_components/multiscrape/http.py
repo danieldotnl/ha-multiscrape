@@ -35,7 +35,6 @@ class HttpWrapper:
         _LOGGER.debug("%s # Authentication configuration processed", self._config_name)
 
     async def async_request(self, context, method, resource, request_data=None):
-
         _LOGGER.debug(
             "%s # Executing %s-request with a %s to url: %s.",
             self._config_name,
