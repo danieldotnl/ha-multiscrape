@@ -106,7 +106,6 @@ class MultiscrapeBinarySensor(MultiscrapeEntity, BinarySensorEntity):
         sensor_selector,
         attribute_selectors,
     ):
-
         """Initialize a multiscrape binary sensor."""
         super().__init__(
             hass,

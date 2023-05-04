@@ -46,7 +46,6 @@ class MultiscrapeDataUpdateCoordinator(DataUpdateCoordinator):
         await self._prepare_new_run()
 
         if self._form_submitter and self._form_submitter.should_submit:
-
             try:
                 result = await self._form_submitter.async_submit(self._resource)
 

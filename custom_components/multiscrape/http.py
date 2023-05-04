@@ -35,7 +35,6 @@ class HttpWrapper:
         _LOGGER.debug("%s # Authentication configuration processed", self._config_name)
 
     async def async_request(self, context, method, resource, request_data=None):
-
         _LOGGER.debug(
             "%s # Executing %s-request with a %s to url: %s.",
             self._config_name,
@@ -48,6 +47,8 @@ class HttpWrapper:
                 "request_headers", context, self._request_headers
             )
             await self._async_file_log("request_body", context, request_data)
+
+        response = None
 
         try:
             response = await self._client.request(
@@ -76,7 +77,26 @@ class HttpWrapper:
             if 400 <= response.status_code <= 599:
                 response.raise_for_status()
             return response
-
+        except httpx.TimeoutException as ex:
+            _LOGGER.debug(
+                "%s # Timeout error while executing %s request to url: %s.\n Error message:\n %s",
+                self._config_name,
+                method,
+                resource,
+                repr(ex),
+            )
+            await self._handle_request_exception(context, response)
+            raise
+        except httpx.RequestError as ex:
+            _LOGGER.debug(
+                "%s # Request error while executing %s request to url: %s.\n Error message:\n %s",
+                self._config_name,
+                method,
+                resource,
+                repr(ex),
+            )
+            await self._handle_request_exception(context, response)
+            raise
         except Exception as ex:
             _LOGGER.debug(
                 "%s # Error executing %s request to url: %s.\n Error message:\n %s",
@@ -85,22 +105,24 @@ class HttpWrapper:
                 resource,
                 repr(ex),
             )
-            try:
-                if self._file_manager:
-                    await self._async_file_log(
-                        "response_headers_error", context, response.headers
-                    )
-                    await self._async_file_log(
-                        "response_body_error", context, response.text
-                    )
-            except Exception as exc:
-                _LOGGER.debug(
-                    "%s # Unable to write headers and body to files during handling of exception.\n Error message:\n %s",
-                    self._config_name,
-                    repr(exc),
-                )
-
+            await self._handle_request_exception(context, response)
             raise
+
+    async def _handle_request_exception(self, context, response):
+        try:
+            if self._file_manager:
+                await self._async_file_log(
+                    "response_headers_error", context, response.headers
+                )
+                await self._async_file_log(
+                    "response_body_error", context, response.text
+                )
+        except Exception as exc:
+            _LOGGER.debug(
+                "%s # Unable to write headers and body to files during handling of exception.\n Error message:\n %s",
+                self._config_name,
+                repr(exc),
+            )
 
     async def _async_file_log(self, content_name, context, content):
         try:
