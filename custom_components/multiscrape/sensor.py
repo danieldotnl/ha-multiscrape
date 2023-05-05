@@ -194,6 +194,8 @@ class MultiscrapeSensor(MultiscrapeEntity, SensorEntity):
                     self._name,
                     self._attr_native_value,
                 )
+                if self._attr_native_value is None:
+                    self._attr_available = False
                 return
             elif self._sensor_selector.on_error.value == CONF_ON_ERROR_VALUE_DEFAULT:
                 self._attr_native_value = self._sensor_selector.on_error_default
