@@ -6,7 +6,6 @@ import os
 from datetime import timedelta
 
 import voluptuous as vol
-from custom_components.multiscrape.const import CONF_SEPARATOR
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_AUTHENTICATION
 from homeassistant.const import CONF_DESCRIPTION
@@ -44,6 +43,7 @@ from .const import CONF_FORM_SUBMIT
 from .const import CONF_FORM_SUBMIT_ONCE
 from .const import CONF_LOG_RESPONSE
 from .const import CONF_PARSER
+from .const import CONF_SEPARATOR
 from .const import COORDINATOR
 from .const import DOMAIN
 from .const import PLATFORM_IDX
