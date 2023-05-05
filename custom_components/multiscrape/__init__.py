@@ -214,8 +214,6 @@ async def async_get_config_and_coordinator(hass, platform_domain, discovery_info
     conf = hass.data[DOMAIN][platform_domain][discovery_info[PLATFORM_IDX]]
     coordinator = shared_data[COORDINATOR]
     scraper = shared_data[SCRAPER]
-    if not scraper.has_data:
-        await coordinator.async_request_refresh()
     return conf, coordinator, scraper
 
 

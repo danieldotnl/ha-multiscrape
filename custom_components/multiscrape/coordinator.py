@@ -1,6 +1,11 @@
 import logging
+from datetime import timedelta
 
+from homeassistant.core import CALLBACK_TYPE
+from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
+from homeassistant.helpers.update_coordinator import event
+from homeassistant.util.dt import utcnow
 
 from .const import DOMAIN
 
@@ -11,12 +16,12 @@ class MultiscrapeDataUpdateCoordinator(DataUpdateCoordinator):
     def __init__(
         self,
         config_name,
-        hass,
+        hass: HomeAssistant,
         http,
         file_manager,
         form_submitter,
         scraper,
-        update_interval,
+        update_interval: timedelta | None,
         resource_renderer,
         method,
         data_renderer,
@@ -29,11 +34,23 @@ class MultiscrapeDataUpdateCoordinator(DataUpdateCoordinator):
         self._form_submitter = form_submitter
         self._resource_renderer = resource_renderer
         self._method = method
+        self._update_interval = update_interval
         self._data_renderer = data_renderer
         self.update_error = False
         self._resource = None
+        self._unsub_refresh: CALLBACK_TYPE | None = None
+        self._retry: int = 0
 
-        super().__init__(hass, _LOGGER, name=DOMAIN, update_interval=update_interval)
+        if self._update_interval == timedelta(seconds=0):
+            self._update_interval = None
+
+        _LOGGER.debug(
+            "%s # Scan interval is %s", self._config_name, self._update_interval
+        )
+
+        super().__init__(
+            hass, _LOGGER, name=DOMAIN, update_interval=self._update_interval
+        )
 
     def notify_scrape_exception(self):
         if self._form_submitter:
@@ -73,6 +90,7 @@ class MultiscrapeDataUpdateCoordinator(DataUpdateCoordinator):
                 "%s # Data succesfully refreshed. Sensors will now start scraping to update.",
                 self._config_name,
             )
+            self._retry = 0
         except Exception as ex:
             _LOGGER.error(
                 "%s # Updating failed with exception: %s",
@@ -81,6 +99,26 @@ class MultiscrapeDataUpdateCoordinator(DataUpdateCoordinator):
             )
             self._scraper.reset()
             self.update_error = True
+            if self._update_interval is None:
+                self._async_unsub_refresh()
+                if self._retry < 3:
+                    self._unsub_refresh = event.async_track_point_in_utc_time(
+                        self.hass,
+                        self._job,
+                        utcnow().replace(microsecond=self._microsecond)
+                        + timedelta(seconds=30),
+                    )
+                    _LOGGER.warning(
+                        "%s # Since updating failed and scan_interval = 0, retry %s of 3 will be scheduled in 30 seconds",
+                        self._config_name,
+                        self._retry + 1,
+                    )
+                    self._retry = self._retry + 1
+                else:
+                    _LOGGER.warning(
+                        "%s # Updating and 3 retries failed and scan_interval = 0, please manually retry with trigger service.",
+                        self._config_name,
+                    )
 
     async def _prepare_new_run(self):
         self.update_error = False
