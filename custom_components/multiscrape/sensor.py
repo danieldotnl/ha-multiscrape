@@ -164,9 +164,6 @@ class MultiscrapeSensor(MultiscrapeEntity, SensorEntity):
                 self._attr_native_value = async_parse_date_datetime(
                     value, self.entity_id, self.device_class
                 )
-
-            if self._icon_template:
-                self._set_icon(value)
         except Exception as exception:
             self.coordinator.notify_scrape_exception()
 
@@ -205,3 +202,6 @@ class MultiscrapeSensor(MultiscrapeEntity, SensorEntity):
                     self._name,
                     self._sensor_selector.on_error_default,
                 )
+        # determine icon after exception so it's also set for on_error cases
+        if self._icon_template:
+            self._set_icon(self._attr_native_value)
