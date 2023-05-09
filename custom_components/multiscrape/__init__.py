@@ -1,11 +1,11 @@
 """The multiscrape component."""
 import asyncio
+import contextlib
 import logging
 import os
 from datetime import timedelta
 
 import voluptuous as vol
-from custom_components.multiscrape.const import CONF_SEPARATOR
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_AUTHENTICATION
 from homeassistant.const import CONF_DESCRIPTION
@@ -25,9 +25,10 @@ from homeassistant.const import Platform
 from homeassistant.const import SERVICE_RELOAD
 from homeassistant.core import HomeAssistant
 from homeassistant.core import ServiceCall
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import discovery
-from homeassistant.helpers.entity_component import EntityComponent
 from homeassistant.helpers.httpx_client import get_async_client
+from homeassistant.helpers.reload import async_integration_yaml_config
 from homeassistant.helpers.reload import async_reload_integration_platforms
 from homeassistant.helpers.service import async_set_service_schema
 from homeassistant.util import slugify
@@ -42,6 +43,7 @@ from .const import CONF_FORM_SUBMIT
 from .const import CONF_FORM_SUBMIT_ONCE
 from .const import CONF_LOG_RESPONSE
 from .const import CONF_PARSER
+from .const import CONF_SEPARATOR
 from .const import COORDINATOR
 from .const import DOMAIN
 from .const import PLATFORM_IDX
@@ -66,12 +68,13 @@ PLATFORMS = [Platform.SENSOR, Platform.BINARY_SENSOR, Platform.BUTTON]
 async def async_setup(hass: HomeAssistant, entry: ConfigEntry):
     """Set up the multiscrape platforms."""
     _LOGGER.debug("# Start loading multiscrape")
-    component = EntityComponent(_LOGGER, DOMAIN, hass)
     _async_setup_shared_data(hass)
 
     async def reload_service_handler(service):
         """Remove all user-defined groups and load new ones from config."""
-        conf = await component.async_prepare_reload()
+        conf = None
+        with contextlib.suppress(HomeAssistantError):
+            conf = await async_integration_yaml_config(hass, DOMAIN)
         if conf is None:
             return
         await async_reload_integration_platforms(hass, DOMAIN, PLATFORMS)
@@ -211,8 +214,6 @@ async def async_get_config_and_coordinator(hass, platform_domain, discovery_info
     conf = hass.data[DOMAIN][platform_domain][discovery_info[PLATFORM_IDX]]
     coordinator = shared_data[COORDINATOR]
     scraper = shared_data[SCRAPER]
-    if not scraper.has_data:
-        await coordinator.async_request_refresh()
     return conf, coordinator, scraper
 
 

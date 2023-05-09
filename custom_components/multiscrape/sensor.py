@@ -14,7 +14,6 @@ from homeassistant.const import CONF_RESOURCE_TEMPLATE
 from homeassistant.const import CONF_UNIQUE_ID
 from homeassistant.const import CONF_UNIT_OF_MEASUREMENT
 from homeassistant.const import Platform
-from homeassistant.const import STATE_UNAVAILABLE
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import PlatformNotReady
 from homeassistant.helpers.entity import async_generate_entity_id
@@ -144,6 +143,7 @@ class MultiscrapeSensor(MultiscrapeEntity, SensorEntity):
         _LOGGER.debug(
             "%s # %s # Start scraping to update sensor", self.scraper.name, self._name
         )
+        self._attr_available = True
 
         try:
             if self.coordinator.update_error is True:
@@ -164,9 +164,6 @@ class MultiscrapeSensor(MultiscrapeEntity, SensorEntity):
                 self._attr_native_value = async_parse_date_datetime(
                     value, self.entity_id, self.device_class
                 )
-
-            if self._icon_template:
-                self._set_icon(value)
         except Exception as exception:
             self.coordinator.notify_scrape_exception()
 
@@ -181,7 +178,7 @@ class MultiscrapeSensor(MultiscrapeEntity, SensorEntity):
                 )
 
             if self._sensor_selector.on_error.value == CONF_ON_ERROR_VALUE_NONE:
-                self._attr_native_value = STATE_UNAVAILABLE
+                self._attr_available = False
                 _LOGGER.debug(
                     "%s # %s # On-error, set value to None",
                     self.scraper.name,
@@ -194,6 +191,8 @@ class MultiscrapeSensor(MultiscrapeEntity, SensorEntity):
                     self._name,
                     self._attr_native_value,
                 )
+                if self._attr_native_value is None:
+                    self._attr_available = False
                 return
             elif self._sensor_selector.on_error.value == CONF_ON_ERROR_VALUE_DEFAULT:
                 self._attr_native_value = self._sensor_selector.on_error_default
@@ -203,3 +202,6 @@ class MultiscrapeSensor(MultiscrapeEntity, SensorEntity):
                     self._name,
                     self._sensor_selector.on_error_default,
                 )
+        # determine icon after exception so it's also set for on_error cases
+        if self._icon_template:
+            self._set_icon(self._attr_native_value)

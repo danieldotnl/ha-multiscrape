@@ -4,6 +4,7 @@ from abc import abstractmethod
 from typing import Any
 
 from homeassistant.core import callback
+from homeassistant.exceptions import TemplateError
 from homeassistant.helpers.entity import Entity
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
@@ -63,15 +64,23 @@ class MultiscrapeEntity(Entity):
         super().__init__()
 
     def _set_icon(self, value):
-        self._attr_icon = self._icon_template.async_render(
-            variables={"value": value}, parse_result=False
-        )
-        _LOGGER.debug(
-            "%s # %s # Icon template rendered and set to: %s",
-            self.scraper.name,
-            self._name,
-            self._attr_icon,
-        )
+        try:
+            self._attr_icon = self._icon_template.async_render(
+                variables={"value": value}, parse_result=False
+            )
+            _LOGGER.debug(
+                "%s # %s # Icon template rendered and set to: %s",
+                self.scraper.name,
+                self._name,
+                self._attr_icon,
+            )
+        except TemplateError as exception:
+            _LOGGER.error(
+                "%s # %s # Exception occured when rendering icon template. Exception: %s",
+                self.scraper.name,
+                self._name,
+                exception,
+            )
 
     async def async_added_to_hass(self) -> None:
         """When entity is added to hass."""
