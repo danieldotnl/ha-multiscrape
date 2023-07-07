@@ -82,7 +82,7 @@ async def async_setup(hass: HomeAssistant, entry: ConfigEntry):
         await _async_process_config(hass, conf)
 
     hass.services.async_register(
-        DOMAIN, SERVICE_RELOAD, reload_service_handler, schema=vol.Schema({})
+        DOMAIN, SERVICE_RELOAD, reload_service_handler, schema=vol.Schema({SupportsResponse.NONE})
     )
     _LOGGER.debug("# Reload service registered")
 
@@ -196,7 +196,7 @@ async def _register_services(hass, target_name, coordinator):
         DOMAIN,
         f"trigger_{target_name}",
         _async_trigger_service,
-        schema=vol.Schema({}),
+        schema=vol.Schema({SupportsResponse.NONE}),
     )
 
     # Register the service description
