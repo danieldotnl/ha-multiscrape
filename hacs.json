@@ -1,6 +1,6 @@
 {
   "name": "Multiscrape",
   "hacs": "1.6.0",
-  "homeassistant": "2021.9.0",
+  "homeassistant": "2023.7.1",
   "render_readme": true
 }

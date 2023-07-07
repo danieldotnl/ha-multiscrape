@@ -1,7 +1,6 @@
 import logging
 from datetime import timedelta
 
-from homeassistant.core import CALLBACK_TYPE
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from homeassistant.helpers.update_coordinator import event
@@ -38,7 +37,6 @@ class MultiscrapeDataUpdateCoordinator(DataUpdateCoordinator):
         self._data_renderer = data_renderer
         self.update_error = False
         self._resource = None
-        self._unsub_refresh: CALLBACK_TYPE | None = None
         self._retry: int = 0
 
         if self._update_interval == timedelta(seconds=0):
