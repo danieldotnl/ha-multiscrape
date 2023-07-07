@@ -205,7 +205,7 @@ async def _register_services(hass, target_name, coordinator):
         CONF_DESCRIPTION: f"Triggers an update for the multiscrape {target_name} integration, independent of the update interval.",
         CONF_FIELDS: {},
     }
-    async_set_service_schema(hass, DOMAIN, target_name, service_desc)
+    async_set_service_schema(hass, DOMAIN, f"trigger_{target_name}", service_desc)
 
 
 async def async_get_config_and_coordinator(hass, platform_domain, discovery_info):
