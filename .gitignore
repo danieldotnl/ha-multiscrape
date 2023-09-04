@@ -1,6 +1,18 @@
+# artifacts
 __pycache__
-pythonenv*
-.python-version
+.pytest*
+*.egg-info
+*/build/*
+*/dist/*
+
+
+# misc
 .coverage
-venv
-.venv
+.vscode
+coverage.xml
+.todo
+
+
+# Home Assistant configuration
+config/*
+!config/configuration.yaml
