@@ -1,0 +1,36 @@
+default_config:
+
+logger:
+  default: info
+  logs:
+    custom_components.multiscrape: debug
+# If you need to debug uncommment the line below (doc: https://www.home-assistant.io/integrations/debugpy/)
+# debugpy:
+
+multiscrape:
+  - name: HA scraper
+    resource: https://www.home-assistant.io
+    scan_interval: 3600
+    sensor:
+      - unique_id: ha_latest_version
+        name: Latest version
+        select: ".current-version > h1:nth-child(1)"
+        value_template: '{{ (value.split(":")[1]) }}'
+      - unique_id: ha_release_date
+        icon: >-
+          {% if is_state('binary_sensor.ha_version_check', 'on') %}
+            mdi:alarm-light
+          {% else %}
+            mdi:bat
+          {% endif %}
+        name: Release date
+        select: ".release-date"
+    binary_sensor:
+      - unique_id: ha_version_check
+        name: Latest version == 2021.7.0
+        select: ".current-version > h1:nth-child(1)"
+        value_template: '{{ (value.split(":")[1]) | trim == "2021.7.0" }}'
+        attributes:
+          - name: Release notes link
+            select: "div.links:nth-child(3) > a:nth-child(1)"
+            attribute: href
