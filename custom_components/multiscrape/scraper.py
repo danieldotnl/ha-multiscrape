@@ -78,9 +78,10 @@ class Scraper:
 
         if selector.just_value:
             _LOGGER.debug("%s # Applying value_template only.", log_prefix)
-            return selector.value_template.async_render_with_possible_json_value(
+            result = selector.value_template.async_render_with_possible_json_value(
                 self._data, None
             )
+            return selector.value_template._parse_result(result)
 
         if self._data[0] in ["{", "["]:
             raise ValueError(
