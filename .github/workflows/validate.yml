@@ -7,9 +7,11 @@ name: "Validate"
   push:
     branches:
       - "main"
+      - "master"
   pull_request:
     branches:
       - "main"
+      - "master"
 
 jobs:
   hassfest: # https://developers.home-assistant.io/blog/2020/04/16/hassfest
