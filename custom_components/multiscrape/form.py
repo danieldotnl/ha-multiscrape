@@ -1,3 +1,4 @@
+"""Form submit logic."""
 import logging
 from urllib.parse import urljoin
 
@@ -7,6 +8,8 @@ _LOGGER = logging.getLogger(__name__)
 
 
 class FormSubmitter:
+    """Class to take care of submitting a form."""
+
     def __init__(
         self,
         config_name,
@@ -21,6 +24,7 @@ class FormSubmitter:
         resubmit_error,
         parser,
     ):
+        """Initialize FormSubmitter class."""
         _LOGGER.debug("%s # Initializing form submitter", config_name)
         self._config_name = config_name
         self._hass = hass
@@ -35,11 +39,8 @@ class FormSubmitter:
         self._parser = parser
         self._should_submit = True
 
-    @property
-    def should_submit(self):
-        return self._should_submit
-
     def notify_scrape_exception(self):
+        """Make sure form is re-submitted after an exception."""
         if self._resubmit_error:
             _LOGGER.debug(
                 "%s # Exception occurred while scraping, will try to resubmit the form next interval.",
@@ -48,6 +49,11 @@ class FormSubmitter:
             self._should_submit = True
 
     async def async_submit(self, main_resource):
+        """Submit the form."""
+        if not self._should_submit:
+            _LOGGER.debug("%s # Skip submitting form")
+            return
+
         _LOGGER.debug("%s # Starting with form-submit", self._config_name)
         input_fields = {}
         action, method = None, None
@@ -99,7 +105,7 @@ class FormSubmitter:
             input_fields,
         )
         _LOGGER.debug(
-            "%s # Form seems to be submitted succesfully (to be sure, use log_response and check file). Now continuing to retrieve target page.",
+            "%s # Form seems to be submitted successfully (to be sure, use log_response and check file). Now continuing to retrieve target page.",
             self._config_name,
         )
 
@@ -143,9 +149,9 @@ class FormSubmitter:
     def _get_input_fields(self, form):
         _LOGGER.debug("%s # Finding all input fields in form", self._config_name)
         elements = form.findAll("input")
-        input_fields = dict(
-            (element.get("name"), element.get("value")) for element in elements
-        )
+        input_fields = {
+            element.get("name"): element.get("value") for element in elements
+        }
         _LOGGER.debug(
             "%s # Found the following input fields: %s", self._config_name, input_fields
         )

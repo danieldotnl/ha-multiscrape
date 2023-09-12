@@ -1,30 +1,83 @@
+"""Coordinator class for multiscrape integration."""
 import logging
 from datetime import timedelta
+from collections.abc import Callable
 
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from homeassistant.helpers.update_coordinator import event
 from homeassistant.util.dt import utcnow
 
+from .scraper import Scraper
+from .http import HttpWrapper
+from .file import LoggingFileManager
+from .form import FormSubmitter
+
 from .const import DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 
 
-class MultiscrapeDataUpdateCoordinator(DataUpdateCoordinator):
+class RequestManagerMixin:
+    """Mixin to add functionality for requesting content."""
+
+    def __init__(
+        self,
+        config_name: str,
+        http: HttpWrapper,
+        form: FormSubmitter,
+        method: str,
+        data_renderer: Callable = None,
+    ) -> None:
+        """Initialize RequestManagerMixin."""
+        self._config_name = config_name
+        self._http: HttpWrapper = http
+        self._form_submitter: FormSubmitter = form
+        self._method: str = method
+        self._data_renderer: Callable = data_renderer
+
+    async def get_page(self, resource: str) -> str:
+        """Retrieve the content of a url and first submit a form if required."""
+        if self._form_submitter:
+            try:
+                result = await self._form_submitter.async_submit(resource)
+
+                if result:
+                    _LOGGER.debug(
+                        "%s # Using response from form-submit as content for scraping.",
+                        self._config_name,
+                    )
+                    return result
+            except Exception as ex:
+                _LOGGER.error(
+                    "%s # Exception in form-submit feature. Will continue trying to scrape target page.\n%s",
+                    self._config_name,
+                    ex,
+                )
+
+        response = await self._http.async_request(
+            "page", self._method, resource, self._data_renderer(None)
+        )
+        return response.text
+
+
+class MultiscrapeDataUpdateCoordinator(RequestManagerMixin, DataUpdateCoordinator):
+    """Multiscrape coordinator class."""
+
     def __init__(
         self,
         config_name,
         hass: HomeAssistant,
-        http,
-        file_manager,
-        form_submitter,
-        scraper,
+        http: HttpWrapper,
+        file_manager: LoggingFileManager,
+        form_submitter: FormSubmitter,
+        scraper: Scraper,
         update_interval: timedelta | None,
-        resource_renderer,
+        resource_renderer: Callable,
         method,
-        data_renderer,
+        data_renderer: Callable,
     ):
+        """Initialize the coordinator."""
         self._hass = hass
         self._config_name = config_name
         self._http = http
@@ -46,11 +99,15 @@ class MultiscrapeDataUpdateCoordinator(DataUpdateCoordinator):
             "%s # Scan interval is %s", self._config_name, self._update_interval
         )
 
-        super().__init__(
-            hass, _LOGGER, name=DOMAIN, update_interval=self._update_interval
+        DataUpdateCoordinator.__init__(
+            self, hass, _LOGGER, name=DOMAIN, update_interval=self._update_interval
+        )
+        RequestManagerMixin.__init__(
+            self, config_name, http, form_submitter, method, data_renderer
         )
 
     def notify_scrape_exception(self):
+        """Notify the form_submitter of an exception so it will re-submit next trigger."""
         if self._form_submitter:
             self._form_submitter.notify_scrape_exception()
 
@@ -59,36 +116,15 @@ class MultiscrapeDataUpdateCoordinator(DataUpdateCoordinator):
             "%s # New run: start (re)loading data from resource", self._config_name
         )
         await self._prepare_new_run()
-
-        if self._form_submitter and self._form_submitter.should_submit:
-            try:
-                result = await self._form_submitter.async_submit(self._resource)
-
-                if result:
-                    _LOGGER.debug(
-                        "%s # Using response from form-submit as data. Now ready to be scraped by sensors.",
-                        self._config_name,
-                    )
-                    await self._scraper.set_content(result)
-                    return
-            except Exception as ex:
-                _LOGGER.error(
-                    "%s # Exception in form-submit feature. Will continue trying to scrape target page.\n%s",
-                    self._config_name,
-                    ex,
-                )
-
-        _LOGGER.debug("%s # Request data from %s", self._config_name, self._resource)
         try:
-            response = await self._http.async_request(
-                "page", self._method, self._resource, self._data_renderer(None)
-            )
-            await self._scraper.set_content(response.text)
+            response = await self.get_page(self._resource)
+            await self._scraper.set_content(response)
             _LOGGER.debug(
-                "%s # Data succesfully refreshed. Sensors will now start scraping to update.",
+                "%s # Data successfully refreshed. Sensors will now start scraping to update.",
                 self._config_name,
             )
             self._retry = 0
+
         except Exception as ex:
             _LOGGER.error(
                 "%s # Updating failed with exception: %s",
@@ -113,7 +149,7 @@ class MultiscrapeDataUpdateCoordinator(DataUpdateCoordinator):
                     )
                     self._retry = self._retry + 1
                 else:
-                    _LOGGER.warning(
+                    _LOGGER.error(
                         "%s # Updating and 3 retries failed and scan_interval = 0, please manually retry with trigger service.",
                         self._config_name,
                     )
@@ -141,24 +177,3 @@ class MultiscrapeDataUpdateCoordinator(DataUpdateCoordinator):
         )
 
         self._scraper.reset()
-
-    async def _async_file_log(self, content_name, content):
-        try:
-            filename = f"{content_name}.txt"
-            await self._hass.async_add_executor_job(
-                self._file_manager.write, filename, content
-            )
-        except Exception as ex:
-            _LOGGER.error(
-                "%s # Unable to write %s to file: %s. \nException: %s",
-                self._config_name,
-                content_name,
-                filename,
-                ex,
-            )
-        _LOGGER.debug(
-            "%s # %s written to file: %s",
-            self._config_name,
-            content_name,
-            filename,
-        )

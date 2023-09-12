@@ -1,12 +1,15 @@
+"""Some utility functions."""
 import logging
+from collections.abc import Callable
 
 from homeassistant.exceptions import TemplateError
 from homeassistant.helpers.template import Template
 
+
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
 
-def create_renderer(hass, value_template):
+def create_renderer(hass, value_template) -> Callable:
     """Create a renderer based on variable_template value."""
     if value_template is None:
         return lambda value: value
@@ -29,6 +32,7 @@ def create_renderer(hass, value_template):
 
 
 def create_dict_renderer(hass, templates_dict):
+    """Create a dictionary of template renderers."""
     if templates_dict is None:
         return lambda value: {}
 
