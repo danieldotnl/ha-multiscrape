@@ -31,18 +31,17 @@ class Scraper:
         self.reset()
 
     @property
-    def has_data(self):
-        return self._data is not None
-
-    @property
     def name(self):
+        """Return scraper name (for logging)."""
         return self._config_name
 
     def reset(self):
+        """Reset the scraper."""
         self._data = None
         self._soup = None
 
     async def set_content(self, content):
+        """Set the content to be scraped."""
         self._data = content
 
         if content[0] in ["{", "["]:
@@ -71,6 +70,7 @@ class Scraper:
                 raise
 
     def scrape(self, selector, sensor, attribute=None):
+        """Scrape based on given selector the data."""
         # This is required as this function is called separately for sensors and attributes
         log_prefix = f"{self._config_name} # {sensor}"
         if attribute:
@@ -124,10 +124,12 @@ class Scraper:
         if value is not None and selector.value_template is not None:
             _LOGGER.debug("%s # Applying value_template on selector result", log_prefix)
             value = selector.value_template.async_render(
-                variables={"value": value}, parse_result=False
+                variables={"value": value}, parse_result=True
             )
 
-        _LOGGER.debug("%s # Final selector value: %s", log_prefix, value)
+        _LOGGER.debug(
+            "%s # Final selector value: %s of type %s", log_prefix, value, type(value)
+        )
         return value
 
     async def _async_file_log(self, content_name, content):
