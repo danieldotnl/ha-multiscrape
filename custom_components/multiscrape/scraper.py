@@ -31,18 +31,17 @@ class Scraper:
         self.reset()
 
     @property
-    def has_data(self):
-        return self._data is not None
-
-    @property
     def name(self):
+        """Property for config name."""
         return self._config_name
 
     def reset(self):
+        """Reset the scraper object."""
         self._data = None
         self._soup = None
 
     async def set_content(self, content):
+        """Set the content to be scraped."""
         self._data = content
 
         if content[0] in ["{", "["]:
@@ -56,7 +55,9 @@ class Scraper:
                     "%s # Loading the content in BeautifulSoup.",
                     self._config_name,
                 )
-                self._soup = BeautifulSoup(self._data, self._parser)
+                self._soup = await self._hass.async_add_executor_job(
+                    BeautifulSoup, self._data, self._parser
+                )
                 self._soup.prettify()
                 if self._file_manager:
                     await self._async_file_log("page_soup", self._soup)
@@ -71,6 +72,7 @@ class Scraper:
                 raise
 
     def scrape(self, selector, sensor, attribute=None):
+        """Scrape the provided selector."""
         # This is required as this function is called separately for sensors and attributes
         log_prefix = f"{self._config_name} # {sensor}"
         if attribute:
