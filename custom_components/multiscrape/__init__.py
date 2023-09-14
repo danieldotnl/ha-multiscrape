@@ -268,6 +268,7 @@ def _create_form_submit_http_wrapper(config_name, config, hass, file_manager):
         timeout,
         params_renderer=create_dict_renderer(hass, params),
         request_headers=headers,
+        data_renderer=create_renderer(hass, None),
     )
     return http
 
@@ -327,7 +328,7 @@ def _create_multiscrape_coordinator(
 
 
 def _create_scraper(config_name, config, hass, file_manager):
-    _LOGGER.debug("%s # Initializing scraper", config_name)
+    _LOGGER.debug("%s # Creating scraper", config_name)
     parser = config.get(CONF_PARSER)
     separator = config.get(CONF_SEPARATOR)
 

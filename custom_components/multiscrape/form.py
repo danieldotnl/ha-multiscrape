@@ -4,6 +4,11 @@ from urllib.parse import urljoin
 
 from bs4 import BeautifulSoup
 
+from homeassistant.core import HomeAssistant
+
+from .file import LoggingFileManager
+from .http import HttpWrapper
+
 _LOGGER = logging.getLogger(__name__)
 
 
@@ -13,9 +18,9 @@ class FormSubmitter:
     def __init__(
         self,
         config_name,
-        hass,
-        http,
-        file_manager,
+        hass: HomeAssistant,
+        http: HttpWrapper,
+        file_manager: LoggingFileManager,
         form_resource,
         select,
         input_values,
@@ -100,9 +105,9 @@ class FormSubmitter:
         _LOGGER.debug("%s # Submitting the form", self._config_name)
         response = await self._http.async_request(
             "form_submit",
-            method,
             submit_resource,
-            input_fields,
+            method=method,
+            request_data=input_fields,
         )
         _LOGGER.debug(
             "%s # Form seems to be submitted successfully (to be sure, use log_response and check file). Now continuing to retrieve target page.",
@@ -141,8 +146,8 @@ class FormSubmitter:
         )
         response = await self._http.async_request(
             "form_page",
-            "GET",
             resource,
+            "GET",
         )
         return response.text
 

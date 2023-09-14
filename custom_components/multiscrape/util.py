@@ -21,9 +21,6 @@ def create_renderer(hass, value_template) -> Callable:
         value_template.hass = hass
 
     def _render(value: Any = None, parse_result=False):
-        _LOGGER.warning(
-            "Executing _render with value: %s for template: %s", value, value_template
-        )
         try:
             return value_template.async_render({"value": value}, parse_result)
         except TemplateError:
