@@ -50,7 +50,7 @@ from .const import PLATFORM_IDX
 from .const import SCRAPER
 from .const import SCRAPER_DATA
 from .const import SCRAPER_IDX
-from .coordinator import MultiscrapeDataUpdateCoordinator
+from .coordinator import ContentRequestManager, MultiscrapeDataUpdateCoordinator
 from .file import LoggingFileManager
 from .form import FormSubmitter
 from .http import HttpWrapper
@@ -149,8 +149,16 @@ async def _async_process_config(hass, config) -> bool:
 
         scraper = _create_scraper(config_name, conf, hass, file_manager)
         http = _create_scrape_http_wrapper(config_name, conf, hass, file_manager)
+        request_manager = _create_content_request_manager(
+            config_name, conf, hass, http, form_submitter
+        )
         coordinator = _create_multiscrape_coordinator(
-            config_name, conf, hass, http, file_manager, form_submitter, scraper
+            config_name,
+            conf,
+            hass,
+            request_manager,
+            file_manager,
+            scraper,
         )
 
         refresh_tasks.append(coordinator.async_refresh())
@@ -225,6 +233,8 @@ def _create_scrape_http_wrapper(config_name, config, hass, file_manager):
     timeout = config.get(CONF_TIMEOUT)
     headers = config.get(CONF_HEADERS)
     params = config.get(CONF_PARAMS)
+    payload = config.get(CONF_PAYLOAD)
+    method = config.get(CONF_METHOD)
 
     client = get_async_client(hass, verify_ssl)
     http = HttpWrapper(
@@ -233,8 +243,10 @@ def _create_scrape_http_wrapper(config_name, config, hass, file_manager):
         client,
         file_manager,
         timeout,
+        method,
         params_renderer=create_dict_renderer(hass, params),
         request_headers=headers,
+        data_renderer=create_renderer(hass, payload),
     )
     if username and password:
         http.set_authentication(username, password, auth_type)
@@ -258,6 +270,20 @@ def _create_form_submit_http_wrapper(config_name, config, hass, file_manager):
         request_headers=headers,
     )
     return http
+
+
+def _create_content_request_manager(
+    config_name, config, hass: HomeAssistant, http, form_submitter
+):
+    _LOGGER.debug("%s # Creating ContentRequestManager", config_name)
+    resource = config.get(CONF_RESOURCE)
+    resource_template = config.get(CONF_RESOURCE_TEMPLATE)
+
+    if resource_template is not None:
+        resource_renderer = create_renderer(hass, resource_template)
+    else:
+        resource_renderer = create_renderer(hass, resource)
+    return ContentRequestManager(config_name, http, resource_renderer, form_submitter)
 
 
 def _create_form_submitter(config_name, config, hass, http, file_manager, parser):
@@ -284,32 +310,19 @@ def _create_form_submitter(config_name, config, hass, http, file_manager, parser
 
 
 def _create_multiscrape_coordinator(
-    config_name, conf, hass, http, file_manager, form_submitter, scraper
+    config_name, conf, hass, request_manager, file_manager, scraper
 ):
-    _LOGGER.debug("%s # Initializing coordinator", config_name)
+    _LOGGER.debug("%s # Creating coordinator", config_name)
 
-    method = conf.get(CONF_METHOD).lower()
     scan_interval = conf.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)
-    resource = conf.get(CONF_RESOURCE)
-    resource_template = conf.get(CONF_RESOURCE_TEMPLATE)
-    data_renderer = create_renderer(hass, conf.get(CONF_PAYLOAD))
-
-    if resource_template is not None:
-        resource_renderer = create_renderer(hass, resource_template)
-    else:
-        resource_renderer = create_renderer(hass, resource)
 
     return MultiscrapeDataUpdateCoordinator(
         config_name,
         hass,
-        http,
+        request_manager,
         file_manager,
-        form_submitter,
         scraper,
         scan_interval,
-        resource_renderer,
-        method,
-        data_renderer,
     )
 
 

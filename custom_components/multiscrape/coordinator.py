@@ -18,26 +18,31 @@ from .const import DOMAIN
 _LOGGER = logging.getLogger(__name__)
 
 
-class RequestManagerMixin:
-    """Mixin to add functionality for requesting content."""
+class ContentRequestManager:
+    """Responsible for orchestrating all request required to retrieve the desired content."""
 
     def __init__(
         self,
         config_name: str,
         http: HttpWrapper,
-        form: FormSubmitter,
-        method: str,
-        data_renderer: Callable = None,
+        resource_renderer: Callable,
+        form: FormSubmitter = None,
     ) -> None:
         """Initialize RequestManagerMixin."""
         self._config_name = config_name
-        self._http: HttpWrapper = http
-        self._form_submitter: FormSubmitter = form
-        self._method: str = method
-        self._data_renderer: Callable = data_renderer
+        self._http = http
+        self._form_submitter = form
+        self._resource_renderer = resource_renderer
 
-    async def get_page(self, resource: str) -> str:
+    def notify_scrape_exception(self):
+        """Notify the form_submitter of an exception so it will re-submit next trigger."""
+        if self._form_submitter:
+            self._form_submitter.notify_scrape_exception()
+
+    async def get_content(self) -> str:
         """Retrieve the content of a url and first submit a form if required."""
+        resource = self._resource_renderer()
+
         if self._form_submitter:
             try:
                 result = await self._form_submitter.async_submit(resource)
@@ -55,39 +60,29 @@ class RequestManagerMixin:
                     ex,
                 )
 
-        response = await self._http.async_request(
-            "page", self._method, resource, self._data_renderer(None)
-        )
+        response = await self._http.async_request("page", resource)
         return response.text
 
 
-class MultiscrapeDataUpdateCoordinator(RequestManagerMixin, DataUpdateCoordinator):
+class MultiscrapeDataUpdateCoordinator(DataUpdateCoordinator):
     """Multiscrape coordinator class."""
 
     def __init__(
         self,
         config_name,
         hass: HomeAssistant,
-        http: HttpWrapper,
+        request_manager: ContentRequestManager,
         file_manager: LoggingFileManager,
-        form_submitter: FormSubmitter,
         scraper: Scraper,
         update_interval: timedelta | None,
-        resource_renderer: Callable,
-        method,
-        data_renderer: Callable,
     ):
         """Initialize the coordinator."""
         self._hass = hass
         self._config_name = config_name
-        self._http = http
+        self._request_manager = request_manager
         self._file_manager = file_manager
         self._scraper = scraper
-        self._form_submitter = form_submitter
-        self._resource_renderer = resource_renderer
-        self._method = method
         self._update_interval = update_interval
-        self._data_renderer = data_renderer
         self.update_error = False
         self._resource = None
         self._retry: int = 0
@@ -99,25 +94,19 @@ class MultiscrapeDataUpdateCoordinator(RequestManagerMixin, DataUpdateCoordinato
             "%s # Scan interval is %s", self._config_name, self._update_interval
         )
 
-        DataUpdateCoordinator.__init__(
-            self, hass, _LOGGER, name=DOMAIN, update_interval=self._update_interval
-        )
-        RequestManagerMixin.__init__(
-            self, config_name, http, form_submitter, method, data_renderer
+        super().__init__(
+            hass, _LOGGER, name=DOMAIN, update_interval=self._update_interval
         )
 
     def notify_scrape_exception(self):
-        """Notify the form_submitter of an exception so it will re-submit next trigger."""
-        if self._form_submitter:
-            self._form_submitter.notify_scrape_exception()
+        """Notify the ContentRequestManager of a scrape exception so it can notify the FormSubmitter."""
+        self._request_manager.notify_scrape_exception()
 
     async def _async_update_data(self):
-        _LOGGER.debug(
-            "%s # New run: start (re)loading data from resource", self._config_name
-        )
         await self._prepare_new_run()
+
         try:
-            response = await self.get_page(self._resource)
+            response = await self._request_manager.get_content()
             await self._scraper.set_content(response)
             _LOGGER.debug(
                 "%s # Data successfully refreshed. Sensors will now start scraping to update.",
@@ -155,6 +144,9 @@ class MultiscrapeDataUpdateCoordinator(RequestManagerMixin, DataUpdateCoordinato
                     )
 
     async def _prepare_new_run(self):
+        _LOGGER.debug(
+            "%s # New run: start (re)loading data from resource", self._config_name
+        )
         self.update_error = False
         if self._file_manager:
             _LOGGER.debug(
@@ -168,12 +160,5 @@ class MultiscrapeDataUpdateCoordinator(RequestManagerMixin, DataUpdateCoordinato
                     self._config_name,
                     ex,
                 )
-
-        self._resource = self._resource_renderer(None)
-        _LOGGER.debug(
-            "%s # Rendered resource template into: %s",
-            self._config_name,
-            self._resource,
-        )
 
         self._scraper.reset()

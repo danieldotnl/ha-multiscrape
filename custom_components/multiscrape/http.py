@@ -1,12 +1,16 @@
+"""HTTP request related functionality."""
 import logging
-
+from collections.abc import Callable
 import httpx
+
 from homeassistant.const import HTTP_DIGEST_AUTHENTICATION
 
 _LOGGER = logging.getLogger(__name__)
 
 
 class HttpWrapper:
+    """Class to wrap a httpx request."""
+
     def __init__(
         self,
         config_name,
@@ -14,9 +18,12 @@ class HttpWrapper:
         client,
         file_manager,
         timeout,
-        params_renderer=None,
-        request_headers=None,
+        method: str = None,
+        params_renderer: Callable = None,
+        request_headers: Callable = None,
+        data_renderer: Callable = None,
     ):
+        """Initialize HttpWrapper."""
         _LOGGER.debug("%s # Initializing http wrapper", config_name)
         self._client = client
         self._file_manager = file_manager
@@ -24,17 +31,24 @@ class HttpWrapper:
         self._timeout = timeout
         self._hass = hass
         self._auth = None
+        self._method = method
         self._params_renderer = params_renderer
         self._request_headers = request_headers
+        self._data_renderer = data_renderer
 
     def set_authentication(self, username, password, auth_type):
+        """Set http authentication."""
         if auth_type == HTTP_DIGEST_AUTHENTICATION:
             self._auth = httpx.DigestAuth(username, password)
         else:
             self._auth = (username, password)
         _LOGGER.debug("%s # Authentication configuration processed", self._config_name)
 
-    async def async_request(self, context, method, resource, request_data=None):
+    async def async_request(self, context, resource, method=None, request_data=None):
+        """Execute a HTTP request."""
+        data = request_data or self._data_renderer()
+        method = method or self._method or "GET"
+
         _LOGGER.debug(
             "%s # Executing %s-request with a %s to url: %s.",
             self._config_name,
@@ -46,7 +60,7 @@ class HttpWrapper:
             await self._async_file_log(
                 "request_headers", context, self._request_headers
             )
-            await self._async_file_log("request_body", context, request_data)
+            await self._async_file_log("request_body", context, data)
 
         response = None
 
@@ -55,9 +69,9 @@ class HttpWrapper:
                 method,
                 resource,
                 headers=self._request_headers,
-                params=self._params_renderer(None),
+                params=self._params_renderer(),
                 auth=self._auth,
-                data=request_data,
+                data=data,
                 timeout=self._timeout,
                 follow_redirects=True,
             )
