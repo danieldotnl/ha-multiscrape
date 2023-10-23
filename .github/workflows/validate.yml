@@ -30,7 +30,7 @@ jobs:
         uses: "actions/checkout@v4.0.0"
 
       - name: "Run HACS validation"
-        uses: "hacs/action@master"
+        uses: "hacs/action@main"
         with:
           category: "integration"
           # Remove this 'ignore' key when you have added brand images for your integration to https://github.com/home-assistant/brands
