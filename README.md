@@ -20,6 +20,10 @@ If you don't manage to scrape the value you are looking for, please [enable debu
 If all of this doesn't help, use the home assistant forum. I cannot give everyone personal assistance and please don't create github issues unless you are sure there is a bug.
 Check the [wiki](https://github.com/danieldotnl/ha-multiscrape/wiki) for a scraping guide and other details on the functionality of this component.
 
+## Important note: be a good citizen and be aware of your responsibility
+
+You and you alone, are accountable for your scraping activities. Be a good (web) citizen. Set reasonable `scan_interval` timings, seek explicit permission before scraping, and adhere to local and international laws. Respect website policies, handle data ethically, mind resource usage, and regularly monitor your actions. Uphold these principles to ensure ethical and sustainable scraping practices.
+
 # HA MultiScrape custom component
 
 This Home Assistant custom component can scrape multiple fields (using CSS selectors) from a single HTTP request (the existing scrape sensor can scrape a single field only). The scraped data becomes available in separate sensors.
