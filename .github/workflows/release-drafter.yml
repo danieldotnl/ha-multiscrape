@@ -1,5 +1,6 @@
 name: Draft a release note
 on:
+  workflow_dispatch:
   push:
     branches:
       - main
