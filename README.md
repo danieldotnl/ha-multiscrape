@@ -82,7 +82,7 @@ Based on latest (pre) release.
 | authentication    | Configure HTTP authentication. `basic` or `digest`. Use this with username and password fields.                           | False    |         | string          |
 | username          | The username for accessing the url.                                                                                       | False    |         | string          |
 | password          | The password for accessing the url.                                                                                       | False    |         | string          |
-| headers           | The headers for the requests.                                                                                             | False    |         | string - list   |
+| headers           | The headers for the requests.                                                                                             | False    |         | template - list   |
 | params            | The query params for the requests.                                                                                        | False    |         | template - list |
 | method            | The method for the request. Either `POST` or `GET`.                                                                       | False    | GET     | string          |
 | payload           | Optional payload to send with a POST request.                                                                             | False    |         | string          |
