@@ -15,7 +15,7 @@ class HttpWrapper:
         file_manager,
         timeout,
         params_renderer=None,
-        request_headers=None,
+        headers_renderer=None,
     ):
         _LOGGER.debug("%s # Initializing http wrapper", config_name)
         self._client = client
@@ -25,7 +25,7 @@ class HttpWrapper:
         self._hass = hass
         self._auth = None
         self._params_renderer = params_renderer
-        self._request_headers = request_headers
+        self._headers_renderer = headers_renderer
 
     def set_authentication(self, username, password, auth_type):
         if auth_type == HTTP_DIGEST_AUTHENTICATION:
@@ -35,16 +35,20 @@ class HttpWrapper:
         _LOGGER.debug("%s # Authentication configuration processed", self._config_name)
 
     async def async_request(self, context, method, resource, request_data=None):
+        headers = self._headers_renderer(None)
+        params = self._params_renderer(None)
+
         _LOGGER.debug(
-            "%s # Executing %s-request with a %s to url: %s.",
+            "%s # Executing %s-request with a %s to url: %s with headers: %s",
             self._config_name,
             context,
             method,
             resource,
+            headers
         )
         if self._file_manager:
             await self._async_file_log(
-                "request_headers", context, self._request_headers
+                "request_headers", context, headers
             )
             await self._async_file_log("request_body", context, request_data)
 
@@ -54,8 +58,8 @@ class HttpWrapper:
             response = await self._client.request(
                 method,
                 resource,
-                headers=self._request_headers,
-                params=self._params_renderer(None),
+                headers=headers,
+                params=params,
                 auth=self._auth,
                 data=request_data,
                 timeout=self._timeout,
