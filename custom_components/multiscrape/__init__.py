@@ -234,7 +234,7 @@ def _create_scrape_http_wrapper(config_name, config, hass, file_manager):
         file_manager,
         timeout,
         params_renderer=create_dict_renderer(hass, params),
-        request_headers=headers,
+        headers_renderer=create_dict_renderer(hass, headers)
     )
     if username and password:
         http.set_authentication(username, password, auth_type)
@@ -255,7 +255,7 @@ def _create_form_submit_http_wrapper(config_name, config, hass, file_manager):
         file_manager,
         timeout,
         params_renderer=create_dict_renderer(hass, params),
-        request_headers=headers,
+        headers_renderer=create_dict_renderer(hass, headers)
     )
     return http
 
