@@ -104,7 +104,7 @@ INTEGRATION_SCHEMA = {
 
 ON_ERROR_SCHEMA = {
     vol.Optional(CONF_ON_ERROR_LOG, default=LOG_ERROR): vol.In(
-        [key for key in LOG_LEVELS.keys()]
+        list(LOG_LEVELS.keys())
     ),
     vol.Optional(CONF_ON_ERROR_VALUE, default=CONF_ON_ERROR_VALUE_NONE): vol.In(
         [

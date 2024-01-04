@@ -26,7 +26,7 @@ async def async_setup_platform(
     async_add_entities: AddEntitiesCallback,
     discovery_info: DiscoveryInfoType | None = None,
 ) -> None:
-    """Set up the multiscrape refresh button"""
+    """Set up the multiscrape refresh button."""
 
     conf, coordinator, scraper = await async_get_config_and_coordinator(
         hass, Platform.BUTTON, discovery_info
@@ -50,6 +50,7 @@ class MultiscrapeRefreshButton(ButtonEntity):
     """Multiscrape refresh button."""
 
     def __init__(self, hass, coordinator, unique_id, name):
+        """Initialize MultiscrapeRefreshButton."""
         self._attr_icon = "mdi:refresh"
         self._attr_entity_category = EntityCategory.CONFIG
         self._attr_name = name
