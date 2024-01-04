@@ -25,7 +25,7 @@ class Scraper:
         self._file_manager = file_manager
         self._config_name = config_name
         self._parser = parser
-        self._soup = None
+        self._soup: BeautifulSoup = None
         self._data = None
         self._separator = separator
         self.reset()
@@ -39,6 +39,13 @@ class Scraper:
         """Reset the scraper object."""
         self._data = None
         self._soup = None
+
+    @property
+    def formatted_content(self):
+        """Property for getting the content. HTML will be prettified."""
+        if self._soup:
+            return self._soup.prettify()
+        return self._data
 
     async def set_content(self, content):
         """Set the content to be scraped."""
@@ -58,9 +65,9 @@ class Scraper:
                 self._soup = await self._hass.async_add_executor_job(
                     BeautifulSoup, self._data, self._parser
                 )
-                self._soup.prettify()
+
                 if self._file_manager:
-                    await self._async_file_log("page_soup", self._soup)
+                    await self._async_file_log("page_soup", self._soup.prettify())
 
             except Exception as ex:
                 self.reset()

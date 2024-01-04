@@ -28,7 +28,7 @@ class ContentRequestManager:
         resource_renderer: Callable,
         form: FormSubmitter = None,
     ) -> None:
-        """Initialize RequestManagerMixin."""
+        """Initialize ContentRequestManager."""
         self._config_name = config_name
         self._http = http
         self._form_submitter = form

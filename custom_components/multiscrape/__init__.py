@@ -24,7 +24,7 @@ from homeassistant.const import CONF_VERIFY_SSL
 from homeassistant.const import Platform
 from homeassistant.const import SERVICE_RELOAD
 from homeassistant.core import HomeAssistant
-from homeassistant.core import ServiceCall
+from homeassistant.core import ServiceCall, SupportsResponse
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import discovery
 from homeassistant.helpers.httpx_client import get_async_client
@@ -54,10 +54,11 @@ from .coordinator import ContentRequestManager, MultiscrapeDataUpdateCoordinator
 from .file import LoggingFileManager
 from .form import FormSubmitter
 from .http import HttpWrapper
-from .schema import CONFIG_SCHEMA  # noqa: F401
+from .schema import COMBINED_SCHEMA, CONFIG_SCHEMA  # noqa: F401
 from .scraper import Scraper
 from .util import create_dict_renderer
 from .util import create_renderer
+from .selector import Selector
 
 _LOGGER = logging.getLogger(__name__)
 # we don't want to go with the default 15 seconds defined in helpers/entity_component
@@ -94,7 +95,7 @@ def _async_setup_shared_data(hass: HomeAssistant):
     hass.data[DOMAIN] = {key: [] for key in [SCRAPER_DATA, *PLATFORMS]}
 
 
-async def _async_process_config(hass, config) -> bool:
+async def _async_process_config(hass: HomeAssistant, config) -> bool:
     """Process scraper configuration."""
 
     _LOGGER.debug("# Start processing config from configuration.yaml")
@@ -195,7 +196,7 @@ async def _async_process_config(hass, config) -> bool:
     return True
 
 
-async def _register_services(hass, target_name, coordinator):
+async def _register_services(hass: HomeAssistant, target_name, coordinator):
     async def _async_trigger_service(service: ServiceCall):
         _LOGGER.info("Multiscrape triggered by service: %s", service.__repr__())
         await coordinator.async_request_refresh()
@@ -214,6 +215,79 @@ async def _register_services(hass, target_name, coordinator):
         CONF_FIELDS: {},
     }
     async_set_service_schema(hass, DOMAIN, f"trigger_{target_name}", service_desc)
+
+    async def _async_get_content_service(service: ServiceCall) -> None:
+        _LOGGER.info("Multiscrape triggered by service: %s", service.__repr__())
+        config_name = "get_content_service"
+        http = _create_scrape_http_wrapper(config_name, service.data, hass, None)
+        form_submitter = None
+        form_submit_config = service.data.get(CONF_FORM_SUBMIT)
+        if form_submit_config:
+            http_form = _create_form_submit_http_wrapper(
+                config_name, service.data, hass, None
+            )
+            form_submitter = _create_form_submitter(
+                config_name,
+                form_submit_config,
+                hass,
+                http_form,
+                None,
+                service.data.get(CONF_PARSER),
+            )
+        request_manager = _create_content_request_manager(
+            config_name, service.data, hass, http, form_submitter
+        )
+        scraper = _create_scraper(config_name, service.data, hass, None)
+
+        result = await request_manager.get_content()
+        await scraper.set_content(result)
+
+        return {"content": str(scraper.formatted_content)}
+
+    async def _async_scrape_service(service: ServiceCall) -> None:
+        _LOGGER.info("Multiscrape triggered by service: %s", service.__repr__())
+        config_name = "get_content_service"
+        conf = service.data
+        http = _create_scrape_http_wrapper(config_name, conf, hass, None)
+        form_submitter = None
+        form_submit_config = conf.get(CONF_FORM_SUBMIT)
+        if form_submit_config:
+            http_form = _create_form_submit_http_wrapper(config_name, conf, hass, None)
+            form_submitter = _create_form_submitter(
+                config_name,
+                form_submit_config,
+                hass,
+                http_form,
+                None,
+                conf.get(CONF_PARSER),
+            )
+        request_manager = _create_content_request_manager(
+            config_name, conf, hass, http, form_submitter
+        )
+        scraper = _create_scraper(config_name, conf, hass, None)
+
+        result = await request_manager.get_content()
+        await scraper.set_content(result)
+        sensor_selector = Selector(hass, conf.get("sensor")[0])
+        result = scraper.scrape(sensor_selector, config_name)
+
+        return {"value": result}
+
+    hass.services.async_register(
+        DOMAIN,
+        "get_content",
+        _async_get_content_service,
+        schema=COMBINED_SCHEMA,
+        supports_response=SupportsResponse.ONLY,
+    )
+
+    hass.services.async_register(
+        DOMAIN,
+        "scrape",
+        _async_scrape_service,
+        schema=COMBINED_SCHEMA,
+        supports_response=SupportsResponse.ONLY,
+    )
 
 
 async def async_get_config_and_coordinator(hass, platform_domain, discovery_info):
