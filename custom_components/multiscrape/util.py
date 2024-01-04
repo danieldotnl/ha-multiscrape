@@ -1,6 +1,5 @@
 """Some utility functions."""
 import logging
-from collections.abc import Callable
 from typing import Any
 
 from homeassistant.exceptions import TemplateError
@@ -10,8 +9,8 @@ from homeassistant.helpers.template import Template
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
 
-def create_renderer(hass, value_template) -> Callable:
-    """Create a renderer based on variable_template value."""
+def create_renderer(hass, value_template):
+    """Create a template renderer based on value_template."""
     if value_template is None:
         return lambda value=None, parse_result=None: value
 
@@ -33,10 +32,12 @@ def create_renderer(hass, value_template) -> Callable:
 
 
 def create_dict_renderer(hass, templates_dict):
-    """Create a dictionary of template renderers."""
+    """Create template renderers for a dictionary with value_templates."""
     if templates_dict is None:
         return lambda value=None, parse_result=None: {}
 
+    # Create a copy of the templates_dict to avoid modification of the original
+    templates_dict = templates_dict.copy()
     for item in templates_dict:
         templates_dict[item] = create_renderer(hass, templates_dict[item])
 
