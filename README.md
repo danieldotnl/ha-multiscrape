@@ -7,6 +7,8 @@
 [![Black][black-shield]][black]
 
 [![hacs][hacsbadge]][hacs]
+![hacs installs](https://img.shields.io/endpoint.svg?url=https%3A%2F%2Flauwbier.nl%2Fhacs%2Fmultiscrape&style=for-the-badge)
+
 [![Project Maintenance][maintenance-shield]][user_profile]
 [![BuyMeCoffee][buymecoffeebadge]][buymecoffee]
 
@@ -35,6 +37,7 @@ It is based on both the existing [Rest sensor](https://www.home-assistant.io/int
 ## Installation
 
 [![hacs][hacsbadge]][hacs]
+![hacs installs](https://img.shields.io/endpoint.svg?url=https%3A%2F%2Flauwbier.nl%2Fhacs%2Fmultiscrape&style=for-the-badge)
 
 Install via HACS (default store) or install manually by copying the files in a new 'custom_components/multiscrape' directory.
 
