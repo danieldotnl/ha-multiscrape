@@ -19,6 +19,7 @@ from homeassistant.const import CONF_RESOURCE
 from homeassistant.const import CONF_RESOURCE_TEMPLATE
 from homeassistant.const import CONF_SCAN_INTERVAL
 from homeassistant.const import CONF_TIMEOUT
+from homeassistant.const import CONF_UNIQUE_ID
 from homeassistant.const import CONF_USERNAME
 from homeassistant.const import CONF_VERIFY_SSL
 from homeassistant.const import Platform
@@ -33,7 +34,7 @@ from homeassistant.helpers.reload import async_reload_integration_platforms
 from homeassistant.helpers.service import async_set_service_schema
 from homeassistant.util import slugify
 
-from .const import CONF_FIELDS
+from .const import CONF_FIELDS, CONF_SENSOR_ATTRS
 from .const import CONF_FORM_INPUT
 from .const import CONF_FORM_INPUT_FILTER
 from .const import CONF_FORM_RESOURCE
@@ -216,37 +217,7 @@ async def _register_services(hass: HomeAssistant, target_name, coordinator):
     }
     async_set_service_schema(hass, DOMAIN, f"trigger_{target_name}", service_desc)
 
-    async def _async_get_content_service(service: ServiceCall) -> None:
-        _LOGGER.info("Multiscrape triggered by service: %s", service.__repr__())
-        config_name = "get_content_service"
-        http = _create_scrape_http_wrapper(config_name, service.data, hass, None)
-        form_submitter = None
-        form_submit_config = service.data.get(CONF_FORM_SUBMIT)
-        if form_submit_config:
-            http_form = _create_form_submit_http_wrapper(
-                config_name, service.data, hass, None
-            )
-            form_submitter = _create_form_submitter(
-                config_name,
-                form_submit_config,
-                hass,
-                http_form,
-                None,
-                service.data.get(CONF_PARSER),
-            )
-        request_manager = _create_content_request_manager(
-            config_name, service.data, hass, http, form_submitter
-        )
-        scraper = _create_scraper(config_name, service.data, hass, None)
-
-        result = await request_manager.get_content()
-        await scraper.set_content(result)
-
-        return {"content": str(scraper.formatted_content)}
-
-    async def _async_scrape_service(service: ServiceCall) -> None:
-        _LOGGER.info("Multiscrape triggered by service: %s", service.__repr__())
-        config_name = "get_content_service"
+    async def _prepare_service_request(service: ServiceCall, config_name):
         conf = service.data
         http = _create_scrape_http_wrapper(config_name, conf, hass, None)
         form_submitter = None
@@ -254,24 +225,46 @@ async def _register_services(hass: HomeAssistant, target_name, coordinator):
         if form_submit_config:
             http_form = _create_form_submit_http_wrapper(config_name, conf, hass, None)
             form_submitter = _create_form_submitter(
-                config_name,
-                form_submit_config,
-                hass,
                 http_form,
-                None,
-                conf.get(CONF_PARSER),
+                service.data.get(CONF_PARSER),
             )
         request_manager = _create_content_request_manager(
-            config_name, conf, hass, http, form_submitter
+            config_name, service.data, hass, http, form_submitter
         )
-        scraper = _create_scraper(config_name, conf, hass, None)
+        scraper = _create_scraper(config_name, service.data, hass, None)
+        return request_manager, scraper
 
+    async def _async_get_content_service(service: ServiceCall) -> None:
+        _LOGGER.info("get_content service triggered: %s", service.__repr__())
+        config_name = "get_content_service"
+        request_manager, scraper = await _prepare_service_request(service, config_name)
         result = await request_manager.get_content()
         await scraper.set_content(result)
-        sensor_selector = Selector(hass, conf.get("sensor")[0])
-        result = scraper.scrape(sensor_selector, config_name)
+        return {"content": str(scraper.formatted_content)}
 
-        return {"value": result}
+    async def _async_scrape_service(service: ServiceCall) -> None:
+        _LOGGER.info("Scrape service triggered: %s", service.__repr__())
+        conf = service.data
+        config_name = "scrape_service"
+        request_manager, scraper = await _prepare_service_request(service, config_name)
+        result = await request_manager.get_content()
+        await scraper.set_content(result)
+
+        response = {}
+
+        for platform in [Platform.SENSOR, Platform.BINARY_SENSOR]:
+            for sensor in conf.get(platform):
+                name = sensor.get(CONF_UNIQUE_ID) or slugify(sensor.get(CONF_NAME))
+                sensor_selector = Selector(hass, sensor)
+                response[name] = {"value": scraper.scrape(sensor_selector, config_name)}
+                for attr_conf in sensor.get(CONF_SENSOR_ATTRS) or []:
+                    attr_name = slugify(attr_conf[CONF_NAME])
+                    attr_selector = Selector(hass, attr_conf)
+                    response[name].setdefault(CONF_SENSOR_ATTRS, {}).update(
+                        {attr_name: scraper.scrape(attr_selector, config_name)}
+                    )
+
+        return response
 
     hass.services.async_register(
         DOMAIN,
