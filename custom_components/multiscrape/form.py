@@ -6,10 +6,43 @@ from bs4 import BeautifulSoup
 
 from homeassistant.core import HomeAssistant
 
+from .const import (
+    CONF_FORM_RESOURCE,
+    CONF_FORM_SELECT,
+    CONF_FORM_INPUT,
+    CONF_FORM_INPUT_FILTER,
+    CONF_FORM_SUBMIT_ONCE,
+    CONF_FORM_RESUBMIT_ERROR,
+)
 from .file import LoggingFileManager
 from .http import HttpWrapper
 
+
 _LOGGER = logging.getLogger(__name__)
+
+
+def create_form_submitter(config_name, config, hass, http, file_manager, parser):
+    """Create a form submitter instance."""
+    resource = config.get(CONF_FORM_RESOURCE)
+    select = config.get(CONF_FORM_SELECT)
+    input_values = config.get(CONF_FORM_INPUT)
+    input_filter = config.get(CONF_FORM_INPUT_FILTER)
+    resubmit_error = config.get(CONF_FORM_RESUBMIT_ERROR)
+    submit_once = config.get(CONF_FORM_SUBMIT_ONCE)
+
+    return FormSubmitter(
+        config_name,
+        hass,
+        http,
+        file_manager,
+        resource,
+        select,
+        input_values,
+        input_filter,
+        submit_once,
+        resubmit_error,
+        parser,
+    )
 
 
 class FormSubmitter:

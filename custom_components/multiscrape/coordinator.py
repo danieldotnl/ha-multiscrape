@@ -4,6 +4,11 @@ from datetime import timedelta
 from collections.abc import Callable
 
 from homeassistant.core import HomeAssistant
+from homeassistant.const import (
+    CONF_RESOURCE,
+    CONF_RESOURCE_TEMPLATE,
+    CONF_SCAN_INTERVAL,
+)
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from homeassistant.helpers.update_coordinator import event
 from homeassistant.util.dt import utcnow
@@ -12,10 +17,28 @@ from .scraper import Scraper
 from .http import HttpWrapper
 from .file import LoggingFileManager
 from .form import FormSubmitter
+from .util import create_renderer
 
 from .const import DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
+# we don't want to go with the default 15 seconds defined in helpers/entity_component
+DEFAULT_SCAN_INTERVAL = timedelta(seconds=60)
+
+
+def create_content_request_manager(
+    config_name, config, hass: HomeAssistant, http, form_submitter
+):
+    """Create a content request manager instance."""
+    _LOGGER.debug("%s # Creating ContentRequestManager", config_name)
+    resource = config.get(CONF_RESOURCE)
+    resource_template = config.get(CONF_RESOURCE_TEMPLATE)
+
+    if resource_template is not None:
+        resource_renderer = create_renderer(hass, resource_template)
+    else:
+        resource_renderer = create_renderer(hass, resource)
+    return ContentRequestManager(config_name, http, resource_renderer, form_submitter)
 
 
 class ContentRequestManager:
@@ -62,6 +85,24 @@ class ContentRequestManager:
 
         response = await self._http.async_request("page", resource)
         return response.text
+
+
+def create_multiscrape_coordinator(
+    config_name, conf, hass, request_manager, file_manager, scraper
+):
+    """Create a multiscrape coordinator instance."""
+    _LOGGER.debug("%s # Creating coordinator", config_name)
+
+    scan_interval = conf.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)
+
+    return MultiscrapeDataUpdateCoordinator(
+        config_name,
+        hass,
+        request_manager,
+        file_manager,
+        scraper,
+        scan_interval,
+    )
 
 
 class MultiscrapeDataUpdateCoordinator(DataUpdateCoordinator):

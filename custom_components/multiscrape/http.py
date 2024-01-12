@@ -3,9 +3,51 @@ import logging
 from collections.abc import Callable
 import httpx
 
-from homeassistant.const import HTTP_DIGEST_AUTHENTICATION
+from homeassistant.helpers.httpx_client import get_async_client
+from homeassistant.const import (
+    HTTP_DIGEST_AUTHENTICATION,
+    CONF_VERIFY_SSL,
+    CONF_USERNAME,
+    CONF_PASSWORD,
+    CONF_AUTHENTICATION,
+    CONF_TIMEOUT,
+    CONF_HEADERS,
+    CONF_PARAMS,
+    CONF_PAYLOAD,
+    CONF_METHOD,
+)
+from .util import create_dict_renderer, create_renderer
 
 _LOGGER = logging.getLogger(__name__)
+
+
+def create_http_wrapper(config_name, config, hass, file_manager):
+    """Create a http wrapper instance."""
+    verify_ssl = config.get(CONF_VERIFY_SSL)
+    username = config.get(CONF_USERNAME)
+    password = config.get(CONF_PASSWORD)
+    auth_type = config.get(CONF_AUTHENTICATION)
+    timeout = config.get(CONF_TIMEOUT)
+    headers = config.get(CONF_HEADERS)
+    params = config.get(CONF_PARAMS)
+    payload = config.get(CONF_PAYLOAD)
+    method = config.get(CONF_METHOD)
+
+    client = get_async_client(hass, verify_ssl)
+    http = HttpWrapper(
+        config_name,
+        hass,
+        client,
+        file_manager,
+        timeout,
+        method,
+        params_renderer=create_dict_renderer(hass, params),
+        request_headers=headers,
+        data_renderer=create_renderer(hass, payload),
+    )
+    if username and password:
+        http.set_authentication(username, password, auth_type)
+    return http
 
 
 class HttpWrapper:

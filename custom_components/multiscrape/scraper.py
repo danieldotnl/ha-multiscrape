@@ -3,8 +3,25 @@ import logging
 
 from bs4 import BeautifulSoup
 
+from .const import CONF_PARSER, CONF_SEPARATOR
+
 DEFAULT_TIMEOUT = 10
 _LOGGER = logging.getLogger(__name__)
+
+
+def create_scraper(config_name, config, hass, file_manager):
+    """Create a scraper instance."""
+    _LOGGER.debug("%s # Creating scraper", config_name)
+    parser = config.get(CONF_PARSER)
+    separator = config.get(CONF_SEPARATOR)
+
+    return Scraper(
+        config_name,
+        hass,
+        file_manager,
+        parser,
+        separator,
+    )
 
 
 class Scraper:
