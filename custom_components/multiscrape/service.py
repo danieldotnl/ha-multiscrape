@@ -31,8 +31,6 @@ from .http import create_http_wrapper
 from .const import (
     CONF_FORM_SUBMIT,
     CONF_PARSER,
-    CONF_SELECT,
-    CONF_SELECT_LIST,
     CONF_SENSOR_ATTRS,
     DOMAIN,
     CONF_FIELDS,
@@ -86,8 +84,9 @@ async def setup_get_content_service(hass: HomeAssistant):
     async def _async_get_content_service(service: ServiceCall) -> None:
         _LOGGER.info("Get_content service triggered: %s", service.__repr__())
         config_name = "get_content_service"
+        conf = _restore_templates(service.data)
         request_manager, scraper = await _prepare_service_request(
-            service, hass, config_name
+            hass, conf, config_name
         )
         result = await request_manager.get_content()
         await scraper.set_content(result)
@@ -122,6 +121,12 @@ async def setup_scrape_service(hass: HomeAssistant):
                 name = sensor.get(CONF_UNIQUE_ID) or slugify(sensor.get(CONF_NAME))
                 sensor_selector = Selector(hass, sensor)
                 response[name] = {"value": scraper.scrape(sensor_selector, config_name)}
+
+                if sensor.get(CONF_ICON):
+                    response[CONF_ICON] = sensor.get(CONF_ICON).async_render(
+                        variables={"value": response[name]}, parse_result=False
+                    )
+
                 for attr_conf in sensor.get(CONF_SENSOR_ATTRS) or []:
                     attr_name = slugify(attr_conf[CONF_NAME])
                     attr_selector = Selector(hass, attr_conf)
@@ -144,10 +149,10 @@ async def _prepare_service_request(hass: HomeAssistant, conf, config_name):
     http = create_http_wrapper(config_name, conf, hass, None)
     form_submitter = None
     form_submit_config = conf.get(CONF_FORM_SUBMIT)
+    parser = conf.get(CONF_PARSER)
     if form_submit_config:
         form_submitter = create_form_submitter(
-            http,
-            conf.get(CONF_PARSER),
+            config_name, form_submit_config, hass, http, None, parser
         )
     request_manager = create_content_request_manager(
         config_name, conf, hass, http, form_submitter
@@ -157,44 +162,29 @@ async def _prepare_service_request(hass: HomeAssistant, conf, config_name):
 
 
 def _restore_templates(config):
-    _LOGGER.error("I GOT HERE!")
+    config = dict(config)
     for platform in [Platform.SENSOR, Platform.BINARY_SENSOR]:
         for sensor in config.get(platform) or []:
             for attr_conf in sensor.get(CONF_SENSOR_ATTRS) or []:
-                attr_conf[CONF_SELECT] = (
-                    cv.template(attr_conf.get(CONF_SELECT))
-                    if attr_conf.get(CONF_SELECT)
-                    else None
-                )
-                attr_conf[CONF_SELECT_LIST] = (
-                    cv.template(attr_conf.get(CONF_SELECT_LIST))
-                    if attr_conf.get(CONF_SELECT_LIST)
-                    else None
-                )
                 attr_conf[CONF_VALUE_TEMPLATE] = (
-                    cv.template(attr_conf.get(CONF_VALUE_TEMPLATE))
+                    cv.template(
+                        _replace_template_characters(attr_conf.get(CONF_VALUE_TEMPLATE))
+                    )
                     if attr_conf.get(CONF_VALUE_TEMPLATE)
                     else None
                 )
-            sensor[CONF_ICON] = (
-                cv.template(sensor.get(CONF_ICON)) if sensor.get(CONF_ICON) else None
-            )
-            sensor[CONF_SELECT] = (
-                cv.template(sensor.get(CONF_SELECT))
-                if sensor.get(CONF_SELECT)
-                else None
-            )
-            sensor[CONF_SELECT_LIST] = (
-                cv.template(sensor.get(CONF_SELECT_LIST))
-                if sensor.get(CONF_SELECT_LIST)
-                else None
-            )
-            sensor[CONF_VALUE_TEMPLATE] = (
-                cv.template(sensor.get(CONF_VALUE_TEMPLATE))
-                if sensor.get(CONF_VALUE_TEMPLATE)
-                else None
-            )
-
-    _LOGGER.error("I GOT HERE!\n%s", config)
-
+            if sensor.get(CONF_ICON):
+                sensor[CONF_ICON] = cv.template(
+                    _replace_template_characters(sensor.get(CONF_ICON))
+                )
+            if sensor.get(CONF_VALUE_TEMPLATE):
+                sensor[CONF_VALUE_TEMPLATE] = cv.template(
+                    _replace_template_characters(sensor.get(CONF_VALUE_TEMPLATE))
+                )
     return config
+
+
+def _replace_template_characters(template: str):
+    template = template.replace("{!{", "{{").replace("}!}", "}}")
+    template = template.replace("{!%", "{%").replace("%!}", "%}")
+    return template

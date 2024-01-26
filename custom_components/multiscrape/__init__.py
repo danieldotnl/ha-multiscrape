@@ -9,7 +9,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_NAME
 
 from homeassistant.const import Platform
-from homeassistant.const import SERVICE_RELOAD
+from homeassistant.const import SERVICE_RELOAD, CONF_RESOURCE, CONF_RESOURCE_TEMPLATE
 from homeassistant.core import HomeAssistant
 
 from homeassistant.exceptions import HomeAssistantError
@@ -36,7 +36,7 @@ from .coordinator import create_content_request_manager
 from .file import LoggingFileManager
 from .form import create_form_submitter
 from .http import create_http_wrapper
-from .schema import SERVICE_COMBINED_SCHEMA, CONFIG_SCHEMA  # noqa: F401
+from .schema import COMBINED_SCHEMA, CONFIG_SCHEMA  # noqa: F401
 from .scraper import create_scraper
 
 _LOGGER = logging.getLogger(__name__)
@@ -65,6 +65,16 @@ async def async_setup(hass: HomeAssistant, entry: ConfigEntry):
     _LOGGER.debug("# Reload service registered")
 
     await setup_integration_services(hass)
+
+    if len(entry[DOMAIN]) == 1:
+        if not entry[DOMAIN][0].get(CONF_RESOURCE) and not entry[DOMAIN][0].get(
+            CONF_RESOURCE_TEMPLATE
+        ):
+            _LOGGER.info(
+                "Did not find any configuration. Assuming we want just the integration level services."
+            )
+            return True
+
     return await _async_process_config(hass, entry)
 
 
@@ -77,9 +87,6 @@ async def _async_process_config(hass: HomeAssistant, config) -> bool:
     """Process scraper configuration."""
 
     _LOGGER.debug("# Start processing config from configuration.yaml")
-    if DOMAIN not in config:
-        _LOGGER.debug("# Multiscrape not found in config")
-        return True
 
     refresh_tasks = []
     load_tasks = []
@@ -117,12 +124,7 @@ async def _async_process_config(hass: HomeAssistant, config) -> bool:
         if form_submit_config:
             parser = conf.get(CONF_PARSER)
             form_submitter = create_form_submitter(
-                config_name,
-                form_submit_config,
-                hass,
-                http,
-                file_manager,
-                parser,
+                config_name, form_submit_config, hass, http, file_manager, parser
             )
 
         scraper = create_scraper(config_name, conf, hass, file_manager)

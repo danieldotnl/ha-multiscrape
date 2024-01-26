@@ -184,10 +184,8 @@ CONFIG_SCHEMA = vol.Schema(
 
 def create_service_schema():
     """Create a schema without templates that render an output value."""
-    # Templates are evaluated by home assistant when the service is triggered, so we make them string and restore them afterwards.
+    # Templates are evaluated by home assistant when the service is triggered, so we make them a string and restore them afterwards.
     SERVICE_SELECTOR_SCHEMA = dict(SELECTOR_SCHEMA)
-    SERVICE_SELECTOR_SCHEMA.update({vol.Optional(CONF_SELECT): cv.string})
-    SERVICE_SELECTOR_SCHEMA.update({vol.Optional(CONF_SELECT_LIST): cv.string})
     SERVICE_SELECTOR_SCHEMA.update({vol.Optional(CONF_VALUE_TEMPLATE): cv.string})
 
     SERVICE_SENSOR_ATTRIBUTE_SCHEMA = {
@@ -196,8 +194,8 @@ def create_service_schema():
     }
 
     SERVICE_SENSOR_SCHEMA = dict(SENSOR_SCHEMA)
+    SERVICE_SENSOR_SCHEMA.update({vol.Optional(CONF_VALUE_TEMPLATE): cv.string})
     SERVICE_SENSOR_SCHEMA.update({vol.Optional(CONF_ICON): cv.string})
-    SERVICE_SENSOR_SCHEMA.update(SERVICE_SELECTOR_SCHEMA)
     SERVICE_SENSOR_SCHEMA.update(
         {
             vol.Optional(CONF_SENSOR_ATTRS): vol.All(
@@ -206,11 +204,9 @@ def create_service_schema():
         }
     )
 
-    _LOGGER.error("After: \n%s", SERVICE_SENSOR_SCHEMA)
-
     SERVICE_BINARY_SENSOR_SCHEMA = dict(BINARY_SENSOR_SCHEMA)
+    SERVICE_BINARY_SENSOR_SCHEMA.update({vol.Optional(CONF_VALUE_TEMPLATE): cv.string})
     SERVICE_BINARY_SENSOR_SCHEMA.update({vol.Optional(CONF_ICON): cv.string})
-    SERVICE_BINARY_SENSOR_SCHEMA.update(SERVICE_SELECTOR_SCHEMA)
     SERVICE_BINARY_SENSOR_SCHEMA.update(
         {
             vol.Optional(CONF_SENSOR_ATTRS): vol.All(

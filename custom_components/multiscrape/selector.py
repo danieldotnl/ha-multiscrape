@@ -34,13 +34,6 @@ class Selector:
                 "Selector error: either select, select_list or a value_template should be provided."
             )
 
-        if self.value_template is not None:
-            self.value_template.hass = hass
-        if self.select_template is not None:
-            self.select_template.hass = hass
-        elif self.select_list_template is not None:
-            self.select_list_template.hass = hass
-
     def create_on_error(self, conf, hass):
         """Determine from config what to do in case of scrape errors."""
         On_Error = namedtuple(
