@@ -77,6 +77,7 @@ class HttpWrapper:
         self._params_renderer = params_renderer
         self._headers_renderer = headers_renderer
         self._data_renderer = data_renderer
+        self._form_headers = None
 
     def set_authentication(self, username, password, auth_type):
         """Set http authentication."""
@@ -86,11 +87,16 @@ class HttpWrapper:
             self._auth = (username, password)
         _LOGGER.debug("%s # Authentication configuration processed", self._config_name)
 
+    def set_form_headers(self, form_headers):
+        self._form_headers = form_headers
+
     async def async_request(self, context, resource, method=None, request_data=None):
         """Execute a HTTP request."""
         data = request_data or self._data_renderer()
         method = method or self._method or "GET"
         headers = self._headers_renderer(None)
+        if self._form_headers:
+            headers.update(self._form_headers)
         params = self._params_renderer(None)
 
         _LOGGER.debug(
