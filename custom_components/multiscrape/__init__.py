@@ -41,6 +41,7 @@ from .const import CONF_FORM_RESUBMIT_ERROR
 from .const import CONF_FORM_SELECT
 from .const import CONF_FORM_SUBMIT
 from .const import CONF_FORM_SUBMIT_ONCE
+from .const import CONF_FORM_HEADER_MAPPINGS
 from .const import CONF_LOG_RESPONSE
 from .const import CONF_PARSER
 from .const import CONF_SEPARATOR
@@ -56,6 +57,7 @@ from .form import FormSubmitter
 from .http import HttpWrapper
 from .schema import CONFIG_SCHEMA  # noqa: F401
 from .scraper import Scraper
+from .selector import Selector
 from .util import create_dict_renderer
 from .util import create_renderer
 
@@ -131,6 +133,8 @@ async def _async_process_config(hass, config) -> bool:
             file_manager = LoggingFileManager(folder)
             await hass.async_add_executor_job(file_manager.create_folders)
 
+        scraper = _create_scraper(config_name, conf, hass, file_manager)
+
         form_submit_config = conf.get(CONF_FORM_SUBMIT)
         form_submitter = None
         if form_submit_config:
@@ -143,11 +147,11 @@ async def _async_process_config(hass, config) -> bool:
                 form_submit_config,
                 hass,
                 form_submit_http,
+                scraper,
                 file_manager,
                 parser,
             )
 
-        scraper = _create_scraper(config_name, conf, hass, file_manager)
         http = _create_scrape_http_wrapper(config_name, conf, hass, file_manager)
         coordinator = _create_multiscrape_coordinator(
             config_name, conf, hass, http, file_manager, form_submitter, scraper
@@ -260,13 +264,16 @@ def _create_form_submit_http_wrapper(config_name, config, hass, file_manager):
     return http
 
 
-def _create_form_submitter(config_name, config, hass, http, file_manager, parser):
+def _create_form_submitter(config_name, config, hass, http, scraper, file_manager, parser):
     resource = config.get(CONF_FORM_RESOURCE)
     select = config.get(CONF_FORM_SELECT)
     input_values = config.get(CONF_FORM_INPUT)
     input_filter = config.get(CONF_FORM_INPUT_FILTER)
     resubmit_error = config.get(CONF_FORM_RESUBMIT_ERROR)
     submit_once = config.get(CONF_FORM_SUBMIT_ONCE)
+    header_mapping_selectors = {}
+    for header_mapping_conf in config.get(CONF_FORM_HEADER_MAPPINGS):
+        header_mapping_selectors[header_mapping_conf.get(CONF_NAME)] = Selector(hass, header_mapping_conf)
 
     return FormSubmitter(
         config_name,
@@ -279,6 +286,8 @@ def _create_form_submitter(config_name, config, hass, http, file_manager, parser
         input_filter,
         submit_once,
         resubmit_error,
+        header_mapping_selectors,
+        scraper,
         parser,
     )
 

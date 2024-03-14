@@ -32,6 +32,7 @@ CONF_FORM_INPUT_FILTER = "input_filter"
 CONF_FORM_RESOURCE = "resource"
 CONF_FORM_SUBMIT_ONCE = "submit_once"
 CONF_FORM_RESUBMIT_ERROR = "resubmit_on_error"
+CONF_FORM_HEADER_MAPPINGS = "header_mappings"
 CONF_LOG_RESPONSE = "log_response"
 DEFAULT_PARSER = "lxml"
 

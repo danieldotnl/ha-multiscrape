@@ -19,6 +19,8 @@ class FormSubmitter:
         input_filter,
         submit_once,
         resubmit_error,
+        header_mapping_selectors,
+        scraper,
         parser,
     ):
         _LOGGER.debug("%s # Initializing form submitter", config_name)
@@ -32,6 +34,8 @@ class FormSubmitter:
         self._input_filter = input_filter
         self._submit_once = submit_once
         self._resubmit_error = resubmit_error
+        self._header_mapping_selectors = header_mapping_selectors
+        self._scraper = scraper
         self._parser = parser
         self._should_submit = True
 
@@ -106,10 +110,18 @@ class FormSubmitter:
         if self._submit_once:
             self._should_submit = False
 
+        await self._scraper.set_content(response.text)
+
         if not self._form_resource:
             return response.text
         else:
             return None
+
+    def scrape(self):
+        result = {}
+        for header_mapping_key in self._header_mapping_selectors:
+            result[header_mapping_key] = self._scraper.scrape(self._header_mapping_selectors[header_mapping_key], header_mapping_key)
+        return result
 
     def _determine_submit_resource(self, action, main_resource):
         resource = main_resource

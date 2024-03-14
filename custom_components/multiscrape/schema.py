@@ -43,6 +43,7 @@ from .const import CONF_FORM_RESUBMIT_ERROR
 from .const import CONF_FORM_SELECT
 from .const import CONF_FORM_SUBMIT
 from .const import CONF_FORM_SUBMIT_ONCE
+from .const import CONF_FORM_HEADER_MAPPINGS
 from .const import CONF_LOG_RESPONSE
 from .const import CONF_ON_ERROR
 from .const import CONF_ON_ERROR_DEFAULT
@@ -71,15 +72,6 @@ from .const import LOG_ERROR
 from .const import LOG_LEVELS
 from .const import METHODS
 from .scraper import DEFAULT_TIMEOUT
-
-FORM_SUBMIT_SCHEMA = {
-    vol.Optional(CONF_FORM_RESOURCE): cv.string,
-    vol.Optional(CONF_FORM_SELECT): cv.string,
-    vol.Optional(CONF_FORM_INPUT): vol.Schema({cv.string: cv.string}),
-    vol.Optional(CONF_FORM_INPUT_FILTER, default=[]): cv.ensure_list,
-    vol.Optional(CONF_FORM_SUBMIT_ONCE, default=False): cv.boolean,
-    vol.Optional(CONF_FORM_RESUBMIT_ERROR, default=True): cv.boolean,
-}
 
 INTEGRATION_SCHEMA = {
     vol.Exclusive(CONF_RESOURCE, CONF_RESOURCE): cv.url,
@@ -122,6 +114,20 @@ SELECTOR_SCHEMA = {
     vol.Optional(CONF_ATTR): cv.string,
     vol.Optional(CONF_VALUE_TEMPLATE): cv.template,
     vol.Optional(CONF_ON_ERROR): vol.Schema(ON_ERROR_SCHEMA),
+}
+
+FORM_HEADERS_MAPPING_SCHEMA = {vol.Required(CONF_NAME): cv.string, **SELECTOR_SCHEMA}
+
+FORM_SUBMIT_SCHEMA = {
+    vol.Optional(CONF_FORM_RESOURCE): cv.string,
+    vol.Optional(CONF_FORM_SELECT): cv.string,
+    vol.Optional(CONF_FORM_INPUT): vol.Schema({cv.string: cv.string}),
+    vol.Optional(CONF_FORM_INPUT_FILTER, default=[]): cv.ensure_list,
+    vol.Optional(CONF_FORM_SUBMIT_ONCE, default=False): cv.boolean,
+    vol.Optional(CONF_FORM_RESUBMIT_ERROR, default=True): cv.boolean,
+    vol.Optional(CONF_FORM_HEADER_MAPPINGS, default=[]): vol.All(
+        cv.ensure_list, [vol.Schema(FORM_HEADERS_MAPPING_SCHEMA)]
+    ),
 }
 
 SENSOR_ATTRIBUTE_SCHEMA = {vol.Required(CONF_NAME): cv.string, **SELECTOR_SCHEMA}

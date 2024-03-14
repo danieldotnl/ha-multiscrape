@@ -63,6 +63,8 @@ class MultiscrapeDataUpdateCoordinator(DataUpdateCoordinator):
         if self._form_submitter and self._form_submitter.should_submit:
             try:
                 result = await self._form_submitter.async_submit(self._resource)
+                form_headers = self._form_submitter.scrape()
+                self._http.set_form_headers(form_headers)
 
                 if result:
                     _LOGGER.debug(
