@@ -42,7 +42,7 @@ def create_http_wrapper(config_name, config, hass, file_manager):
         timeout,
         method,
         params_renderer=create_dict_renderer(hass, params),
-        request_headers=headers,
+        headers_renderer=create_dict_renderer(hass, headers),
         data_renderer=create_renderer(hass, payload),
     )
     if username and password:
@@ -62,7 +62,7 @@ class HttpWrapper:
         timeout,
         method: str = None,
         params_renderer: Callable = None,
-        request_headers: Callable = None,
+        headers_renderer: Callable = None,
         data_renderer: Callable = None,
     ):
         """Initialize HttpWrapper."""
@@ -75,7 +75,7 @@ class HttpWrapper:
         self._auth = None
         self._method = method
         self._params_renderer = params_renderer
-        self._request_headers = request_headers
+        self._headers_renderer = headers_renderer
         self._data_renderer = data_renderer
 
     def set_authentication(self, username, password, auth_type):
@@ -90,18 +90,19 @@ class HttpWrapper:
         """Execute a HTTP request."""
         data = request_data or self._data_renderer()
         method = method or self._method or "GET"
+        headers = self._headers_renderer(None)
+        params = self._params_renderer(None)
 
         _LOGGER.debug(
-            "%s # Executing %s-request with a %s to url: %s.",
+            "%s # Executing %s-request with a %s to url: %s with headers: %s.",
             self._config_name,
             context,
             method,
             resource,
+            headers,
         )
         if self._file_manager:
-            await self._async_file_log(
-                "request_headers", context, self._request_headers
-            )
+            await self._async_file_log("request_headers", context, headers)
             await self._async_file_log("request_body", context, data)
 
         response = None
@@ -110,8 +111,8 @@ class HttpWrapper:
             response = await self._client.request(
                 method,
                 resource,
-                headers=self._request_headers,
-                params=self._params_renderer(),
+                headers=headers,
+                params=params,
                 auth=self._auth,
                 data=data,
                 timeout=self._timeout,
