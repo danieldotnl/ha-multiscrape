@@ -6,6 +6,12 @@
       "type": "shell",
       "command": "scripts/develop",
       "problemMatcher": []
+    },
+    {
+      "label": "Upgrade Home Assistant or dependencies",
+      "type": "shell",
+      "command": "scripts/setup",
+      "problemMatcher": []
     }
   ]
 }
