@@ -1,12 +1,58 @@
+"""HTTP request related functionality."""
 import logging
-
+from collections.abc import Callable
 import httpx
-from homeassistant.const import HTTP_DIGEST_AUTHENTICATION
+
+from homeassistant.helpers.httpx_client import get_async_client
+from homeassistant.const import (
+    HTTP_DIGEST_AUTHENTICATION,
+    CONF_VERIFY_SSL,
+    CONF_USERNAME,
+    CONF_PASSWORD,
+    CONF_AUTHENTICATION,
+    CONF_TIMEOUT,
+    CONF_HEADERS,
+    CONF_PARAMS,
+    CONF_PAYLOAD,
+    CONF_METHOD,
+)
+from .util import create_dict_renderer, create_renderer
 
 _LOGGER = logging.getLogger(__name__)
 
 
+def create_http_wrapper(config_name, config, hass, file_manager):
+    """Create a http wrapper instance."""
+    verify_ssl = config.get(CONF_VERIFY_SSL)
+    username = config.get(CONF_USERNAME)
+    password = config.get(CONF_PASSWORD)
+    auth_type = config.get(CONF_AUTHENTICATION)
+    timeout = config.get(CONF_TIMEOUT)
+    headers = config.get(CONF_HEADERS)
+    params = config.get(CONF_PARAMS)
+    payload = config.get(CONF_PAYLOAD)
+    method = config.get(CONF_METHOD)
+
+    client = get_async_client(hass, verify_ssl)
+    http = HttpWrapper(
+        config_name,
+        hass,
+        client,
+        file_manager,
+        timeout,
+        method,
+        params_renderer=create_dict_renderer(hass, params),
+        headers_renderer=create_dict_renderer(hass, headers),
+        data_renderer=create_renderer(hass, payload),
+    )
+    if username and password:
+        http.set_authentication(username, password, auth_type)
+    return http
+
+
 class HttpWrapper:
+    """Class to wrap a httpx request."""
+
     def __init__(
         self,
         config_name,
@@ -14,9 +60,12 @@ class HttpWrapper:
         client,
         file_manager,
         timeout,
-        params_renderer=None,
-        headers_renderer=None,
+        method: str = None,
+        params_renderer: Callable = None,
+        headers_renderer: Callable = None,
+        data_renderer: Callable = None,
     ):
+        """Initialize HttpWrapper."""
         _LOGGER.debug("%s # Initializing http wrapper", config_name)
         self._client = client
         self._file_manager = file_manager
@@ -24,33 +73,37 @@ class HttpWrapper:
         self._timeout = timeout
         self._hass = hass
         self._auth = None
+        self._method = method
         self._params_renderer = params_renderer
         self._headers_renderer = headers_renderer
+        self._data_renderer = data_renderer
 
     def set_authentication(self, username, password, auth_type):
+        """Set http authentication."""
         if auth_type == HTTP_DIGEST_AUTHENTICATION:
             self._auth = httpx.DigestAuth(username, password)
         else:
             self._auth = (username, password)
         _LOGGER.debug("%s # Authentication configuration processed", self._config_name)
 
-    async def async_request(self, context, method, resource, request_data=None):
+    async def async_request(self, context, resource, method=None, request_data=None):
+        """Execute a HTTP request."""
+        data = request_data or self._data_renderer()
+        method = method or self._method or "GET"
         headers = self._headers_renderer(None)
         params = self._params_renderer(None)
 
         _LOGGER.debug(
-            "%s # Executing %s-request with a %s to url: %s with headers: %s",
+            "%s # Executing %s-request with a %s to url: %s with headers: %s.",
             self._config_name,
             context,
             method,
             resource,
-            headers
+            headers,
         )
         if self._file_manager:
-            await self._async_file_log(
-                "request_headers", context, headers
-            )
-            await self._async_file_log("request_body", context, request_data)
+            await self._async_file_log("request_headers", context, headers)
+            await self._async_file_log("request_body", context, data)
 
         response = None
 
@@ -61,7 +114,7 @@ class HttpWrapper:
                 headers=headers,
                 params=params,
                 auth=self._auth,
-                data=request_data,
+                data=data,
                 timeout=self._timeout,
                 follow_redirects=True,
             )

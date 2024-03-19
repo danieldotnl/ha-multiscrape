@@ -1,3 +1,4 @@
+"""Abstraction of the CSS selectors defined in the config."""
 from collections import namedtuple
 
 from homeassistant.const import CONF_VALUE_TEMPLATE
@@ -14,7 +15,10 @@ from .const import DEFAULT_ON_ERROR_VALUE
 
 
 class Selector:
+    """Implementation of a Selector handling the css selectors from the config."""
+
     def __init__(self, hass, conf):
+        """Initialize a Selector."""
         self.select_template = conf.get(CONF_SELECT)
         self.select_list_template = conf.get(CONF_SELECT_LIST)
         self.attribute = conf.get(CONF_ATTR)
@@ -30,14 +34,8 @@ class Selector:
                 "Selector error: either select, select_list or a value_template should be provided."
             )
 
-        if self.value_template is not None:
-            self.value_template.hass = hass
-        if self.select_template is not None:
-            self.select_template.hass = hass
-        elif self.select_list_template is not None:
-            self.select_list_template.hass = hass
-
     def create_on_error(self, conf, hass):
+        """Determine from config what to do in case of scrape errors."""
         On_Error = namedtuple(
             "On_Error",
             f"{CONF_ON_ERROR_LOG} {CONF_ON_ERROR_VALUE} {CONF_ON_ERROR_DEFAULT}",
@@ -56,20 +54,25 @@ class Selector:
 
     @property
     def is_list(self):
+        """Determine whether this selector is a list selector."""
         return self.select_list_template is not None
 
     @property
     def element(self):
+        """Render the select template and return the CSS selector for a single element."""
         return self.select_template.async_render(parse_result=True)
 
     @property
     def list(self):
+        """Render the select template and return the CSS selector for a list of elements."""
         return self.select_list_template.async_render(parse_result=True)
 
     @property
     def just_value(self):
+        """Determine if this selector define a static value and no select is required."""
         return not self.select_list_template and not self.select_template
 
     @property
     def on_error_default(self):
+        """Return the default on_error value in case as defined in the config."""
         return self.on_error.default.async_render(parse_result=True)

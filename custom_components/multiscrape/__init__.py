@@ -3,65 +3,43 @@ import asyncio
 import contextlib
 import logging
 import os
-from datetime import timedelta
 
 import voluptuous as vol
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import CONF_AUTHENTICATION
-from homeassistant.const import CONF_DESCRIPTION
-from homeassistant.const import CONF_HEADERS
-from homeassistant.const import CONF_METHOD
 from homeassistant.const import CONF_NAME
-from homeassistant.const import CONF_PARAMS
-from homeassistant.const import CONF_PASSWORD
-from homeassistant.const import CONF_PAYLOAD
-from homeassistant.const import CONF_RESOURCE
-from homeassistant.const import CONF_RESOURCE_TEMPLATE
-from homeassistant.const import CONF_SCAN_INTERVAL
-from homeassistant.const import CONF_TIMEOUT
-from homeassistant.const import CONF_USERNAME
-from homeassistant.const import CONF_VERIFY_SSL
+
 from homeassistant.const import Platform
-from homeassistant.const import SERVICE_RELOAD
+from homeassistant.const import SERVICE_RELOAD, CONF_RESOURCE, CONF_RESOURCE_TEMPLATE
 from homeassistant.core import HomeAssistant
-from homeassistant.core import ServiceCall
+
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import discovery
-from homeassistant.helpers.httpx_client import get_async_client
 from homeassistant.helpers.reload import async_integration_yaml_config
 from homeassistant.helpers.reload import async_reload_integration_platforms
-from homeassistant.helpers.service import async_set_service_schema
 from homeassistant.util import slugify
 
-from .const import CONF_FIELDS
-from .const import CONF_FORM_INPUT
-from .const import CONF_FORM_INPUT_FILTER
-from .const import CONF_FORM_RESOURCE
-from .const import CONF_FORM_RESUBMIT_ERROR
-from .const import CONF_FORM_SELECT
+from .service import setup_config_services, setup_integration_services
+
 from .const import CONF_FORM_SUBMIT
-from .const import CONF_FORM_SUBMIT_ONCE
 from .const import CONF_LOG_RESPONSE
 from .const import CONF_PARSER
-from .const import CONF_SEPARATOR
 from .const import COORDINATOR
 from .const import DOMAIN
 from .const import PLATFORM_IDX
 from .const import SCRAPER
 from .const import SCRAPER_DATA
 from .const import SCRAPER_IDX
-from .coordinator import MultiscrapeDataUpdateCoordinator
+from .coordinator import (
+    create_multiscrape_coordinator,
+)
+from .coordinator import create_content_request_manager
 from .file import LoggingFileManager
-from .form import FormSubmitter
-from .http import HttpWrapper
-from .schema import CONFIG_SCHEMA  # noqa: F401
-from .scraper import Scraper
-from .util import create_dict_renderer
-from .util import create_renderer
+from .form import create_form_submitter
+from .http import create_http_wrapper
+from .schema import COMBINED_SCHEMA, CONFIG_SCHEMA  # noqa: F401
+from .scraper import create_scraper
 
 _LOGGER = logging.getLogger(__name__)
-# we don't want to go with the default 15 seconds defined in helpers/entity_component
-DEFAULT_SCAN_INTERVAL = timedelta(seconds=60)
 PLATFORMS = [Platform.SENSOR, Platform.BINARY_SENSOR, Platform.BUTTON]
 
 
@@ -86,6 +64,17 @@ async def async_setup(hass: HomeAssistant, entry: ConfigEntry):
     )
     _LOGGER.debug("# Reload service registered")
 
+    await setup_integration_services(hass)
+
+    if len(entry[DOMAIN]) == 1:
+        if not entry[DOMAIN][0].get(CONF_RESOURCE) and not entry[DOMAIN][0].get(
+            CONF_RESOURCE_TEMPLATE
+        ):
+            _LOGGER.info(
+                "Did not find any configuration. Assuming we want just the integration level services."
+            )
+            return True
+
     return await _async_process_config(hass, entry)
 
 
@@ -94,13 +83,10 @@ def _async_setup_shared_data(hass: HomeAssistant):
     hass.data[DOMAIN] = {key: [] for key in [SCRAPER_DATA, *PLATFORMS]}
 
 
-async def _async_process_config(hass, config) -> bool:
+async def _async_process_config(hass: HomeAssistant, config) -> bool:
     """Process scraper configuration."""
 
     _LOGGER.debug("# Start processing config from configuration.yaml")
-    if DOMAIN not in config:
-        _LOGGER.debug("# Multiscrape not found in config")
-        return True
 
     refresh_tasks = []
     load_tasks = []
@@ -131,35 +117,34 @@ async def _async_process_config(hass, config) -> bool:
             file_manager = LoggingFileManager(folder)
             await hass.async_add_executor_job(file_manager.create_folders)
 
+        http = create_http_wrapper(config_name, conf, hass, file_manager)
+
         form_submit_config = conf.get(CONF_FORM_SUBMIT)
         form_submitter = None
         if form_submit_config:
-            form_submit_http = _create_form_submit_http_wrapper(
-                config_name, conf, hass, file_manager
-            )
             parser = conf.get(CONF_PARSER)
-            form_submitter = _create_form_submitter(
-                config_name,
-                form_submit_config,
-                hass,
-                form_submit_http,
-                file_manager,
-                parser,
+            form_submitter = create_form_submitter(
+                config_name, form_submit_config, hass, http, file_manager, parser
             )
 
-        scraper = _create_scraper(config_name, conf, hass, file_manager)
-        http = _create_scrape_http_wrapper(config_name, conf, hass, file_manager)
-        coordinator = _create_multiscrape_coordinator(
-            config_name, conf, hass, http, file_manager, form_submitter, scraper
+        scraper = create_scraper(config_name, conf, hass, file_manager)
+
+        request_manager = create_content_request_manager(
+            config_name, conf, hass, http, form_submitter
+        )
+        coordinator = create_multiscrape_coordinator(
+            config_name,
+            conf,
+            hass,
+            request_manager,
+            file_manager,
+            scraper,
         )
 
         refresh_tasks.append(coordinator.async_refresh())
         hass.data[DOMAIN][SCRAPER_DATA].append(
             {SCRAPER: scraper, COORDINATOR: coordinator}
         )
-
-        target_name = slugify(config_name)
-        await _register_services(hass, target_name, coordinator)
 
         for platform_domain in PLATFORMS:
             if platform_domain not in conf:
@@ -184,28 +169,8 @@ async def _async_process_config(hass, config) -> bool:
     if load_tasks:
         await asyncio.gather(*load_tasks)
 
+    await setup_config_services(hass, coordinator, config_name)
     return True
-
-
-async def _register_services(hass, target_name, coordinator):
-    async def _async_trigger_service(service: ServiceCall):
-        _LOGGER.info("Multiscrape triggered by service: %s", service.__repr__())
-        await coordinator.async_request_refresh()
-
-    hass.services.async_register(
-        DOMAIN,
-        f"trigger_{target_name}",
-        _async_trigger_service,
-        schema=vol.Schema({}),
-    )
-
-    # Register the service description
-    service_desc = {
-        CONF_NAME: f"Trigger an update of {target_name}",
-        CONF_DESCRIPTION: f"Triggers an update for the multiscrape {target_name} integration, independent of the update interval.",
-        CONF_FIELDS: {},
-    }
-    async_set_service_schema(hass, DOMAIN, f"trigger_{target_name}", service_desc)
 
 
 async def async_get_config_and_coordinator(hass, platform_domain, discovery_info):
@@ -215,113 +180,3 @@ async def async_get_config_and_coordinator(hass, platform_domain, discovery_info
     coordinator = shared_data[COORDINATOR]
     scraper = shared_data[SCRAPER]
     return conf, coordinator, scraper
-
-
-def _create_scrape_http_wrapper(config_name, config, hass, file_manager):
-    verify_ssl = config.get(CONF_VERIFY_SSL)
-    username = config.get(CONF_USERNAME)
-    password = config.get(CONF_PASSWORD)
-    auth_type = config.get(CONF_AUTHENTICATION)
-    timeout = config.get(CONF_TIMEOUT)
-    headers = config.get(CONF_HEADERS)
-    params = config.get(CONF_PARAMS)
-
-    client = get_async_client(hass, verify_ssl)
-    http = HttpWrapper(
-        config_name,
-        hass,
-        client,
-        file_manager,
-        timeout,
-        params_renderer=create_dict_renderer(hass, params),
-        headers_renderer=create_dict_renderer(hass, headers)
-    )
-    if username and password:
-        http.set_authentication(username, password, auth_type)
-    return http
-
-
-def _create_form_submit_http_wrapper(config_name, config, hass, file_manager):
-    verify_ssl = config.get(CONF_VERIFY_SSL)
-    timeout = config.get(CONF_TIMEOUT)
-    headers = config.get(CONF_HEADERS)
-    params = config.get(CONF_PARAMS)
-
-    client = get_async_client(hass, verify_ssl)
-    http = HttpWrapper(
-        config_name,
-        hass,
-        client,
-        file_manager,
-        timeout,
-        params_renderer=create_dict_renderer(hass, params),
-        headers_renderer=create_dict_renderer(hass, headers)
-    )
-    return http
-
-
-def _create_form_submitter(config_name, config, hass, http, file_manager, parser):
-    resource = config.get(CONF_FORM_RESOURCE)
-    select = config.get(CONF_FORM_SELECT)
-    input_values = config.get(CONF_FORM_INPUT)
-    input_filter = config.get(CONF_FORM_INPUT_FILTER)
-    resubmit_error = config.get(CONF_FORM_RESUBMIT_ERROR)
-    submit_once = config.get(CONF_FORM_SUBMIT_ONCE)
-
-    return FormSubmitter(
-        config_name,
-        hass,
-        http,
-        file_manager,
-        resource,
-        select,
-        input_values,
-        input_filter,
-        submit_once,
-        resubmit_error,
-        parser,
-    )
-
-
-def _create_multiscrape_coordinator(
-    config_name, conf, hass, http, file_manager, form_submitter, scraper
-):
-    _LOGGER.debug("%s # Initializing coordinator", config_name)
-
-    method = conf.get(CONF_METHOD).lower()
-    scan_interval = conf.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)
-    resource = conf.get(CONF_RESOURCE)
-    resource_template = conf.get(CONF_RESOURCE_TEMPLATE)
-    data_renderer = create_renderer(hass, conf.get(CONF_PAYLOAD))
-
-    if resource_template is not None:
-        resource_renderer = create_renderer(hass, resource_template)
-    else:
-        resource_renderer = create_renderer(hass, resource)
-
-    return MultiscrapeDataUpdateCoordinator(
-        config_name,
-        hass,
-        http,
-        file_manager,
-        form_submitter,
-        scraper,
-        scan_interval,
-        resource_renderer,
-        method,
-        data_renderer,
-    )
-
-
-def _create_scraper(config_name, config, hass, file_manager):
-    _LOGGER.debug("%s # Initializing scraper", config_name)
-    parser = config.get(CONF_PARSER)
-    separator = config.get(CONF_SEPARATOR)
-
-    return Scraper(
-        config_name,
-        hass,
-        file_manager,
-        parser,
-        separator,
-    )

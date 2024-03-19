@@ -1,18 +1,59 @@
+"""Form submit logic."""
 import logging
 from urllib.parse import urljoin
 
 from bs4 import BeautifulSoup
 
+from homeassistant.core import HomeAssistant
+
+from .const import (
+    CONF_FORM_RESOURCE,
+    CONF_FORM_SELECT,
+    CONF_FORM_INPUT,
+    CONF_FORM_INPUT_FILTER,
+    CONF_FORM_SUBMIT_ONCE,
+    CONF_FORM_RESUBMIT_ERROR,
+)
+from .file import LoggingFileManager
+from .http import HttpWrapper
+
+
 _LOGGER = logging.getLogger(__name__)
 
 
-class FormSubmitter:
-    def __init__(
-        self,
+def create_form_submitter(config_name, config, hass, http, file_manager, parser):
+    """Create a form submitter instance."""
+    resource = config.get(CONF_FORM_RESOURCE)
+    select = config.get(CONF_FORM_SELECT)
+    input_values = config.get(CONF_FORM_INPUT)
+    input_filter = config.get(CONF_FORM_INPUT_FILTER)
+    resubmit_error = config.get(CONF_FORM_RESUBMIT_ERROR)
+    submit_once = config.get(CONF_FORM_SUBMIT_ONCE)
+
+    return FormSubmitter(
         config_name,
         hass,
         http,
         file_manager,
+        resource,
+        select,
+        input_values,
+        input_filter,
+        submit_once,
+        resubmit_error,
+        parser,
+    )
+
+
+class FormSubmitter:
+    """Class to take care of submitting a form."""
+
+    def __init__(
+        self,
+        config_name,
+        hass: HomeAssistant,
+        http: HttpWrapper,
+        file_manager: LoggingFileManager,
         form_resource,
         select,
         input_values,
@@ -21,6 +62,7 @@ class FormSubmitter:
         resubmit_error,
         parser,
     ):
+        """Initialize FormSubmitter class."""
         _LOGGER.debug("%s # Initializing form submitter", config_name)
         self._config_name = config_name
         self._hass = hass
@@ -35,11 +77,8 @@ class FormSubmitter:
         self._parser = parser
         self._should_submit = True
 
-    @property
-    def should_submit(self):
-        return self._should_submit
-
     def notify_scrape_exception(self):
+        """Make sure form is re-submitted after an exception."""
         if self._resubmit_error:
             _LOGGER.debug(
                 "%s # Exception occurred while scraping, will try to resubmit the form next interval.",
@@ -48,6 +87,11 @@ class FormSubmitter:
             self._should_submit = True
 
     async def async_submit(self, main_resource):
+        """Submit the form."""
+        if not self._should_submit:
+            _LOGGER.debug("%s # Skip submitting form")
+            return
+
         _LOGGER.debug("%s # Starting with form-submit", self._config_name)
         input_fields = {}
         action, method = None, None
@@ -94,12 +138,12 @@ class FormSubmitter:
         _LOGGER.debug("%s # Submitting the form", self._config_name)
         response = await self._http.async_request(
             "form_submit",
-            method,
             submit_resource,
-            input_fields,
+            method=method,
+            request_data=input_fields,
         )
         _LOGGER.debug(
-            "%s # Form seems to be submitted succesfully (to be sure, use log_response and check file). Now continuing to retrieve target page.",
+            "%s # Form seems to be submitted successfully (to be sure, use log_response and check file). Now continuing to retrieve target page.",
             self._config_name,
         )
 
@@ -135,17 +179,17 @@ class FormSubmitter:
         )
         response = await self._http.async_request(
             "form_page",
-            "GET",
             resource,
+            "GET",
         )
         return response.text
 
     def _get_input_fields(self, form):
         _LOGGER.debug("%s # Finding all input fields in form", self._config_name)
         elements = form.findAll("input")
-        input_fields = dict(
-            (element.get("name"), element.get("value")) for element in elements
-        )
+        input_fields = {
+            element.get("name"): element.get("value") for element in elements
+        }
         _LOGGER.debug(
             "%s # Found the following input fields: %s", self._config_name, input_fields
         )

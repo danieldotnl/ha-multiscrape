@@ -27,7 +27,6 @@ class MultiscrapeEntity(Entity):
         scraper: Scraper,
         name,
         device_class,
-        resource_template,
         force_update,
         icon_template,
         picture,
@@ -55,7 +54,6 @@ class MultiscrapeEntity(Entity):
 
         self._hass = hass
         self._attribute_selectors = attribute_selectors
-        self._resource_template = resource_template
 
         self._icon_template = icon_template
         if self._icon_template:
@@ -76,7 +74,7 @@ class MultiscrapeEntity(Entity):
             )
         except TemplateError as exception:
             _LOGGER.error(
-                "%s # %s # Exception occured when rendering icon template. Exception: %s",
+                "%s # %s # Exception occurred when rendering icon template. Exception: %s",
                 self.scraper.name,
                 self._name,
                 exception,
@@ -146,7 +144,7 @@ class MultiscrapeEntity(Entity):
                         exception,
                     )
 
-                    if attr_selector.on_error.log in LOG_LEVELS.keys():
+                    if attr_selector.on_error.log in LOG_LEVELS:
                         level = LOG_LEVELS[attr_selector.on_error.log]
                         _LOGGER.log(
                             level,

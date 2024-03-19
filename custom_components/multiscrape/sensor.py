@@ -10,7 +10,6 @@ from homeassistant.const import CONF_DEVICE_CLASS
 from homeassistant.const import CONF_FORCE_UPDATE
 from homeassistant.const import CONF_ICON
 from homeassistant.const import CONF_NAME
-from homeassistant.const import CONF_RESOURCE_TEMPLATE
 from homeassistant.const import CONF_UNIQUE_ID
 from homeassistant.const import CONF_UNIT_OF_MEASUREMENT
 from homeassistant.const import Platform
@@ -63,7 +62,6 @@ async def async_setup_platform(
     device_class = conf.get(CONF_DEVICE_CLASS)
     state_class = conf.get(CONF_STATE_CLASS)
     force_update = conf.get(CONF_FORCE_UPDATE)
-    resource_template = conf.get(CONF_RESOURCE_TEMPLATE)
     icon_template = conf.get(CONF_ICON)
     picture = conf.get(CONF_PICTURE)
 
@@ -85,7 +83,6 @@ async def async_setup_platform(
                 device_class,
                 state_class,
                 force_update,
-                resource_template,
                 icon_template,
                 picture,
                 sensor_selector,
@@ -109,7 +106,6 @@ class MultiscrapeSensor(MultiscrapeEntity, SensorEntity):
         device_class,
         state_class,
         force_update,
-        resource_template,
         icon_template,
         picture,
         sensor_selector,
@@ -122,7 +118,6 @@ class MultiscrapeSensor(MultiscrapeEntity, SensorEntity):
             scraper,
             name,
             device_class,
-            resource_template,
             force_update,
             icon_template,
             picture,
