@@ -8,5 +8,5 @@
   "iot_class": "local_polling",
   "issue_tracker": "https://github.com/danieldotnl/ha-multiscrape/issues",
   "requirements": ["lxml>=4.9.1", "beautifulsoup4>=4.12.2"],
-  "version": "6.5.0"
+  "version": "7.0.0"
 }

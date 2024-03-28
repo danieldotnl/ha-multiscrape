@@ -39,6 +39,7 @@ It is based on both the existing [Rest sensor](https://www.home-assistant.io/int
 [![hacs][hacsbadge]][hacs]
 ![hacs installs](https://img.shields.io/endpoint.svg?url=https%3A%2F%2Flauwbier.nl%2Fhacs%2Fmultiscrape&style=for-the-badge)
 
+[![Install quickly via a HACS link](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=danieldotnl&repository=ha-measureit&category=integration)\
 Install via HACS (default store) or install manually by copying the files in a new 'custom_components/multiscrape' directory.
 
 ## Example configuration (YAML)
@@ -170,6 +171,30 @@ Configure what should happen in case of a scraping error (the css selector does 
 
 For each multiscrape instance, a service will be created to trigger a scrape run through an automation. (For manual triggering, the button entity can now be configured.)
 The services are named `multiscrape.trigger_{name of integration}`.
+
+Multiscrape also offers a `get_content` and a `scrape` service. `get_content` retrieves the content of the website you want to scrape. It shows the same data for which you now need to enable `log_response` and open the page_soup.txt file.\
+`scrape` does what it says. It scrapes a website and provides the sensors and attributes.
+
+Both services accept the same configuration as what you would provide in your configuration yaml (what is described above), with a small but important caveat: if the service input contains templates, those are automatically parsed by home assistant when the service is being called. That is fine for templates like `resource` and `select`, but templates that need to be applied on the scraped data itself (like `value_template`), cannot be parsed when the service is called. Therefore you need to slightly alter the syntax and add a `!` in the middle. E.g. `{{` becomes `{!{` and `%}` becomes `%!}`. Multiscrape will then understand that this string needs to handled as a template after the service has been called.\
+*If someone has a better solution, please let me know!*
+
+To call one of those services, go to 'Developer tools' in Home Assistant and then to 'services'. Find the `multiscrape.get_content` or `multiscrape.scrape` services and go to yaml mode. There you enter your configuration.
+Example:
+
+```yaml
+service: multiscrape.scrape
+data:
+  name: HA scraper
+  resource: https://www.home-assistant.io
+  sensor:
+    - unique_id: ha_latest_version
+      name: Latest version
+      select: ".current-version > h1:nth-child(1)"
+      value_template: '{!{ (value.split(":")[1]) }!}'
+    - unique_id: ha_release_date
+      name: Release date
+      select: ".release-date"
+```
 
 ## Debug logging
 
