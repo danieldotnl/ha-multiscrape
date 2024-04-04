@@ -146,6 +146,8 @@ async def _async_process_config(hass: HomeAssistant, config) -> bool:
             {SCRAPER: scraper, COORDINATOR: coordinator}
         )
 
+        await setup_config_services(hass, coordinator, config_name)
+
         for platform_domain in PLATFORMS:
             if platform_domain not in conf:
                 continue
@@ -169,7 +171,7 @@ async def _async_process_config(hass: HomeAssistant, config) -> bool:
     if load_tasks:
         await asyncio.gather(*load_tasks)
 
-    await setup_config_services(hass, coordinator, config_name)
+
     return True
 
 
