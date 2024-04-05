@@ -39,7 +39,6 @@ from homeassistant.const import HTTP_DIGEST_AUTHENTICATION
 from .const import CONF_ATTR
 from .const import CONF_FORM_INPUT
 from .const import CONF_FORM_INPUT_FILTER
-from .const import CONF_FORM_RESOURCE
 from .const import CONF_FORM_RESUBMIT_ERROR
 from .const import CONF_FORM_SELECT
 from .const import CONF_FORM_SUBMIT
@@ -75,16 +74,7 @@ from .scraper import DEFAULT_TIMEOUT
 
 _LOGGER = logging.getLogger(__name__)
 
-FORM_SUBMIT_SCHEMA = {
-    vol.Optional(CONF_FORM_RESOURCE): cv.string,
-    vol.Optional(CONF_FORM_SELECT): cv.string,
-    vol.Optional(CONF_FORM_INPUT): vol.Schema({cv.string: cv.string}),
-    vol.Optional(CONF_FORM_INPUT_FILTER, default=[]): cv.ensure_list,
-    vol.Optional(CONF_FORM_SUBMIT_ONCE, default=False): cv.boolean,
-    vol.Optional(CONF_FORM_RESUBMIT_ERROR, default=True): cv.boolean,
-}
-
-INTEGRATION_SCHEMA = {
+HTTP_SCHEMA = {
     vol.Exclusive(CONF_RESOURCE, CONF_RESOURCE): cv.url,
     vol.Exclusive(CONF_RESOURCE_TEMPLATE, CONF_RESOURCE): cv.template,
     vol.Optional(CONF_AUTHENTICATION): vol.In(
@@ -98,6 +88,19 @@ INTEGRATION_SCHEMA = {
     vol.Optional(CONF_PAYLOAD): cv.template,
     vol.Optional(CONF_VERIFY_SSL, default=DEFAULT_VERIFY_SSL): cv.boolean,
     vol.Optional(CONF_TIMEOUT, default=DEFAULT_TIMEOUT): cv.positive_int,
+}
+
+FORM_SUBMIT_SCHEMA = {
+    **HTTP_SCHEMA,
+    vol.Optional(CONF_FORM_SELECT): cv.string,
+    vol.Optional(CONF_FORM_INPUT): vol.Schema({cv.string: cv.string}),
+    vol.Optional(CONF_FORM_INPUT_FILTER, default=[]): cv.ensure_list,
+    vol.Optional(CONF_FORM_SUBMIT_ONCE, default=False): cv.boolean,
+    vol.Optional(CONF_FORM_RESUBMIT_ERROR, default=True): cv.boolean,
+}
+
+INTEGRATION_SCHEMA = {
+    **HTTP_SCHEMA,
     vol.Optional(CONF_PARSER, default=DEFAULT_PARSER): cv.string,
     vol.Optional(CONF_NAME): cv.string,
     vol.Optional(CONF_SCAN_INTERVAL): cv.time_period,

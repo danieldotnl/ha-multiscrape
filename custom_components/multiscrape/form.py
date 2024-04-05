@@ -5,9 +5,9 @@ from urllib.parse import urljoin
 from bs4 import BeautifulSoup
 
 from homeassistant.core import HomeAssistant
+from homeassistant.const import CONF_RESOURCE
 
 from .const import (
-    CONF_FORM_RESOURCE,
     CONF_FORM_SELECT,
     CONF_FORM_INPUT,
     CONF_FORM_INPUT_FILTER,
@@ -23,7 +23,7 @@ _LOGGER = logging.getLogger(__name__)
 
 def create_form_submitter(config_name, config, hass, http, file_manager, parser):
     """Create a form submitter instance."""
-    resource = config.get(CONF_FORM_RESOURCE)
+    resource = config.get(CONF_RESOURCE)
     select = config.get(CONF_FORM_SELECT)
     input_values = config.get(CONF_FORM_INPUT)
     input_filter = config.get(CONF_FORM_INPUT_FILTER)

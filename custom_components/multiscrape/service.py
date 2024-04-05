@@ -151,8 +151,9 @@ async def _prepare_service_request(hass: HomeAssistant, conf, config_name):
     form_submit_config = conf.get(CONF_FORM_SUBMIT)
     parser = conf.get(CONF_PARSER)
     if form_submit_config:
+        form_http = create_http_wrapper(config_name, form_submit_config, hass, None)
         form_submitter = create_form_submitter(
-            config_name, form_submit_config, hass, http, None, parser
+            config_name, form_submit_config, hass, form_http, None, parser
         )
     request_manager = create_content_request_manager(
         config_name, conf, hass, http, form_submitter
