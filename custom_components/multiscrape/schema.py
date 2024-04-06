@@ -73,8 +73,6 @@ from .const import LOG_LEVELS
 from .const import METHODS
 from .scraper import DEFAULT_TIMEOUT
 
-INTEGRATION_SCHEMA = {
-
 _LOGGER = logging.getLogger(__name__)
 
 HTTP_SCHEMA = {
@@ -91,15 +89,6 @@ HTTP_SCHEMA = {
     vol.Optional(CONF_PAYLOAD): cv.template,
     vol.Optional(CONF_VERIFY_SSL, default=DEFAULT_VERIFY_SSL): cv.boolean,
     vol.Optional(CONF_TIMEOUT, default=DEFAULT_TIMEOUT): cv.positive_int,
-}
-
-FORM_SUBMIT_SCHEMA = {
-    **HTTP_SCHEMA,
-    vol.Optional(CONF_FORM_SELECT): cv.string,
-    vol.Optional(CONF_FORM_INPUT): vol.Schema({cv.string: cv.string}),
-    vol.Optional(CONF_FORM_INPUT_FILTER, default=[]): cv.ensure_list,
-    vol.Optional(CONF_FORM_SUBMIT_ONCE, default=False): cv.boolean,
-    vol.Optional(CONF_FORM_RESUBMIT_ERROR, default=True): cv.boolean,
 }
 
 INTEGRATION_SCHEMA = {
@@ -134,7 +123,7 @@ SELECTOR_SCHEMA = {
 FORM_HEADERS_MAPPING_SCHEMA = {vol.Required(CONF_NAME): cv.string, **SELECTOR_SCHEMA}
 
 FORM_SUBMIT_SCHEMA = {
-    vol.Optional(CONF_FORM_RESOURCE): cv.string,
+    **HTTP_SCHEMA,
     vol.Optional(CONF_FORM_SELECT): cv.string,
     vol.Optional(CONF_FORM_INPUT): vol.Schema({cv.string: cv.string}),
     vol.Optional(CONF_FORM_INPUT_FILTER, default=[]): cv.ensure_list,
