@@ -119,18 +119,18 @@ async def _async_process_config(hass: HomeAssistant, config) -> bool:
 
         http = create_http_wrapper(config_name, conf, hass, file_manager)
 
-        scraper = _create_scraper(config_name, conf, hass, file_manager)
+        scraper = create_scraper(config_name, conf, hass, file_manager)
 
         form_submit_config = conf.get(CONF_FORM_SUBMIT)
         form_submitter = None
         if form_submit_config:
             form_http = create_http_wrapper(config_name, form_submit_config, hass, file_manager)
             parser = conf.get(CONF_PARSER)
-            form_submitter = _create_form_submitter(
+            form_submitter = create_form_submitter(
                 config_name,
                 form_submit_config,
                 hass,
-                form_submit_http,
+                form_http,
                 scraper,
                 file_manager,
                 parser,
