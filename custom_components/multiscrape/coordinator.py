@@ -69,6 +69,8 @@ class ContentRequestManager:
         if self._form_submitter:
             try:
                 result = await self._form_submitter.async_submit(resource)
+                form_headers = self._form_submitter.scrape()
+                self._http.set_form_headers(form_headers)
 
                 if result:
                     _LOGGER.debug(
