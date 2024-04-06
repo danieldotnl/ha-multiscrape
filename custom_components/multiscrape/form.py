@@ -171,7 +171,8 @@ class FormSubmitter:
         else:
             return None
 
-    def scrape(self):
+    def scrape_header_mappings(self):
+        """Scrape header mappings."""
         result = {}
         for header_mapping_key in self._header_mapping_selectors:
             result[header_mapping_key] = self._scraper.scrape(self._header_mapping_selectors[header_mapping_key], header_mapping_key)

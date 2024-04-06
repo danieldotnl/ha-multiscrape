@@ -88,6 +88,7 @@ class HttpWrapper:
         _LOGGER.debug("%s # Authentication configuration processed", self._config_name)
 
     def set_form_headers(self, form_headers):
+        """Set form headers."""
         self._form_headers = form_headers
 
     async def async_request(self, context, resource, method=None, request_data=None):
