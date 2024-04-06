@@ -2,6 +2,10 @@
 import logging
 from urllib.parse import urljoin
 
+from homeassistant.const import CONF_NAME
+from .const import CONF_FORM_HEADER_MAPPINGS
+
+
 from bs4 import BeautifulSoup
 
 from homeassistant.core import HomeAssistant
@@ -16,12 +20,13 @@ from .const import (
 )
 from .file import LoggingFileManager
 from .http import HttpWrapper
+from .selector import Selector
 
 
 _LOGGER = logging.getLogger(__name__)
 
 
-def create_form_submitter(config_name, config, hass, http, file_manager, parser):
+def create_form_submitter(config_name, config, hass, http, scraper, file_manager, parser):
     """Create a form submitter instance."""
     resource = config.get(CONF_RESOURCE)
     select = config.get(CONF_FORM_SELECT)
@@ -29,6 +34,9 @@ def create_form_submitter(config_name, config, hass, http, file_manager, parser)
     input_filter = config.get(CONF_FORM_INPUT_FILTER)
     resubmit_error = config.get(CONF_FORM_RESUBMIT_ERROR)
     submit_once = config.get(CONF_FORM_SUBMIT_ONCE)
+    header_mapping_selectors = {}
+    for header_mapping_conf in config.get(CONF_FORM_HEADER_MAPPINGS):
+        header_mapping_selectors[header_mapping_conf.get(CONF_NAME)] = Selector(hass, header_mapping_conf)
 
     return FormSubmitter(
         config_name,
@@ -41,6 +49,8 @@ def create_form_submitter(config_name, config, hass, http, file_manager, parser)
         input_filter,
         submit_once,
         resubmit_error,
+        header_mapping_selectors,
+        scraper,
         parser,
     )
 
