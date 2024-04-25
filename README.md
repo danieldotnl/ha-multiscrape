@@ -39,7 +39,7 @@ It is based on both the existing [Rest sensor](https://www.home-assistant.io/int
 [![hacs][hacsbadge]][hacs]
 ![hacs installs](https://img.shields.io/endpoint.svg?url=https%3A%2F%2Flauwbier.nl%2Fhacs%2Fmultiscrape&style=for-the-badge)
 
-[![Install quickly via a HACS link](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=danieldotnl&repository=ha-measureit&category=integration)\
+[![Install quickly via a HACS link](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=danieldotnl&repository=ha-multiscrape&category=integration)\
 Install via HACS (default store) or install manually by copying the files in a new 'custom_components/multiscrape' directory.
 
 ## Example configuration (YAML)
