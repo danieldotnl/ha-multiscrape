@@ -80,7 +80,7 @@ class ContentRequestManager:
                     ex,
                 )
 
-        response = await self._http.async_request("page", resource, self._cookies)
+        response = await self._http.async_request("page", resource, cookies=self._cookies)
         return response.text
 
 
