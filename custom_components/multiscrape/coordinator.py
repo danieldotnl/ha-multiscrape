@@ -1,25 +1,21 @@
 """Coordinator class for multiscrape integration."""
 import logging
-from datetime import timedelta
 from collections.abc import Callable
+from datetime import timedelta
 
+from homeassistant.const import (CONF_RESOURCE, CONF_RESOURCE_TEMPLATE,
+                                 CONF_SCAN_INTERVAL)
 from homeassistant.core import HomeAssistant
-from homeassistant.const import (
-    CONF_RESOURCE,
-    CONF_RESOURCE_TEMPLATE,
-    CONF_SCAN_INTERVAL,
-)
-from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
-from homeassistant.helpers.update_coordinator import event
+from homeassistant.helpers.update_coordinator import (DataUpdateCoordinator,
+                                                      event)
 from homeassistant.util.dt import utcnow
 
-from .scraper import Scraper
-from .http import HttpWrapper
+from .const import DOMAIN
 from .file import LoggingFileManager
 from .form import FormSubmitter
+from .http import HttpWrapper
+from .scraper import Scraper
 from .util import create_renderer
-
-from .const import DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 # we don't want to go with the default 15 seconds defined in helpers/entity_component
@@ -69,8 +65,8 @@ class ContentRequestManager:
         if self._form_submitter:
             try:
                 result = await self._form_submitter.async_submit(resource)
-                form_headers = self._form_submitter.scrape_header_mappings()
-                self._http.set_form_headers(form_headers)
+                form_variables = self._form_submitter.scrape_variables()
+                self._http.set_variables(form_variables)
 
                 if result:
                     _LOGGER.debug(

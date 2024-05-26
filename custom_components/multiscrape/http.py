@@ -1,21 +1,14 @@
 """HTTP request related functionality."""
 import logging
 from collections.abc import Callable
-import httpx
 
+import httpx
+from homeassistant.const import (CONF_AUTHENTICATION, CONF_HEADERS,
+                                 CONF_METHOD, CONF_PARAMS, CONF_PASSWORD,
+                                 CONF_PAYLOAD, CONF_TIMEOUT, CONF_USERNAME,
+                                 CONF_VERIFY_SSL, HTTP_DIGEST_AUTHENTICATION)
 from homeassistant.helpers.httpx_client import get_async_client
-from homeassistant.const import (
-    HTTP_DIGEST_AUTHENTICATION,
-    CONF_VERIFY_SSL,
-    CONF_USERNAME,
-    CONF_PASSWORD,
-    CONF_AUTHENTICATION,
-    CONF_TIMEOUT,
-    CONF_HEADERS,
-    CONF_PARAMS,
-    CONF_PAYLOAD,
-    CONF_METHOD,
-)
+
 from .util import create_dict_renderer, create_renderer
 
 _LOGGER = logging.getLogger(__name__)
@@ -77,7 +70,7 @@ class HttpWrapper:
         self._params_renderer = params_renderer
         self._headers_renderer = headers_renderer
         self._data_renderer = data_renderer
-        self._form_headers = None
+        self._form_variables = None
 
     def set_authentication(self, username, password, auth_type):
         """Set http authentication."""
@@ -87,17 +80,17 @@ class HttpWrapper:
             self._auth = (username, password)
         _LOGGER.debug("%s # Authentication configuration processed", self._config_name)
 
-    def set_form_headers(self, form_headers):
-        """Set form headers."""
-        self._form_headers = form_headers
+    def set_variables(self, form_variables):
+        """Set form variables."""
+        self._form_variables = form_variables
 
     async def async_request(self, context, resource, method=None, request_data=None):
         """Execute a HTTP request."""
         data = request_data or self._data_renderer()
         method = method or self._method or "GET"
         headers = self._headers_renderer(None)
-        if self._form_headers:
-            headers.update(self._form_headers)
+        if self._form_variables:
+            headers.update(self._form_variables)
         params = self._params_renderer(None)
 
         _LOGGER.debug(
