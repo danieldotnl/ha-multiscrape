@@ -131,10 +131,10 @@ Configure a refresh button to manually trigger scraping.
 
 Configure the attributes on the sensor that can be set with additional scraping values.
 
-| name           | description                                   | required | default | type            |
-| -------------- | --------------------------------------------- | -------- | ------- | --------------- |
-| name           | Name of the attribute (will be slugified)     | True     |         | string          |
-|                | Shared fields from the [Selector](#Selector). | True     |         |                 |
+| name | description                                   | required | default | type   |
+| ---- | --------------------------------------------- | -------- | ------- | ------ |
+| name | Name of the attribute (will be slugified)     | True     |         | string |
+|      | Shared fields from the [Selector](#Selector). | True     |         |        |
 
 ### Form-submit
 
@@ -148,17 +148,38 @@ Configure the form-submit functionality which enables you to submit a (login) fo
 | input_filter      | A list of input fields that should not be submitted with the form                                         | False    |         | string - list       |
 | submit_once       | Submit the form only once on startup instead of each scan interval                                        | False    | False   | boolean             |
 | resubmit_on_error | Resubmit the form after a scraping error is encountered                                                   | False    | True    | boolean             |
-| header_mappings   | See [Header Mappings](#Header-Mappings)                                                                   | False    |         | list                |
+| variables         | See [Form Variables](#Form-Variables)                                                                     | False    |         | list                |
 
-### Header Mappings
+### Form Variables
 
-Configure the headers you want to be forwarded from scraping the [Form-submit](#form-submit) page to scraping the main page for sensor data. A common use case is to populate the `X-Login-Token` header which is the result of the login.
+Configure the variables you want to be forwarded from scraping the [Form-submit](#form-submit) page to scraping the main page for sensor data. A common use case is to populate the `X-Login-Token` header which is the result of the login.
 
-| name           | description                                   | required | default | type            |
-| -------------- | --------------------------------------------- | -------- | ------- | --------------- |
-| name           | Name of the header                            | True     |         | string          |
-|                | Shared fields from the [Selector](#Selector). | True     |         |                 |
+| name | description                                   | required | default | type   |
+| ---- | --------------------------------------------- | -------- | ------- | ------ |
+| name | Name of the variable                          | True     |         | string |
+|      | Shared fields from the [Selector](#Selector). | True     |         |        |
 
+Example:
+
+```yaml
+multiscrape:
+  - resource: "https://website-api.airvisual.com/v1/users/65a28a0cec1ff309a74ba414/devices/avo_65a2bd77c2f7aeabcd715393?units.system=metric&AQI=US&language=en"
+    form_submit:
+      submit_once: True
+      resource: "https://website-api.airvisual.com/v1/auth/signin/by/email"
+      input:
+        email: "<email>"
+        password: "<password>"
+      variables:
+        - name: token
+          value_template: "{{ (value | from_json).loginToken }}"
+    headers:
+      X-Login-Token: "{{ token }}"
+    sensor:
+      - name: AirVisual Outdoor AQI
+        value_template: "{{ (value | from_json).current.aqi.value }}"
+        unit_of_measurement: "AQI US"
+```
 
 ### Selector
 
@@ -191,7 +212,7 @@ Multiscrape also offers a `get_content` and a `scrape` service. `get_content` re
 `scrape` does what it says. It scrapes a website and provides the sensors and attributes.
 
 Both services accept the same configuration as what you would provide in your configuration yaml (what is described above), with a small but important caveat: if the service input contains templates, those are automatically parsed by home assistant when the service is being called. That is fine for templates like `resource` and `select`, but templates that need to be applied on the scraped data itself (like `value_template`), cannot be parsed when the service is called. Therefore you need to slightly alter the syntax and add a `!` in the middle. E.g. `{{` becomes `{!{` and `%}` becomes `%!}`. Multiscrape will then understand that this string needs to handled as a template after the service has been called.\
-*If someone has a better solution, please let me know!*
+_If someone has a better solution, please let me know!_
 
 To call one of those services, go to 'Developer tools' in Home Assistant and then to 'services'. Find the `multiscrape.get_content` or `multiscrape.scrape` services and go to yaml mode. There you enter your configuration.
 Example:
