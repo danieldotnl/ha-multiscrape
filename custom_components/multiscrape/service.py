@@ -1,40 +1,24 @@
 """Class for implementing the multiscrape services."""
 
 import logging
-import voluptuous as vol
+
 import homeassistant.helpers.config_validation as cv
-from homeassistant.core import HomeAssistant
-from homeassistant.core import ServiceCall, SupportsResponse
-from homeassistant.const import (
-    CONF_NAME,
-    CONF_DESCRIPTION,
-    CONF_UNIQUE_ID,
-    CONF_VALUE_TEMPLATE,
-    CONF_ICON,
-)
+import voluptuous as vol
+from homeassistant.const import (CONF_DESCRIPTION, CONF_ICON, CONF_NAME,
+                                 CONF_UNIQUE_ID, CONF_VALUE_TEMPLATE, Platform)
+from homeassistant.core import HomeAssistant, ServiceCall, SupportsResponse
 from homeassistant.helpers.service import async_set_service_schema
 from homeassistant.util import slugify
-from homeassistant.const import Platform
 
-from .scraper import create_scraper
-
+from .const import (CONF_FIELDS, CONF_FORM_SUBMIT, CONF_PARSER,
+                    CONF_SENSOR_ATTRS, DOMAIN)
+from .coordinator import (MultiscrapeDataUpdateCoordinator,
+                          create_content_request_manager)
 from .form import create_form_submitter
-
-from .selector import Selector
-from .schema import SERVICE_COMBINED_SCHEMA
-from .coordinator import (
-    MultiscrapeDataUpdateCoordinator,
-    create_content_request_manager,
-)
 from .http import create_http_wrapper
-
-from .const import (
-    CONF_FORM_SUBMIT,
-    CONF_PARSER,
-    CONF_SENSOR_ATTRS,
-    DOMAIN,
-    CONF_FIELDS,
-)
+from .schema import SERVICE_COMBINED_SCHEMA
+from .scraper import create_scraper
+from .selector import Selector
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -59,7 +43,8 @@ async def setup_config_services(
 
 async def _setup_trigger_service(hass: HomeAssistant, target_name, coordinator):
     async def _async_trigger_service(service: ServiceCall):
-        _LOGGER.info("Multiscrape triggered by service: %s", service.__repr__())
+        _LOGGER.info("Multiscrape triggered by service: %s",
+                     service.__repr__())
         await coordinator.async_request_refresh()
 
     hass.services.async_register(
@@ -75,7 +60,8 @@ async def _setup_trigger_service(hass: HomeAssistant, target_name, coordinator):
         CONF_DESCRIPTION: f"Triggers an update for the multiscrape {target_name} integration, independent of the update interval.",
         CONF_FIELDS: {},
     }
-    async_set_service_schema(hass, DOMAIN, f"trigger_{target_name}", service_desc)
+    async_set_service_schema(
+        hass, DOMAIN, f"trigger_{target_name}", service_desc)
 
 
 async def setup_get_content_service(hass: HomeAssistant):
@@ -118,9 +104,11 @@ async def setup_scrape_service(hass: HomeAssistant):
 
         for platform in [Platform.SENSOR, Platform.BINARY_SENSOR]:
             for sensor in conf.get(platform) or []:
-                name = sensor.get(CONF_UNIQUE_ID) or slugify(sensor.get(CONF_NAME))
+                name = sensor.get(CONF_UNIQUE_ID) or slugify(
+                    sensor.get(CONF_NAME))
                 sensor_selector = Selector(hass, sensor)
-                response[name] = {"value": scraper.scrape(sensor_selector, config_name)}
+                response[name] = {"value": scraper.scrape(
+                    sensor_selector, config_name, variables=sensor.coordinator._request_manager._form_variables)}
 
                 if sensor.get(CONF_ICON):
                     response[CONF_ICON] = sensor.get(CONF_ICON).async_render(
@@ -131,7 +119,8 @@ async def setup_scrape_service(hass: HomeAssistant):
                     attr_name = slugify(attr_conf[CONF_NAME])
                     attr_selector = Selector(hass, attr_conf)
                     response[name].setdefault(CONF_SENSOR_ATTRS, {}).update(
-                        {attr_name: scraper.scrape(attr_selector, config_name)}
+                        {attr_name: scraper.scrape(
+                            attr_selector, config_name, variables=sensor.coordinator._request_manager._form_variables)}
                     )
 
         return response
@@ -151,7 +140,8 @@ async def _prepare_service_request(hass: HomeAssistant, conf, config_name):
     form_submit_config = conf.get(CONF_FORM_SUBMIT)
     parser = conf.get(CONF_PARSER)
     if form_submit_config:
-        form_http = create_http_wrapper(config_name, form_submit_config, hass, None)
+        form_http = create_http_wrapper(
+            config_name, form_submit_config, hass, None)
         form_submitter = create_form_submitter(
             config_name, form_submit_config, hass, form_http, None, parser
         )
@@ -169,7 +159,8 @@ def _restore_templates(config):
             for attr_conf in sensor.get(CONF_SENSOR_ATTRS) or []:
                 attr_conf[CONF_VALUE_TEMPLATE] = (
                     cv.template(
-                        _replace_template_characters(attr_conf.get(CONF_VALUE_TEMPLATE))
+                        _replace_template_characters(
+                            attr_conf.get(CONF_VALUE_TEMPLATE))
                     )
                     if attr_conf.get(CONF_VALUE_TEMPLATE)
                     else None
@@ -180,7 +171,8 @@ def _restore_templates(config):
                 )
             if sensor.get(CONF_VALUE_TEMPLATE):
                 sensor[CONF_VALUE_TEMPLATE] = cv.template(
-                    _replace_template_characters(sensor.get(CONF_VALUE_TEMPLATE))
+                    _replace_template_characters(
+                        sensor.get(CONF_VALUE_TEMPLATE))
                 )
     return config
 

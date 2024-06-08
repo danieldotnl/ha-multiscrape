@@ -96,11 +96,7 @@ class Scraper:
                 )
                 raise
 
-    def set_variables(self, variables):
-        """Set variables."""
-        self._variables = variables
-
-    def scrape(self, selector, sensor, attribute=None):
+    def scrape(self, selector, sensor, attribute=None, variables: dict = {}):
         """Scrape based on given selector the data."""
         # This is required as this function is called separately for sensors and attributes
         log_prefix = f"{self._config_name} # {sensor}"
@@ -110,7 +106,7 @@ class Scraper:
         if selector.just_value:
             _LOGGER.debug("%s # Applying value_template only.", log_prefix)
             result = selector.value_template.async_render_with_possible_json_value(
-                self._data, None, variables=self._variables
+                self._data, None, variables=variables
             )
             return selector.value_template._parse_result(result)
 
@@ -121,7 +117,8 @@ class Scraper:
 
         if selector.is_list:
             tags = self._soup.select(selector.list)
-            _LOGGER.debug("%s # List selector selected tags: %s", log_prefix, tags)
+            _LOGGER.debug("%s # List selector selected tags: %s",
+                          log_prefix, tags)
             if selector.attribute is not None:
                 _LOGGER.debug(
                     "%s # Try to find attributes: %s",
@@ -153,13 +150,15 @@ class Scraper:
             _LOGGER.debug("%s # Selector result: %s", log_prefix, value)
 
         if value is not None and selector.value_template is not None:
-            _LOGGER.debug("%s # Applying value_template on selector result", log_prefix)
+            _LOGGER.debug(
+                "%s # Applying value_template on selector result", log_prefix)
             value = selector.value_template.async_render(
                 variables={"value": value} | self._variables, parse_result=True
             )
 
         _LOGGER.debug(
-            "%s # Final selector value: %s of type %s", log_prefix, value, type(value)
+            "%s # Final selector value: %s of type %s", log_prefix, value, type(
+                value)
         )
         return value
 

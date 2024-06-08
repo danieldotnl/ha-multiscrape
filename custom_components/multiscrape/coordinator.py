@@ -69,7 +69,6 @@ class ContentRequestManager:
             try:
                 result = await self._form_submitter.async_submit(resource)
                 self._form_variables = self._form_submitter.scrape_variables()
-                self._scraper.set_variables(self._form_variables)
 
                 if result:
                     _LOGGER.debug(
