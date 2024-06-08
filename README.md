@@ -109,7 +109,7 @@ Configure the sensors that will scrape the data.
 | ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- | ------- | --------------- |
 | unique_id           | Will be used as entity_id and enables editing the entity in the UI                                                                                                                                               | False    |         | string          |
 | name                | Friendly name for the sensor                                                                                                                                                                                     | False    |         | string          |
-|                     | Shared fields from the [Selector](#Selector).                                                                                                                                                                    | True     |         |                 |
+|                     | See [Selector](#Selector) fields                                                                                                                                                                                 | True     |         |                 |
 | attributes          | See [Sensor attributes](#sensor-attributes)                                                                                                                                                                      | False    |         | list            |
 | unit_of_measurement | Defines the units of measurement of the sensor                                                                                                                                                                   | False    |         | string          |
 | device_class        | Sets the device_class for [sensors](https://www.home-assistant.io/integrations/sensor/) or [binary sensors](https://www.home-assistant.io/integrations/binary_sensor/)                                           | False    |         | string          |
@@ -131,10 +131,10 @@ Configure a refresh button to manually trigger scraping.
 
 Configure the attributes on the sensor that can be set with additional scraping values.
 
-| name | description                                   | required | default | type   |
-| ---- | --------------------------------------------- | -------- | ------- | ------ |
-| name | Name of the attribute (will be slugified)     | True     |         | string |
-|      | Shared fields from the [Selector](#Selector). | True     |         |        |
+| name | description                               | required | default | type   |
+| ---- | ----------------------------------------- | -------- | ------- | ------ |
+| name | Name of the attribute (will be slugified) | True     |         | string |
+|      | See [Selector](#Selector) fields          | True     |         |        |
 
 ### Form-submit
 
@@ -152,38 +152,35 @@ Configure the form-submit functionality which enables you to submit a (login) fo
 
 ### Form Variables
 
-Configure the variables you want to be forwarded from scraping the [Form-submit](#form-submit) page to scraping the main page for sensor data. A common use case is to populate the `X-Login-Token` header which is the result of the login.
+Configure the variables that will be scraped from the [`form_submit`](#form-submit) response. You will be able to use those values in the `value_template` of a header or a selector in the main configuration. A common use case is to populate the `X-Login-Token` header which is the result of the login.
 
-| name | description                                   | required | default | type   |
-| ---- | --------------------------------------------- | -------- | ------- | ------ |
-| name | Name of the variable                          | True     |         | string |
-|      | Shared fields from the [Selector](#Selector). | True     |         |        |
+| name | description                      | required | default | type   |
+| ---- | -------------------------------- | -------- | ------- | ------ |
+| name | Name of the variable             | True     |         | string |
+|      | See [Selector](#Selector) fields | True     |         |        |
 
 Example:
 
 ```yaml
 multiscrape:
-  - resource: "https://website-api.airvisual.com/v1/users/65a28a0cec1ff309a74ba414/devices/avo_65a2bd77c2f7aeabcd715393?units.system=metric&AQI=US&language=en"
+  - resource: "https://somesiteyouwanttoscrape.com"
     form_submit:
       submit_once: True
-      resource: "https://website-api.airvisual.com/v1/auth/signin/by/email"
+      resource: "https://authforsomesiteyouwanttoscrape.com"
       input:
         email: "<email>"
         password: "<password>"
       variables:
         - name: token
-          value_template: "{{ (value | from_json).loginToken }}"
+          value_template: "{{ ... }}"
     headers:
       X-Login-Token: "{{ token }}"
-    sensor:
-      - name: AirVisual Outdoor AQI
-        value_template: "{{ (value | from_json).current.aqi.value }}"
-        unit_of_measurement: "AQI US"
+    sensor: ...
 ```
 
 ### Selector
 
-Shared field used in multiple configs above. Used to define the scraping: how to extract a value from the page.
+Used to configure scraping options.
 
 | name           | description                                                                                                                                           | required | default | type            |
 | -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- | -------- | ------- | --------------- |
