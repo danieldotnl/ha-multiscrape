@@ -86,10 +86,10 @@ class HttpWrapper:
 
     async def async_request(self, context, resource, method=None, request_data=None):
         """Execute a HTTP request."""
-        data = request_data or self._data_renderer(None, False, self._variables)
+        data = request_data or self._data_renderer(self._variables)
         method = method or self._method or "GET"
-        headers = self._headers_renderer(None, False, self._variables)
-        params = self._params_renderer(None, False, self._variables)
+        headers = self._headers_renderer(self._variables)
+        params = self._params_renderer(self._variables)
 
         _LOGGER.debug(
             "%s # Executing %s-request with a %s to url: %s with headers: %s.",
