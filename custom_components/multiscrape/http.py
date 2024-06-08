@@ -70,7 +70,6 @@ class HttpWrapper:
         self._params_renderer = params_renderer
         self._headers_renderer = headers_renderer
         self._data_renderer = data_renderer
-        self._variables = None
 
     def set_authentication(self, username, password, auth_type):
         """Set http authentication."""
@@ -78,18 +77,15 @@ class HttpWrapper:
             self._auth = httpx.DigestAuth(username, password)
         else:
             self._auth = (username, password)
-        _LOGGER.debug("%s # Authentication configuration processed", self._config_name)
+        _LOGGER.debug(
+            "%s # Authentication configuration processed", self._config_name)
 
-    def set_variables(self, variables):
-        """Set variables."""
-        self._variables = variables
-
-    async def async_request(self, context, resource, method=None, request_data=None):
+    async def async_request(self, context, resource, method=None, request_data=None, variables: dict = {}):
         """Execute a HTTP request."""
-        data = request_data or self._data_renderer(self._variables)
+        data = request_data or self._data_renderer(variables)
         method = method or self._method or "GET"
-        headers = self._headers_renderer(self._variables)
-        params = self._params_renderer(self._variables)
+        headers = self._headers_renderer(variables)
+        params = self._params_renderer(variables)
 
         _LOGGER.debug(
             "%s # Executing %s-request with a %s to url: %s with headers: %s.",
