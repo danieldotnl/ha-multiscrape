@@ -23,7 +23,7 @@ DEFAULT_SCAN_INTERVAL = timedelta(seconds=60)
 
 
 def create_content_request_manager(
-    config_name, config, hass: HomeAssistant, http, form_submitter, scraper
+    config_name, config, hass: HomeAssistant, http, form_submitter
 ):
     """Create a content request manager instance."""
     _LOGGER.debug("%s # Creating ContentRequestManager", config_name)
@@ -34,7 +34,7 @@ def create_content_request_manager(
         resource_renderer = create_renderer(hass, resource_template)
     else:
         resource_renderer = create_renderer(hass, resource)
-    return ContentRequestManager(config_name, http, resource_renderer, form_submitter, scraper)
+    return ContentRequestManager(config_name, http, resource_renderer, form_submitter)
 
 
 class ContentRequestManager:
@@ -46,14 +46,12 @@ class ContentRequestManager:
         http: HttpWrapper,
         resource_renderer: Callable,
         form: FormSubmitter = None,
-        scraper: Scraper = None,
     ) -> None:
         """Initialize ContentRequestManager."""
         self._config_name = config_name
         self._http = http
         self._form_submitter = form
         self._resource_renderer = resource_renderer
-        self._scraper = scraper
         self._form_variables = {}
 
     def notify_scrape_exception(self):

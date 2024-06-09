@@ -124,7 +124,7 @@ async def _async_process_config(hass: HomeAssistant, config) -> bool:
 
         http = create_http_wrapper(config_name, conf, hass, file_manager)
         scraper = create_scraper(config_name, conf, hass, file_manager)
-        request_manager = create_content_request_manager(config_name, conf, hass, http, form_submitter, scraper)
+        request_manager = create_content_request_manager(config_name, conf, hass, http, form_submitter)
         coordinator = create_multiscrape_coordinator(
             config_name,
             conf,
