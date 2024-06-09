@@ -45,7 +45,6 @@ class Scraper:
         self._soup: BeautifulSoup = None
         self._data = None
         self._separator = separator
-        self._variables = {}
         self.reset()
 
     @property
@@ -152,8 +151,7 @@ class Scraper:
         if value is not None and selector.value_template is not None:
             _LOGGER.debug(
                 "%s # Applying value_template on selector result", log_prefix)
-            value = selector.value_template.async_render(
-                variables={"value": value} | self._variables, parse_result=True
+            value = selector.value_template.async_render(variables=variables, parse_result=True
             )
 
         _LOGGER.debug(
