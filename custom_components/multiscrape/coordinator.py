@@ -201,3 +201,7 @@ class MultiscrapeDataUpdateCoordinator(DataUpdateCoordinator):
                 )
 
         self._scraper.reset()
+
+    def get_form_variables(self):
+        """Return the form variables."""
+        return self._request_manager._form_variables

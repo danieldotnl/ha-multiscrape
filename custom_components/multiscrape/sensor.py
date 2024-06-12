@@ -136,7 +136,7 @@ class MultiscrapeSensor(MultiscrapeEntity, SensorEntity):
                     "Skipped scraping because data couldn't be updated")
 
             value = self.scraper.scrape(
-                self._sensor_selector, self._name, variables=self.coordinator._request_manager._form_variables)
+                self._sensor_selector, self._name, variables=self.coordinator.get_form_variables())
             _LOGGER.debug(
                 "%s # %s # Selected: %s", self.scraper.name, self._name, value
             )
