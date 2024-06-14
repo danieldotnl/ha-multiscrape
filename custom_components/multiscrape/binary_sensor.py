@@ -127,7 +127,7 @@ class MultiscrapeBinarySensor(MultiscrapeEntity, BinarySensorEntity):
                     "Skipped scraping because data couldn't be updated")
 
             value = self.scraper.scrape(
-                self._sensor_selector, self._name, variables=self.coordinator.get_form_variables())
+                self._sensor_selector, self._name, variables=self.coordinator.form_variables)
             try:
                 self._attr_is_on = bool(int(value))
             except ValueError:

@@ -108,7 +108,7 @@ async def setup_scrape_service(hass: HomeAssistant):
                     sensor.get(CONF_NAME))
                 sensor_selector = Selector(hass, sensor)
                 response[name] = {"value": scraper.scrape(
-                    sensor_selector, config_name, variables=sensor.coordinator.get_form_variables())}
+                    sensor_selector, config_name, variables=sensor.coordinator.form_variables)}
 
                 if sensor.get(CONF_ICON):
                     response[CONF_ICON] = sensor.get(CONF_ICON).async_render(
@@ -120,7 +120,7 @@ async def setup_scrape_service(hass: HomeAssistant):
                     attr_selector = Selector(hass, attr_conf)
                     response[name].setdefault(CONF_SENSOR_ATTRS, {}).update(
                         {attr_name: scraper.scrape(
-                            attr_selector, config_name, variables=sensor.coordinator.get_form_variables())}
+                            attr_selector, config_name, variables=sensor.coordinator.form_variables)}
                     )
 
         return response

@@ -84,6 +84,11 @@ class ContentRequestManager:
         response = await self._http.async_request("page", resource, variables=self._form_variables)
         return response.text
 
+    @property
+    def form_variables(self):
+        """Return the form variables."""
+        return self._form_variables
+
 
 def create_multiscrape_coordinator(
     config_name, conf, hass, request_manager, file_manager, scraper
@@ -202,6 +207,7 @@ class MultiscrapeDataUpdateCoordinator(DataUpdateCoordinator):
 
         self._scraper.reset()
 
-    def get_form_variables(self):
+    @property
+    def form_variables(self):
         """Return the form variables."""
-        return self._request_manager._form_variables
+        return self._request_manager.form_variables
