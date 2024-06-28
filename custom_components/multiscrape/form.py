@@ -3,20 +3,14 @@ import logging
 from urllib.parse import urljoin
 
 from bs4 import BeautifulSoup
-
-from homeassistant.core import HomeAssistant
 from homeassistant.const import CONF_RESOURCE
+from homeassistant.core import HomeAssistant
 
-from .const import (
-    CONF_FORM_SELECT,
-    CONF_FORM_INPUT,
-    CONF_FORM_INPUT_FILTER,
-    CONF_FORM_SUBMIT_ONCE,
-    CONF_FORM_RESUBMIT_ERROR,
-)
+from .const import (CONF_FORM_INPUT, CONF_FORM_INPUT_FILTER,
+                    CONF_FORM_RESUBMIT_ERROR, CONF_FORM_SELECT,
+                    CONF_FORM_SUBMIT_ONCE)
 from .file import LoggingFileManager
 from .http import HttpWrapper
-
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -76,6 +70,7 @@ class FormSubmitter:
         self._resubmit_error = resubmit_error
         self._parser = parser
         self._should_submit = True
+        self._cookies = None
 
     def notify_scrape_exception(self):
         """Make sure form is re-submitted after an exception."""
@@ -141,6 +136,7 @@ class FormSubmitter:
             submit_resource,
             method=method,
             request_data=input_fields,
+            cookies=self._cookies
         )
         _LOGGER.debug(
             "%s # Form seems to be submitted successfully (to be sure, use log_response and check file). Now continuing to retrieve target page.",
@@ -151,9 +147,9 @@ class FormSubmitter:
             self._should_submit = False
 
         if not self._form_resource:
-            return response.text
+            return response.text, response.cookies
         else:
-            return None
+            return None, response.cookies
 
     def _determine_submit_resource(self, action, main_resource):
         resource = main_resource
@@ -182,6 +178,7 @@ class FormSubmitter:
             resource,
             "GET",
         )
+        self._cookies = response.cookies
         return response.text
 
     def _get_input_fields(self, form):
