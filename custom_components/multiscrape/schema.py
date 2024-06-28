@@ -1,75 +1,42 @@
 """The multiscrape component schemas."""
+import logging
+
 import homeassistant.helpers.config_validation as cv
 import voluptuous as vol
-import logging
-from homeassistant.components.binary_sensor import (
-    DEVICE_CLASSES_SCHEMA as BINARY_SENSOR_DEVICE_CLASSES_SCHEMA,
-)
-from homeassistant.components.binary_sensor import DOMAIN as BINARY_SENSOR_DOMAIN
+from homeassistant.components.binary_sensor import \
+    DEVICE_CLASSES_SCHEMA as BINARY_SENSOR_DEVICE_CLASSES_SCHEMA
+from homeassistant.components.binary_sensor import \
+    DOMAIN as BINARY_SENSOR_DOMAIN
 from homeassistant.components.button import DOMAIN as BUTTON_DOMAIN
-from homeassistant.components.sensor import (
-    DEVICE_CLASSES_SCHEMA as SENSOR_DEVICE_CLASSES_SCHEMA,
-)
+from homeassistant.components.sensor import \
+    DEVICE_CLASSES_SCHEMA as SENSOR_DEVICE_CLASSES_SCHEMA
 from homeassistant.components.sensor import DOMAIN as SENSOR_DOMAIN
-from homeassistant.components.sensor import (
-    STATE_CLASSES_SCHEMA as SENSOR_STATE_CLASSES_SCHEMA,
-)
-from homeassistant.const import CONF_AUTHENTICATION
-from homeassistant.const import CONF_DEVICE_CLASS
-from homeassistant.const import CONF_FORCE_UPDATE
-from homeassistant.const import CONF_HEADERS
-from homeassistant.const import CONF_ICON
-from homeassistant.const import CONF_METHOD
-from homeassistant.const import CONF_NAME
-from homeassistant.const import CONF_PARAMS
-from homeassistant.const import CONF_PASSWORD
-from homeassistant.const import CONF_PAYLOAD
-from homeassistant.const import CONF_RESOURCE
-from homeassistant.const import CONF_RESOURCE_TEMPLATE
-from homeassistant.const import CONF_SCAN_INTERVAL
-from homeassistant.const import CONF_TIMEOUT
-from homeassistant.const import CONF_UNIQUE_ID
-from homeassistant.const import CONF_UNIT_OF_MEASUREMENT
-from homeassistant.const import CONF_USERNAME
-from homeassistant.const import CONF_VALUE_TEMPLATE
-from homeassistant.const import CONF_VERIFY_SSL
-from homeassistant.const import HTTP_BASIC_AUTHENTICATION
-from homeassistant.const import HTTP_DIGEST_AUTHENTICATION
+from homeassistant.components.sensor import \
+    STATE_CLASSES_SCHEMA as SENSOR_STATE_CLASSES_SCHEMA
+from homeassistant.const import (CONF_AUTHENTICATION, CONF_DEVICE_CLASS,
+                                 CONF_FORCE_UPDATE, CONF_HEADERS, CONF_ICON,
+                                 CONF_METHOD, CONF_NAME, CONF_PARAMS,
+                                 CONF_PASSWORD, CONF_PAYLOAD, CONF_RESOURCE,
+                                 CONF_RESOURCE_TEMPLATE, CONF_SCAN_INTERVAL,
+                                 CONF_TIMEOUT, CONF_UNIQUE_ID,
+                                 CONF_UNIT_OF_MEASUREMENT, CONF_USERNAME,
+                                 CONF_VALUE_TEMPLATE, CONF_VERIFY_SSL,
+                                 HTTP_BASIC_AUTHENTICATION,
+                                 HTTP_DIGEST_AUTHENTICATION)
 
-from .const import CONF_ATTR
-from .const import CONF_FORM_INPUT
-from .const import CONF_FORM_INPUT_FILTER
-from .const import CONF_FORM_RESUBMIT_ERROR
-from .const import CONF_FORM_SELECT
-from .const import CONF_FORM_SUBMIT
-from .const import CONF_FORM_SUBMIT_ONCE
-from .const import CONF_LOG_RESPONSE
-from .const import CONF_ON_ERROR
-from .const import CONF_ON_ERROR_DEFAULT
-from .const import CONF_ON_ERROR_LOG
-from .const import CONF_ON_ERROR_VALUE
-from .const import CONF_ON_ERROR_VALUE_DEFAULT
-from .const import CONF_ON_ERROR_VALUE_LAST
-from .const import CONF_ON_ERROR_VALUE_NONE
-from .const import CONF_PARSER
-from .const import CONF_PICTURE
-from .const import CONF_SELECT
-from .const import CONF_SELECT_LIST
-from .const import CONF_SENSOR_ATTRS
-from .const import CONF_SEPARATOR
-from .const import CONF_STATE_CLASS
-from .const import DEFAULT_BINARY_SENSOR_NAME
-from .const import DEFAULT_BUTTON_NAME
-from .const import DEFAULT_FORCE_UPDATE
-from .const import DEFAULT_METHOD
-from .const import DEFAULT_PARSER
-from .const import DEFAULT_SENSOR_NAME
-from .const import DEFAULT_SEPARATOR
-from .const import DEFAULT_VERIFY_SSL
-from .const import DOMAIN
-from .const import LOG_ERROR
-from .const import LOG_LEVELS
-from .const import METHODS
+from .const import (CONF_ATTR, CONF_FORM_INPUT, CONF_FORM_INPUT_FILTER,
+                    CONF_FORM_RESUBMIT_ERROR, CONF_FORM_SELECT,
+                    CONF_FORM_SUBMIT, CONF_FORM_SUBMIT_ONCE,
+                    CONF_FORM_VARIABLES, CONF_LOG_RESPONSE, CONF_ON_ERROR,
+                    CONF_ON_ERROR_DEFAULT, CONF_ON_ERROR_LOG,
+                    CONF_ON_ERROR_VALUE, CONF_ON_ERROR_VALUE_DEFAULT,
+                    CONF_ON_ERROR_VALUE_LAST, CONF_ON_ERROR_VALUE_NONE,
+                    CONF_PARSER, CONF_PICTURE, CONF_SELECT, CONF_SELECT_LIST,
+                    CONF_SENSOR_ATTRS, CONF_SEPARATOR, CONF_STATE_CLASS,
+                    DEFAULT_BINARY_SENSOR_NAME, DEFAULT_BUTTON_NAME,
+                    DEFAULT_FORCE_UPDATE, DEFAULT_METHOD, DEFAULT_PARSER,
+                    DEFAULT_SENSOR_NAME, DEFAULT_SEPARATOR, DEFAULT_VERIFY_SSL,
+                    DOMAIN, LOG_ERROR, LOG_LEVELS, METHODS)
 from .scraper import DEFAULT_TIMEOUT
 
 _LOGGER = logging.getLogger(__name__)
@@ -88,15 +55,6 @@ HTTP_SCHEMA = {
     vol.Optional(CONF_PAYLOAD): cv.template,
     vol.Optional(CONF_VERIFY_SSL, default=DEFAULT_VERIFY_SSL): cv.boolean,
     vol.Optional(CONF_TIMEOUT, default=DEFAULT_TIMEOUT): cv.positive_int,
-}
-
-FORM_SUBMIT_SCHEMA = {
-    **HTTP_SCHEMA,
-    vol.Optional(CONF_FORM_SELECT): cv.string,
-    vol.Optional(CONF_FORM_INPUT): vol.Schema({cv.string: cv.string}),
-    vol.Optional(CONF_FORM_INPUT_FILTER, default=[]): cv.ensure_list,
-    vol.Optional(CONF_FORM_SUBMIT_ONCE, default=False): cv.boolean,
-    vol.Optional(CONF_FORM_RESUBMIT_ERROR, default=True): cv.boolean,
 }
 
 INTEGRATION_SCHEMA = {
@@ -126,6 +84,20 @@ SELECTOR_SCHEMA = {
     vol.Optional(CONF_ATTR): cv.string,
     vol.Optional(CONF_VALUE_TEMPLATE): cv.template,
     vol.Optional(CONF_ON_ERROR): vol.Schema(ON_ERROR_SCHEMA),
+}
+
+FORM_HEADERS_MAPPING_SCHEMA = {vol.Required(CONF_NAME): cv.string, **SELECTOR_SCHEMA}
+
+FORM_SUBMIT_SCHEMA = {
+    **HTTP_SCHEMA,
+    vol.Optional(CONF_FORM_SELECT): cv.string,
+    vol.Optional(CONF_FORM_INPUT): vol.Schema({cv.string: cv.string}),
+    vol.Optional(CONF_FORM_INPUT_FILTER, default=[]): cv.ensure_list,
+    vol.Optional(CONF_FORM_SUBMIT_ONCE, default=False): cv.boolean,
+    vol.Optional(CONF_FORM_RESUBMIT_ERROR, default=True): cv.boolean,
+    vol.Optional(CONF_FORM_VARIABLES, default=[]): vol.All(
+        cv.ensure_list, [vol.Schema(FORM_HEADERS_MAPPING_SCHEMA)]
+    ),
 }
 
 SENSOR_ATTRIBUTE_SCHEMA = {vol.Required(CONF_NAME): cv.string, **SELECTOR_SCHEMA}

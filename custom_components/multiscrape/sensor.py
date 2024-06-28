@@ -3,32 +3,22 @@ from __future__ import annotations
 
 import logging
 
-from homeassistant.components.sensor import SensorDeviceClass
-from homeassistant.components.sensor import SensorEntity
+from homeassistant.components.sensor import SensorDeviceClass, SensorEntity
 from homeassistant.components.sensor.helpers import async_parse_date_datetime
-from homeassistant.const import CONF_DEVICE_CLASS
-from homeassistant.const import CONF_FORCE_UPDATE
-from homeassistant.const import CONF_ICON
-from homeassistant.const import CONF_NAME
-from homeassistant.const import CONF_UNIQUE_ID
-from homeassistant.const import CONF_UNIT_OF_MEASUREMENT
-from homeassistant.const import Platform
+from homeassistant.const import (CONF_DEVICE_CLASS, CONF_FORCE_UPDATE,
+                                 CONF_ICON, CONF_NAME, CONF_UNIQUE_ID,
+                                 CONF_UNIT_OF_MEASUREMENT, Platform)
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import PlatformNotReady
 from homeassistant.helpers.entity import async_generate_entity_id
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.typing import ConfigType
-from homeassistant.helpers.typing import DiscoveryInfoType
+from homeassistant.helpers.typing import ConfigType, DiscoveryInfoType
 from homeassistant.util import slugify
 
 from . import async_get_config_and_coordinator
-from .const import CONF_ON_ERROR_VALUE_DEFAULT
-from .const import CONF_ON_ERROR_VALUE_LAST
-from .const import CONF_ON_ERROR_VALUE_NONE
-from .const import CONF_PICTURE
-from .const import CONF_SENSOR_ATTRS
-from .const import CONF_STATE_CLASS
-from .const import LOG_LEVELS
+from .const import (CONF_ON_ERROR_VALUE_DEFAULT, CONF_ON_ERROR_VALUE_LAST,
+                    CONF_ON_ERROR_VALUE_NONE, CONF_PICTURE, CONF_SENSOR_ATTRS,
+                    CONF_STATE_CLASS, LOG_LEVELS)
 from .entity import MultiscrapeEntity
 from .selector import Selector
 
@@ -142,9 +132,11 @@ class MultiscrapeSensor(MultiscrapeEntity, SensorEntity):
 
         try:
             if self.coordinator.update_error is True:
-                raise ValueError("Skipped scraping because data couldn't be updated")
+                raise ValueError(
+                    "Skipped scraping because data couldn't be updated")
 
-            value = self.scraper.scrape(self._sensor_selector, self._name)
+            value = self.scraper.scrape(
+                self._sensor_selector, self._name, variables=self.coordinator.form_variables)
             _LOGGER.debug(
                 "%s # %s # Selected: %s", self.scraper.name, self._name, value
             )

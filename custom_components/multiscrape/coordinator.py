@@ -1,25 +1,21 @@
 """Coordinator class for multiscrape integration."""
 import logging
-from datetime import timedelta
 from collections.abc import Callable
+from datetime import timedelta
 
+from homeassistant.const import (CONF_RESOURCE, CONF_RESOURCE_TEMPLATE,
+                                 CONF_SCAN_INTERVAL)
 from homeassistant.core import HomeAssistant
-from homeassistant.const import (
-    CONF_RESOURCE,
-    CONF_RESOURCE_TEMPLATE,
-    CONF_SCAN_INTERVAL,
-)
-from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
-from homeassistant.helpers.update_coordinator import event
+from homeassistant.helpers.update_coordinator import (DataUpdateCoordinator,
+                                                      event)
 from homeassistant.util.dt import utcnow
 
-from .scraper import Scraper
-from .http import HttpWrapper
+from .const import DOMAIN
 from .file import LoggingFileManager
 from .form import FormSubmitter
+from .http import HttpWrapper
+from .scraper import Scraper
 from .util import create_renderer
-
-from .const import DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 # we don't want to go with the default 15 seconds defined in helpers/entity_component
@@ -56,6 +52,7 @@ class ContentRequestManager:
         self._http = http
         self._form_submitter = form
         self._resource_renderer = resource_renderer
+        self._form_variables = {}
 
     def notify_scrape_exception(self):
         """Notify the form_submitter of an exception so it will re-submit next trigger."""
@@ -69,6 +66,7 @@ class ContentRequestManager:
         if self._form_submitter:
             try:
                 result = await self._form_submitter.async_submit(resource)
+                self._form_variables = self._form_submitter.scrape_variables()
 
                 if result:
                     _LOGGER.debug(
@@ -83,8 +81,13 @@ class ContentRequestManager:
                     ex,
                 )
 
-        response = await self._http.async_request("page", resource)
+        response = await self._http.async_request("page", resource, variables=self._form_variables)
         return response.text
+
+    @property
+    def form_variables(self):
+        """Return the form variables."""
+        return self._form_variables
 
 
 def create_multiscrape_coordinator(
@@ -203,3 +206,8 @@ class MultiscrapeDataUpdateCoordinator(DataUpdateCoordinator):
                 )
 
         self._scraper.reset()
+
+    @property
+    def form_variables(self):
+        """Return the form variables."""
+        return self._request_manager.form_variables

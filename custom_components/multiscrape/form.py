@@ -3,25 +3,20 @@ import logging
 from urllib.parse import urljoin
 
 from bs4 import BeautifulSoup
-
+from homeassistant.const import CONF_NAME, CONF_RESOURCE
 from homeassistant.core import HomeAssistant
-from homeassistant.const import CONF_RESOURCE
 
-from .const import (
-    CONF_FORM_SELECT,
-    CONF_FORM_INPUT,
-    CONF_FORM_INPUT_FILTER,
-    CONF_FORM_SUBMIT_ONCE,
-    CONF_FORM_RESUBMIT_ERROR,
-)
+from .const import (CONF_FORM_INPUT, CONF_FORM_INPUT_FILTER,
+                    CONF_FORM_RESUBMIT_ERROR, CONF_FORM_SELECT,
+                    CONF_FORM_SUBMIT_ONCE, CONF_FORM_VARIABLES)
 from .file import LoggingFileManager
 from .http import HttpWrapper
-
+from .selector import Selector
 
 _LOGGER = logging.getLogger(__name__)
 
 
-def create_form_submitter(config_name, config, hass, http, file_manager, parser):
+def create_form_submitter(config_name, config, hass, http, scraper, file_manager, parser):
     """Create a form submitter instance."""
     resource = config.get(CONF_RESOURCE)
     select = config.get(CONF_FORM_SELECT)
@@ -29,6 +24,9 @@ def create_form_submitter(config_name, config, hass, http, file_manager, parser)
     input_filter = config.get(CONF_FORM_INPUT_FILTER)
     resubmit_error = config.get(CONF_FORM_RESUBMIT_ERROR)
     submit_once = config.get(CONF_FORM_SUBMIT_ONCE)
+    variables_selectors = {}
+    for variables_conf in config.get(CONF_FORM_VARIABLES):
+        variables_selectors[variables_conf.get(CONF_NAME)] = Selector(hass, variables_conf)
 
     return FormSubmitter(
         config_name,
@@ -41,6 +39,8 @@ def create_form_submitter(config_name, config, hass, http, file_manager, parser)
         input_filter,
         submit_once,
         resubmit_error,
+        variables_selectors,
+        scraper,
         parser,
     )
 
@@ -60,6 +60,8 @@ class FormSubmitter:
         input_filter,
         submit_once,
         resubmit_error,
+        variables_selectors,
+        scraper,
         parser,
     ):
         """Initialize FormSubmitter class."""
@@ -74,6 +76,8 @@ class FormSubmitter:
         self._input_filter = input_filter
         self._submit_once = submit_once
         self._resubmit_error = resubmit_error
+        self._variables_selectors = variables_selectors
+        self._scraper = scraper
         self._parser = parser
         self._should_submit = True
 
@@ -150,10 +154,19 @@ class FormSubmitter:
         if self._submit_once:
             self._should_submit = False
 
+        await self._scraper.set_content(response.text)
+
         if not self._form_resource:
             return response.text
         else:
             return None
+
+    def scrape_variables(self):
+        """Scrape header mappings."""
+        result = {}
+        for variable_key in self._variables_selectors:
+            result[variable_key] = self._scraper.scrape(self._variables_selectors[variable_key], variable_key)
+        return result
 
     def _determine_submit_resource(self, action, main_resource):
         resource = main_resource
