@@ -24,7 +24,7 @@ def create_renderer(hass, value_template):
             _LOGGER.exception(
                 "Error rendering template: %s with variables %s", value_template, variables
             )
-            return None
+            raise
 
     return _render
 
