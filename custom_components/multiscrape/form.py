@@ -6,6 +6,8 @@ from bs4 import BeautifulSoup
 from homeassistant.const import CONF_NAME, CONF_RESOURCE
 from homeassistant.core import HomeAssistant
 
+from custom_components.multiscrape.scraper import create_scraper
+
 from .const import (CONF_FORM_INPUT, CONF_FORM_INPUT_FILTER,
                     CONF_FORM_RESUBMIT_ERROR, CONF_FORM_SELECT,
                     CONF_FORM_SUBMIT_ONCE, CONF_FORM_VARIABLES)
@@ -16,7 +18,7 @@ from .selector import Selector
 _LOGGER = logging.getLogger(__name__)
 
 
-def create_form_submitter(config_name, config, hass, http, scraper, file_manager, parser):
+def create_form_submitter(config_name, config, hass, http, file_manager, parser):
     """Create a form submitter instance."""
     resource = config.get(CONF_RESOURCE)
     select = config.get(CONF_FORM_SELECT)
@@ -24,9 +26,15 @@ def create_form_submitter(config_name, config, hass, http, scraper, file_manager
     input_filter = config.get(CONF_FORM_INPUT_FILTER)
     resubmit_error = config.get(CONF_FORM_RESUBMIT_ERROR)
     submit_once = config.get(CONF_FORM_SUBMIT_ONCE)
+
+    scraper = None
     variables_selectors = {}
-    for variables_conf in config.get(CONF_FORM_VARIABLES):
-        variables_selectors[variables_conf.get(CONF_NAME)] = Selector(hass, variables_conf)
+    variables = config.get(CONF_FORM_VARIABLES)
+    _LOGGER.debug("DEBUG VARIABLES: %s", variables)
+    if (variables != []):
+        scraper = create_scraper(config_name, config, hass, file_manager)
+        for variables_conf in variables:
+            variables_selectors[variables_conf.get(CONF_NAME)] = Selector(hass, variables_conf)
 
     return FormSubmitter(
         config_name,
