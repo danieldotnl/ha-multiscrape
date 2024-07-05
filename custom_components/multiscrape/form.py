@@ -162,7 +162,8 @@ class FormSubmitter:
         if self._submit_once:
             self._should_submit = False
 
-        await self._scraper.set_content(response.text)
+        if self._scraper:
+            await self._scraper.set_content(response.text)
 
         if not self._form_resource:
             return response.text
