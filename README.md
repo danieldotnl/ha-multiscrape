@@ -52,8 +52,8 @@ multiscrape:
     sensor:
       - unique_id: ha_latest_version
         name: Latest version
-        select: ".current-version > h1:nth-child(1)"
-        value_template: '{{ (value.split(":")[1]) }}'
+        select: ".release-date"
+        value_template: "{{ value | trim }}"
       - unique_id: ha_release_date
         icon: >-
           {% if is_state('binary_sensor.ha_version_check', 'on') %}
@@ -63,14 +63,16 @@ multiscrape:
           {% endif %}
         name: Release date
         select: ".release-date"
+        attribute: "title"
+        value_template: "{{ (value.split('released')[1]) }}"
     binary_sensor:
       - unique_id: ha_version_check
         name: Latest version == 2021.7.0
-        select: ".current-version > h1:nth-child(1)"
-        value_template: '{{ (value.split(":")[1]) | trim == "2021.7.0" }}'
+        select: ".release-date"
+        value_template: '{{ value | trim == "2021.7.0" }}'
         attributes:
           - name: Release notes link
-            select: "div.links:nth-child(3) > a:nth-child(1)"
+            select: ".release-date"
             attribute: href
 ```
 
@@ -189,11 +191,13 @@ data:
   sensor:
     - unique_id: ha_latest_version
       name: Latest version
-      select: ".current-version > h1:nth-child(1)"
-      value_template: '{!{ (value.split(":")[1]) }!}'
+      select: ".release-date"
+      value_template: "{!{ value | trim }!}"
     - unique_id: ha_release_date
       name: Release date
       select: ".release-date"
+      attribute: "title"
+      value_template: "{!{ (value.split('released')[1]) }!}"
 ```
 
 ## Debug logging
