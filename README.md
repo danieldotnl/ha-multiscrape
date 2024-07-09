@@ -154,7 +154,7 @@ Configure the form-submit functionality which enables you to submit a (login) fo
 
 ### Form Variables
 
-Configure the variables that will be scraped from the [`form_submit`](#form-submit) response. These variables can be used in the `value_template` of a header, a sensor or an attribute of the main configuration of the current integration. A common use case is to populate the `X-Login-Token` header which is the result of the login.
+Configure the variables that will be scraped from the [`form_submit`](#form-submit) response. These variables can be used in the `value_template` of the main configuration of the current integration: a `selector` in sensors/attributes or in a `header`. A common use case is to populate the `X-Login-Token` header which is the result of the login.
 
 | name | description                      | required | default | type   |
 | ---- | -------------------------------- | -------- | ------- | ------ |
