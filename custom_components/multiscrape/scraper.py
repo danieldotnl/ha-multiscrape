@@ -151,6 +151,7 @@ class Scraper:
         if value is not None and selector.value_template is not None:
             _LOGGER.debug(
                 "%s # Applying value_template on selector result", log_prefix)
+            variables["value"] = value
             value = selector.value_template.async_render(variables=variables, parse_result=True
             )
 
