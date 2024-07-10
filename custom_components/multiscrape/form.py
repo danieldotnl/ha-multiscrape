@@ -30,7 +30,6 @@ def create_form_submitter(config_name, config, hass, http, file_manager, parser)
     scraper = None
     variables_selectors = {}
     variables = config.get(CONF_FORM_VARIABLES)
-    _LOGGER.debug("DEBUG VARIABLES: %s", variables)
     if (variables != []):
         scraper = create_scraper(config_name, config, hass, file_manager)
         for variables_conf in variables:
@@ -101,7 +100,7 @@ class FormSubmitter:
     async def async_submit(self, main_resource):
         """Submit the form."""
         if not self._should_submit:
-            _LOGGER.debug("%s # Skip submitting form")
+            _LOGGER.debug("%s # Skip submitting form", self._config_name)
             return
 
         _LOGGER.debug("%s # Starting with form-submit", self._config_name)
