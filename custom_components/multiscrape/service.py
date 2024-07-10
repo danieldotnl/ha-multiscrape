@@ -161,7 +161,6 @@ def _restore_templates(config):
         selectors.extend(form_variables)
 
     for selector in selectors:
-        _LOGGER.info("DEBUG selector: %s", selector)
         for attr_conf in selector.get(CONF_SENSOR_ATTRS) or []:
             attr_conf[CONF_VALUE_TEMPLATE] = (
                 _restore_template(attr_conf.get(CONF_VALUE_TEMPLATE))
