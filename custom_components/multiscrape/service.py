@@ -10,10 +10,11 @@ from homeassistant.core import HomeAssistant, ServiceCall, SupportsResponse
 from homeassistant.helpers.service import async_set_service_schema
 from homeassistant.util import slugify
 
-from .const import (CONF_FIELDS, CONF_FORM_SUBMIT, CONF_PARSER,
-                    CONF_SENSOR_ATTRS, DOMAIN)
+from .const import (CONF_FIELDS, CONF_FORM_SUBMIT, CONF_LOG_RESPONSE,
+                    CONF_PARSER, CONF_SENSOR_ATTRS, DOMAIN)
 from .coordinator import (MultiscrapeDataUpdateCoordinator,
                           create_content_request_manager)
+from .file import create_file_manager
 from .form import create_form_submitter
 from .http import create_http_wrapper
 from .schema import SERVICE_COMBINED_SCHEMA
@@ -136,20 +137,21 @@ async def setup_scrape_service(hass: HomeAssistant):
 
 
 async def _prepare_service_request(hass: HomeAssistant, conf, config_name):
-    http = create_http_wrapper(config_name, conf, hass, None)
+    file_manager = await create_file_manager(hass, config_name, conf.get(CONF_LOG_RESPONSE))
+    http = create_http_wrapper(config_name, conf, hass, file_manager)
     form_submitter = None
     form_submit_config = conf.get(CONF_FORM_SUBMIT)
     parser = conf.get(CONF_PARSER)
     if form_submit_config:
         form_http = create_http_wrapper(
-            config_name, form_submit_config, hass, None)
+            config_name, form_submit_config, hass, file_manager)
         form_submitter = create_form_submitter(
-            config_name, form_submit_config, hass, form_http, None, parser
+            config_name, form_submit_config, hass, form_http, file_manager, parser
         )
     request_manager = create_content_request_manager(
         config_name, conf, hass, http, form_submitter
     )
-    scraper = create_scraper(config_name, conf, hass, None)
+    scraper = create_scraper(config_name, conf, hass, file_manager)
     return request_manager, scraper
 
 

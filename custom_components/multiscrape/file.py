@@ -1,6 +1,27 @@
 """LoggingFileManager for file utilities."""
+import logging
 import os
 
+from homeassistant.core import HomeAssistant
+from homeassistant.util import slugify
+
+_LOGGER = logging.getLogger(__name__)
+
+async def create_file_manager(hass: HomeAssistant, config_name: str, log_response: bool):
+    """Create a file manager instance."""
+    file_manager = None
+    if log_response:
+        folder = os.path.join(
+            hass.config.config_dir, f"multiscrape/{slugify(config_name)}/"
+        )
+        _LOGGER.debug(
+            "%s # Log responses enabled, creating logging folder: %s",
+            config_name,
+            folder,
+        )
+        file_manager = LoggingFileManager(folder)
+        hass.async_add_executor_job(file_manager.create_folders)
+    return file_manager
 
 class LoggingFileManager:
     """LoggingFileManager for handling logging files."""
