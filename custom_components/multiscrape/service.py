@@ -4,14 +4,16 @@ import logging
 
 import homeassistant.helpers.config_validation as cv
 import voluptuous as vol
-from homeassistant.const import (CONF_DESCRIPTION, CONF_ICON, CONF_NAME,
-                                 CONF_UNIQUE_ID, CONF_VALUE_TEMPLATE, Platform)
+from homeassistant.const import (CONF_DESCRIPTION, CONF_HEADERS, CONF_ICON,
+                                 CONF_NAME, CONF_UNIQUE_ID,
+                                 CONF_VALUE_TEMPLATE, Platform)
 from homeassistant.core import HomeAssistant, ServiceCall, SupportsResponse
 from homeassistant.helpers.service import async_set_service_schema
+from homeassistant.helpers.template import Template
 from homeassistant.util import slugify
 
-from .const import (CONF_FIELDS, CONF_FORM_SUBMIT, CONF_LOG_RESPONSE,
-                    CONF_PARSER, CONF_SENSOR_ATTRS, DOMAIN)
+from .const import (CONF_FIELDS, CONF_FORM_SUBMIT, CONF_FORM_VARIABLES,
+                    CONF_LOG_RESPONSE, CONF_PARSER, CONF_SENSOR_ATTRS, DOMAIN)
 from .coordinator import (MultiscrapeDataUpdateCoordinator,
                           create_content_request_manager)
 from .file import create_file_manager
@@ -44,8 +46,7 @@ async def setup_config_services(
 
 async def _setup_trigger_service(hass: HomeAssistant, target_name, coordinator):
     async def _async_trigger_service(service: ServiceCall):
-        _LOGGER.info("Multiscrape triggered by service: %s",
-                     service.__repr__())
+        _LOGGER.info("Multiscrape triggered by service: %s", service.__repr__())
         await coordinator.async_request_refresh()
 
     hass.services.async_register(
@@ -61,8 +62,7 @@ async def _setup_trigger_service(hass: HomeAssistant, target_name, coordinator):
         CONF_DESCRIPTION: f"Triggers an update for the multiscrape {target_name} integration, independent of the update interval.",
         CONF_FIELDS: {},
     }
-    async_set_service_schema(
-        hass, DOMAIN, f"trigger_{target_name}", service_desc)
+    async_set_service_schema(hass, DOMAIN, f"trigger_{target_name}", service_desc)
 
 
 async def setup_get_content_service(hass: HomeAssistant):
@@ -105,12 +105,9 @@ async def setup_scrape_service(hass: HomeAssistant):
 
         for platform in [Platform.SENSOR, Platform.BINARY_SENSOR]:
             for sensor in conf.get(platform) or []:
-                name = sensor.get(CONF_UNIQUE_ID) or slugify(
-                    sensor.get(CONF_NAME))
+                name = sensor.get(CONF_UNIQUE_ID) or slugify(sensor.get(CONF_NAME))
                 sensor_selector = Selector(hass, sensor)
-                variables = sensor.coordinator.form_variables if hasattr(sensor, 'coordinator') else {}
-                response[name] = {"value": scraper.scrape(
-                    sensor_selector, config_name, variables=variables)}
+                response[name] = {"value": scraper.scrape(sensor_selector, config_name)}
 
                 if sensor.get(CONF_ICON):
                     response[CONF_ICON] = sensor.get(CONF_ICON).async_render(
@@ -121,8 +118,7 @@ async def setup_scrape_service(hass: HomeAssistant):
                     attr_name = slugify(attr_conf[CONF_NAME])
                     attr_selector = Selector(hass, attr_conf)
                     response[name].setdefault(CONF_SENSOR_ATTRS, {}).update(
-                        {attr_name: scraper.scrape(
-                            attr_selector, config_name, variables=variables)}
+                        {attr_name: scraper.scrape(attr_selector, config_name)}
                     )
 
         return response
@@ -157,27 +153,35 @@ async def _prepare_service_request(hass: HomeAssistant, conf, config_name):
 
 def _restore_templates(config):
     config = dict(config)
+    selectors = []
     for platform in [Platform.SENSOR, Platform.BINARY_SENSOR]:
-        for sensor in config.get(platform) or []:
-            for attr_conf in sensor.get(CONF_SENSOR_ATTRS) or []:
-                attr_conf[CONF_VALUE_TEMPLATE] = (
-                    cv.template(
-                        _replace_template_characters(
-                            attr_conf.get(CONF_VALUE_TEMPLATE))
-                    )
-                    if attr_conf.get(CONF_VALUE_TEMPLATE)
-                    else None
-                )
-            if sensor.get(CONF_ICON):
-                sensor[CONF_ICON] = cv.template(
-                    _replace_template_characters(sensor.get(CONF_ICON))
-                )
-            if sensor.get(CONF_VALUE_TEMPLATE):
-                sensor[CONF_VALUE_TEMPLATE] = cv.template(
-                    _replace_template_characters(
-                        sensor.get(CONF_VALUE_TEMPLATE))
-                )
+        selectors.extend(config.get(platform) or [])
+    if config.get(CONF_FORM_SUBMIT):
+        form_variables = config[CONF_FORM_SUBMIT].get(CONF_FORM_VARIABLES) or []
+        selectors.extend(form_variables)
+
+    for selector in selectors:
+        _LOGGER.info("DEBUG selector: %s", selector)
+        for attr_conf in selector.get(CONF_SENSOR_ATTRS) or []:
+            attr_conf[CONF_VALUE_TEMPLATE] = (
+                _restore_template(attr_conf.get(CONF_VALUE_TEMPLATE))
+                if attr_conf.get(CONF_VALUE_TEMPLATE)
+                else None
+            )
+        if selector.get(CONF_ICON):
+            selector[CONF_ICON] = _restore_template(selector.get(CONF_ICON))
+        if selector.get(CONF_VALUE_TEMPLATE):
+            selector[CONF_VALUE_TEMPLATE] = _restore_template(selector[CONF_VALUE_TEMPLATE])
+
+    headers = config.get(CONF_HEADERS) or {}
+    for key, value in headers.items():
+        headers[key] = _restore_template(value)
+
     return config
+
+def _restore_template(value: str | Template):
+    value = value.template if isinstance(value, Template) else value
+    return cv.template(_replace_template_characters(value))
 
 
 def _replace_template_characters(template: str):
