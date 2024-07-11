@@ -157,8 +157,7 @@ def _restore_templates(config):
     for platform in [Platform.SENSOR, Platform.BINARY_SENSOR]:
         selectors.extend(config.get(platform) or [])
     if config.get(CONF_FORM_SUBMIT):
-        form_variables = config[CONF_FORM_SUBMIT].get(CONF_FORM_VARIABLES) or []
-        selectors.extend(form_variables)
+        selectors.extend(config[CONF_FORM_SUBMIT].get(CONF_FORM_VARIABLES) or [])
 
     for selector in selectors:
         for attr_conf in selector.get(CONF_SENSOR_ATTRS) or []:
