@@ -1,6 +1,6 @@
 {
   "domain": "multiscrape",
-  "name": "Multiscrape scraping component",
+  "name": "Multiscrape",
   "codeowners": ["@danieldotnl"],
   "config_flow": false,
   "dependencies": [],
