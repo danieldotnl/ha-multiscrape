@@ -1,40 +1,27 @@
 """Class for implementing the multiscrape services."""
 
 import logging
-import voluptuous as vol
+
 import homeassistant.helpers.config_validation as cv
-from homeassistant.core import HomeAssistant
-from homeassistant.core import ServiceCall, SupportsResponse
-from homeassistant.const import (
-    CONF_NAME,
-    CONF_DESCRIPTION,
-    CONF_UNIQUE_ID,
-    CONF_VALUE_TEMPLATE,
-    CONF_ICON,
-)
+import voluptuous as vol
+from homeassistant.const import (CONF_DESCRIPTION, CONF_HEADERS, CONF_ICON,
+                                 CONF_NAME, CONF_UNIQUE_ID,
+                                 CONF_VALUE_TEMPLATE, Platform)
+from homeassistant.core import HomeAssistant, ServiceCall, SupportsResponse
 from homeassistant.helpers.service import async_set_service_schema
+from homeassistant.helpers.template import Template
 from homeassistant.util import slugify
-from homeassistant.const import Platform
 
-from .scraper import create_scraper
-
+from .const import (CONF_FIELDS, CONF_FORM_SUBMIT, CONF_FORM_VARIABLES,
+                    CONF_LOG_RESPONSE, CONF_PARSER, CONF_SENSOR_ATTRS, DOMAIN)
+from .coordinator import (MultiscrapeDataUpdateCoordinator,
+                          create_content_request_manager)
+from .file import create_file_manager
 from .form import create_form_submitter
-
-from .selector import Selector
-from .schema import SERVICE_COMBINED_SCHEMA
-from .coordinator import (
-    MultiscrapeDataUpdateCoordinator,
-    create_content_request_manager,
-)
 from .http import create_http_wrapper
-
-from .const import (
-    CONF_FORM_SUBMIT,
-    CONF_PARSER,
-    CONF_SENSOR_ATTRS,
-    DOMAIN,
-    CONF_FIELDS,
-)
+from .schema import SERVICE_COMBINED_SCHEMA
+from .scraper import create_scraper
+from .selector import Selector
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -146,43 +133,53 @@ async def setup_scrape_service(hass: HomeAssistant):
 
 
 async def _prepare_service_request(hass: HomeAssistant, conf, config_name):
-    http = create_http_wrapper(config_name, conf, hass, None)
+    file_manager = await create_file_manager(hass, config_name, conf.get(CONF_LOG_RESPONSE))
+    http = create_http_wrapper(config_name, conf, hass, file_manager)
     form_submitter = None
     form_submit_config = conf.get(CONF_FORM_SUBMIT)
     parser = conf.get(CONF_PARSER)
     if form_submit_config:
-        form_http = create_http_wrapper(config_name, form_submit_config, hass, None)
+        form_http = create_http_wrapper(
+            config_name, form_submit_config, hass, file_manager)
         form_submitter = create_form_submitter(
-            config_name, form_submit_config, hass, form_http, None, parser
+            config_name, form_submit_config, hass, form_http, file_manager, parser
         )
     request_manager = create_content_request_manager(
         config_name, conf, hass, http, form_submitter
     )
-    scraper = create_scraper(config_name, conf, hass, None)
+    scraper = create_scraper(config_name, conf, hass, file_manager)
     return request_manager, scraper
 
 
 def _restore_templates(config):
     config = dict(config)
+    selectors = []
     for platform in [Platform.SENSOR, Platform.BINARY_SENSOR]:
-        for sensor in config.get(platform) or []:
-            for attr_conf in sensor.get(CONF_SENSOR_ATTRS) or []:
-                attr_conf[CONF_VALUE_TEMPLATE] = (
-                    cv.template(
-                        _replace_template_characters(attr_conf.get(CONF_VALUE_TEMPLATE))
-                    )
-                    if attr_conf.get(CONF_VALUE_TEMPLATE)
-                    else None
-                )
-            if sensor.get(CONF_ICON):
-                sensor[CONF_ICON] = cv.template(
-                    _replace_template_characters(sensor.get(CONF_ICON))
-                )
-            if sensor.get(CONF_VALUE_TEMPLATE):
-                sensor[CONF_VALUE_TEMPLATE] = cv.template(
-                    _replace_template_characters(sensor.get(CONF_VALUE_TEMPLATE))
-                )
+        selectors.extend(config.get(platform) or [])
+    if config.get(CONF_FORM_SUBMIT):
+        selectors.extend(config[CONF_FORM_SUBMIT].get(CONF_FORM_VARIABLES) or [])
+
+    for selector in selectors:
+        for attr_conf in selector.get(CONF_SENSOR_ATTRS) or []:
+            attr_conf[CONF_VALUE_TEMPLATE] = (
+                _restore_template(attr_conf.get(CONF_VALUE_TEMPLATE))
+                if attr_conf.get(CONF_VALUE_TEMPLATE)
+                else None
+            )
+        if selector.get(CONF_ICON):
+            selector[CONF_ICON] = _restore_template(selector.get(CONF_ICON))
+        if selector.get(CONF_VALUE_TEMPLATE):
+            selector[CONF_VALUE_TEMPLATE] = _restore_template(selector[CONF_VALUE_TEMPLATE])
+
+    headers = config.get(CONF_HEADERS) or {}
+    for key, value in headers.items():
+        headers[key] = _restore_template(value)
+
     return config
+
+def _restore_template(value: str | Template):
+    value = value.template if isinstance(value, Template) else value
+    return cv.template(_replace_template_characters(value))
 
 
 def _replace_template_characters(template: str):

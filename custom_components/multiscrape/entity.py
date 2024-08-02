@@ -8,10 +8,8 @@ from homeassistant.exceptions import TemplateError
 from homeassistant.helpers.entity import Entity
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
-from .const import CONF_ON_ERROR_VALUE_DEFAULT
-from .const import CONF_ON_ERROR_VALUE_LAST
-from .const import CONF_ON_ERROR_VALUE_NONE
-from .const import LOG_LEVELS
+from .const import (CONF_ON_ERROR_VALUE_DEFAULT, CONF_ON_ERROR_VALUE_LAST,
+                    CONF_ON_ERROR_VALUE_NONE, LOG_LEVELS)
 from .scraper import Scraper
 
 _LOGGER = logging.getLogger(__name__)
@@ -92,7 +90,8 @@ class MultiscrapeEntity(Entity):
         )
         if self.coordinator:
             self.async_on_remove(
-                self.coordinator.async_add_listener(self._handle_coordinator_update)
+                self.coordinator.async_add_listener(
+                    self._handle_coordinator_update)
             )
 
     @callback
@@ -133,7 +132,8 @@ class MultiscrapeEntity(Entity):
             )
             for name, attr_selector in self._attribute_selectors.items():
                 try:
-                    attr_value = self.scraper.scrape(attr_selector, self._name, name)
+                    attr_value = self.scraper.scrape(
+                        attr_selector, self._name, name, variables=self.coordinator.form_variables)
                     self._attr_extra_state_attributes[name] = attr_value
                 except Exception as exception:
                     _LOGGER.debug(

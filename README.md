@@ -88,7 +88,7 @@ Based on latest (pre) release.
 | authentication    | Configure HTTP authentication. `basic` or `digest`. Use this with username and password fields.                           | False    |         | string          |
 | username          | The username for accessing the url.                                                                                       | False    |         | string          |
 | password          | The password for accessing the url.                                                                                       | False    |         | string          |
-| headers           | The headers for the requests.                                                                                             | False    |         | template - list   |
+| headers           | The headers for the requests.                                                                                             | False    |         | template - list |
 | params            | The query params for the requests.                                                                                        | False    |         | template - list |
 | method            | The method for the request. Either `POST` or `GET`.                                                                       | False    | GET     | string          |
 | payload           | Optional payload to send with a POST request.                                                                             | False    |         | string          |
@@ -111,10 +111,7 @@ Configure the sensors that will scrape the data.
 | ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- | ------- | --------------- |
 | unique_id           | Will be used as entity_id and enables editing the entity in the UI                                                                                                                                               | False    |         | string          |
 | name                | Friendly name for the sensor                                                                                                                                                                                     | False    |         | string          |
-| select              | CSS selector used for retrieving the value of the sensor. Only required when `select_list` is not provided.                                                                                                      | True     |         | string/template |
-| select_list         | CSS selector for multiple values of multiple elements which will be returned as csv. Only required when `select` is not provided.                                                                                | True     |         | string/template |
-| attribute           | Attribute from the selected element to read as value                                                                                                                                                             | False    |         | string          |
-| value_template      | Defines a template applied on the result of the selector to extract the value. For binary sensors, the sensor is on if the template evaluates as True                                                            | False    |         | string/template |
+|                     | See [Selector](#Selector) fields                                                                                                                                                                                 | True     |         |                 |
 | attributes          | See [Sensor attributes](#sensor-attributes)                                                                                                                                                                      | False    |         | list            |
 | unit_of_measurement | Defines the units of measurement of the sensor                                                                                                                                                                   | False    |         | string          |
 | device_class        | Sets the device_class for [sensors](https://www.home-assistant.io/integrations/sensor/) or [binary sensors](https://www.home-assistant.io/integrations/binary_sensor/)                                           | False    |         | string          |
@@ -122,7 +119,6 @@ Configure the sensors that will scrape the data.
 | icon                | Defines the icon or a template for the icon of the sensor. The value of the selector (or value_template when given) is provided as input for the template. For binary sensors, the value is parsed in a boolean. | False    |         | string/template |
 | picture             | Contains a path to a local image and will set it as entity picture                                                                                                                                               | False    |         | string          |
 | force_update        | Sends update events even if the value hasn’t changed. Useful if you want to have meaningful value graphs in history.                                                                                             | False    | False   | boolean         |
-| on_error            | See [On-error](#on-error)                                                                                                                                                                                        | False    |         |                 |
 
 ### Refresh button
 
@@ -137,18 +133,14 @@ Configure a refresh button to manually trigger scraping.
 
 Configure the attributes on the sensor that can be set with additional scraping values.
 
-| name           | description                                                                                                                       | required | default | type            |
-| -------------- | --------------------------------------------------------------------------------------------------------------------------------- | -------- | ------- | --------------- |
-| name           | Name of the attribute (will be slugified)                                                                                         | True     |         | string          |
-| select         | CSS selector used for retrieving the value of the attribute. Only required when `select_list` is not provided.                    | True     |         | string/template |
-| select_list    | CSS selector for multiple values of multiple elements which will be returned as csv. Only required when `select` is not provided. | True     |         | string/template |
-| attribute      | Attribute from the selected element to read as value                                                                              | False    |         | string          |
-| value_template | Defines a template applied on the result of the selector to extract the value                                                     | False    |         | string/template |
-| on_error       | See [On-error](#on-error)                                                                                                         | False    |         |                 |
+| name | description                               | required | default | type   |
+| ---- | ----------------------------------------- | -------- | ------- | ------ |
+| name | Name of the attribute (will be slugified) | True     |         | string |
+|      | See [Selector](#Selector) fields          | True     |         |        |
 
 ### Form-submit
 
-Configure the form-submit functionality which enables you to submit a (login) form before scraping a site. More details on how this works [can be found on the wiki.](https://github.com/danieldotnl/ha-multiscrape/wiki/Form-submit-functionality)
+Configure the form-submit functionality which enables you to submit a (login) form before scraping a site. More details on how this works [can be found on the wiki](https://github.com/danieldotnl/ha-multiscrape/wiki/Form-submit-functionality).
 
 | name              | description                                                                                               | required | default | type                |
 | ----------------- | --------------------------------------------------------------------------------------------------------- | -------- | ------- | ------------------- |
@@ -158,6 +150,47 @@ Configure the form-submit functionality which enables you to submit a (login) fo
 | input_filter      | A list of input fields that should not be submitted with the form                                         | False    |         | string - list       |
 | submit_once       | Submit the form only once on startup instead of each scan interval                                        | False    | False   | boolean             |
 | resubmit_on_error | Resubmit the form after a scraping error is encountered                                                   | False    | True    | boolean             |
+| variables         | See [Form Variables](#Form-Variables)                                                                     | False    |         | list                |
+
+### Form Variables
+
+Configure the variables that will be scraped from the [`form_submit`](#form-submit) response. These variables can be used in the `value_template` of the main configuration of the current integration: a `selector` in sensors/attributes or in a `header`. A common use case is to populate the `X-Login-Token` header which is the result of the login.
+
+| name | description                      | required | default | type   |
+| ---- | -------------------------------- | -------- | ------- | ------ |
+| name | Name of the variable             | True     |         | string |
+|      | See [Selector](#Selector) fields | True     |         |        |
+
+Example:
+
+```yaml
+multiscrape:
+  - resource: "https://somesiteyouwanttoscrape.com"
+    form_submit:
+      submit_once: True
+      resource: "https://authforsomesiteyouwanttoscrape.com"
+      input:
+        email: "<email>"
+        password: "<password>"
+      variables:
+        - name: token
+          value_template: "{{ ... }}"
+    headers:
+      X-Login-Token: "{{ token }}"
+    sensor: ...
+```
+
+### Selector
+
+Used to configure scraping options.
+
+| name           | description                                                                                                                                           | required | default | type            |
+| -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- | -------- | ------- | --------------- |
+| select         | CSS selector used for retrieving the value of the attribute. Only required when `select_list` or `value_template` is not provided.                    | False    |         | string/template |
+| select_list    | CSS selector for multiple values of multiple elements which will be returned as csv. Only required when `select` or `value_template` is not provided. | False    |         | string/template |
+| attribute      | Attribute from the selected element to read as value.                                                                                                 | False    |         | string          |
+| value_template | Defines a template applied to extract the value from the result of the selector (if provided) or raw page (if selector not provided)                  | False    |         | string/template |
+| on_error       | See [On-error](#on-error)                                                                                                                             | False    |         |                 |
 
 ### On-error
 
@@ -178,7 +211,7 @@ Multiscrape also offers a `get_content` and a `scrape` service. `get_content` re
 `scrape` does what it says. It scrapes a website and provides the sensors and attributes.
 
 Both services accept the same configuration as what you would provide in your configuration yaml (what is described above), with a small but important caveat: if the service input contains templates, those are automatically parsed by home assistant when the service is being called. That is fine for templates like `resource` and `select`, but templates that need to be applied on the scraped data itself (like `value_template`), cannot be parsed when the service is called. Therefore you need to slightly alter the syntax and add a `!` in the middle. E.g. `{{` becomes `{!{` and `%}` becomes `%!}`. Multiscrape will then understand that this string needs to handled as a template after the service has been called.\
-*If someone has a better solution, please let me know!*
+_If someone has a better solution, please let me know!_
 
 To call one of those services, go to 'Developer tools' in Home Assistant and then to 'services'. Find the `multiscrape.get_content` or `multiscrape.scrape` services and go to yaml mode. There you enter your configuration.
 Example:
