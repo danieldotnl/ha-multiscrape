@@ -53,6 +53,7 @@ class ContentRequestManager:
         self._form_submitter = form
         self._resource_renderer = resource_renderer
         self._cookies = None
+        self._form_variables = {}
 
     def notify_scrape_exception(self):
         """Notify the form_submitter of an exception so it will re-submit next trigger."""
@@ -66,6 +67,7 @@ class ContentRequestManager:
         if self._form_submitter:
             try:
                 result, self._cookies = await self._form_submitter.async_submit(resource)
+                self._form_variables = self._form_submitter.scrape_variables()
 
                 if result:
                     _LOGGER.debug(
@@ -80,8 +82,13 @@ class ContentRequestManager:
                     ex,
                 )
 
-        response = await self._http.async_request("page", resource, cookies=self._cookies)
+        response = await self._http.async_request("page", resource, cookies=self._cookies, variables=self._form_variables)
         return response.text
+
+    @property
+    def form_variables(self):
+        """Return the form variables."""
+        return self._form_variables
 
 
 def create_multiscrape_coordinator(
@@ -200,3 +207,8 @@ class MultiscrapeDataUpdateCoordinator(DataUpdateCoordinator):
                 )
 
         self._scraper.reset()
+
+    @property
+    def form_variables(self):
+        """Return the form variables."""
+        return self._request_manager.form_variables
