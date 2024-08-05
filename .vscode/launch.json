@@ -3,6 +3,14 @@
   "version": "0.2.0",
   "configurations": [
     {
+      "name": "Home Assistant debugging",
+      "type": "python",
+      "request": "launch",
+      "module": "homeassistant",
+      "justMyCode": false,
+      "args": ["--debug", "-c", "config"]
+    },
+    {
       // Example of attaching to local debug server
       "name": "Python: Attach Local",
       "type": "python",
