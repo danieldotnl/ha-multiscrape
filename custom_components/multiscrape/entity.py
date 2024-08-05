@@ -8,10 +8,8 @@ from homeassistant.exceptions import TemplateError
 from homeassistant.helpers.entity import Entity
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
-from .const import CONF_ON_ERROR_VALUE_DEFAULT
-from .const import CONF_ON_ERROR_VALUE_LAST
-from .const import CONF_ON_ERROR_VALUE_NONE
-from .const import LOG_LEVELS
+from .const import (CONF_ON_ERROR_VALUE_DEFAULT, CONF_ON_ERROR_VALUE_LAST,
+                    CONF_ON_ERROR_VALUE_NONE, LOG_LEVELS)
 from .scraper import Scraper
 
 _LOGGER = logging.getLogger(__name__)
@@ -52,7 +50,7 @@ class MultiscrapeEntity(Entity):
                 self._attr_entity_picture,
             )
 
-        self._hass = hass
+        self.hass = hass
         self._attribute_selectors = attribute_selectors
 
         self._icon_template = icon_template

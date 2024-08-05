@@ -1,25 +1,21 @@
 """Coordinator class for multiscrape integration."""
 import logging
-from datetime import timedelta
 from collections.abc import Callable
+from datetime import timedelta
 
+from homeassistant.const import (CONF_RESOURCE, CONF_RESOURCE_TEMPLATE,
+                                 CONF_SCAN_INTERVAL)
 from homeassistant.core import HomeAssistant
-from homeassistant.const import (
-    CONF_RESOURCE,
-    CONF_RESOURCE_TEMPLATE,
-    CONF_SCAN_INTERVAL,
-)
-from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
-from homeassistant.helpers.update_coordinator import event
+from homeassistant.helpers.update_coordinator import (DataUpdateCoordinator,
+                                                      event)
 from homeassistant.util.dt import utcnow
 
-from .scraper import Scraper
-from .http import HttpWrapper
+from .const import DOMAIN
 from .file import LoggingFileManager
 from .form import FormSubmitter
+from .http import HttpWrapper
+from .scraper import Scraper
 from .util import create_renderer
-
-from .const import DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 # we don't want to go with the default 15 seconds defined in helpers/entity_component
@@ -118,7 +114,6 @@ class MultiscrapeDataUpdateCoordinator(DataUpdateCoordinator):
         update_interval: timedelta | None,
     ):
         """Initialize the coordinator."""
-        self._hass = hass
         self._config_name = config_name
         self._request_manager = request_manager
         self._file_manager = file_manager
@@ -194,7 +189,7 @@ class MultiscrapeDataUpdateCoordinator(DataUpdateCoordinator):
                 "%s # Deleting logging files from previous run", self._config_name
             )
             try:
-                await self._hass.async_add_executor_job(self._file_manager.empty_folder)
+                await self.hass.async_add_executor_job(self._file_manager.empty_folder)
             except Exception as ex:
                 _LOGGER.error(
                     "%s # Error deleting files from previous run: %s",
