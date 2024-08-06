@@ -3,15 +3,10 @@ from collections import namedtuple
 
 from homeassistant.const import CONF_VALUE_TEMPLATE
 
-from .const import CONF_ATTR
-from .const import CONF_ON_ERROR
-from .const import CONF_ON_ERROR_DEFAULT
-from .const import CONF_ON_ERROR_LOG
-from .const import CONF_ON_ERROR_VALUE
-from .const import CONF_SELECT
-from .const import CONF_SELECT_LIST
-from .const import DEFAULT_ON_ERROR_LOG
-from .const import DEFAULT_ON_ERROR_VALUE
+from .const import (CONF_ATTR, CONF_ON_ERROR, CONF_ON_ERROR_DEFAULT,
+                    CONF_ON_ERROR_LOG, CONF_ON_ERROR_VALUE, CONF_SELECT,
+                    CONF_SELECT_LIST, DEFAULT_ON_ERROR_LOG,
+                    DEFAULT_ON_ERROR_VALUE)
 
 
 class Selector:
@@ -20,9 +15,18 @@ class Selector:
     def __init__(self, hass, conf):
         """Initialize a Selector."""
         self.select_template = conf.get(CONF_SELECT)
+        if self.select_template and self.select_template.hass is None:
+            self.select_template.hass = hass
+
         self.select_list_template = conf.get(CONF_SELECT_LIST)
+        if self.select_list_template and self.select_list_template.hass is None:
+            self.select_list_template.hass = hass
+
         self.attribute = conf.get(CONF_ATTR)
         self.value_template = conf.get(CONF_VALUE_TEMPLATE)
+        if self.value_template and self.value_template.hass is None:
+            self.value_template.hass = hass
+
         self.on_error = self.create_on_error(conf.get(CONF_ON_ERROR), hass)
 
         if (

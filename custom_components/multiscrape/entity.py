@@ -50,7 +50,7 @@ class MultiscrapeEntity(Entity):
                 self._attr_entity_picture,
             )
 
-        self._hass = hass
+        self.hass = hass
         self._attribute_selectors = attribute_selectors
 
         self._icon_template = icon_template

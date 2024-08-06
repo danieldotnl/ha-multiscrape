@@ -121,7 +121,6 @@ class MultiscrapeDataUpdateCoordinator(DataUpdateCoordinator):
         update_interval: timedelta | None,
     ):
         """Initialize the coordinator."""
-        self._hass = hass
         self._config_name = config_name
         self._request_manager = request_manager
         self._file_manager = file_manager
@@ -197,7 +196,7 @@ class MultiscrapeDataUpdateCoordinator(DataUpdateCoordinator):
                 "%s # Deleting logging files from previous run", self._config_name
             )
             try:
-                await self._hass.async_add_executor_job(self._file_manager.empty_folder)
+                await self.hass.async_add_executor_job(self._file_manager.empty_folder)
             except Exception as ex:
                 _LOGGER.error(
                     "%s # Error deleting files from previous run: %s",
