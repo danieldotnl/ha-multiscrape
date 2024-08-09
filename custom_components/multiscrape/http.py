@@ -1,4 +1,5 @@
 """HTTP request related functionality."""
+import asyncio
 import logging
 from collections.abc import Callable
 
@@ -80,7 +81,7 @@ class HttpWrapper:
         _LOGGER.debug(
             "%s # Authentication configuration processed", self._config_name)
 
-    async def async_request(self, context, resource, method=None, request_data=None, variables: dict = {}):
+    async def async_request(self, context, resource, method=None, request_data=None, cookies=None, variables: dict = {}):
         """Execute a HTTP request."""
         data = request_data or self._data_renderer(variables)
         method = method or self._method or "GET"
@@ -88,16 +89,19 @@ class HttpWrapper:
         params = self._params_renderer(variables)
 
         _LOGGER.debug(
-            "%s # Executing %s-request with a %s to url: %s with headers: %s.",
+            "%s # Executing %s-request with a %s to url: %s with headers: %s and cookies: %s.",
             self._config_name,
             context,
             method,
             resource,
             headers,
+            cookies
         )
         if self._file_manager:
-            await self._async_file_log("request_headers", context, headers)
-            await self._async_file_log("request_body", context, data)
+            task1 = self._async_file_log("request_headers", context, headers)
+            task2 = self._async_file_log("request_body", context, data)
+            task3 = self._async_file_log("request_cookies", context, cookies)
+            await asyncio.gather(task1, task2, task3)
 
         response = None
 
@@ -111,6 +115,7 @@ class HttpWrapper:
                 data=data,
                 timeout=self._timeout,
                 follow_redirects=True,
+                cookies=cookies
             )
 
             _LOGGER.debug(
@@ -119,10 +124,12 @@ class HttpWrapper:
                 response.status_code,
             )
             if self._file_manager:
-                await self._async_file_log(
+                task1 = self._async_file_log(
                     "response_headers", context, response.headers
                 )
-                await self._async_file_log("response_body", context, response.text)
+                task2 = self._async_file_log("response_body", context, response.text)
+                task3 = self._async_file_log("response_cookies", context, response.cookies)
+                await asyncio.gather(task1, task2, task3)
 
             # bit of a hack since httpx also raises an exception for redirects: https://github.com/encode/httpx/blob/c6c8cb1fe2da9380f8046a19cdd5aade586f69c8/CHANGELOG.md#0200-13th-october-2021
             if 400 <= response.status_code <= 599:
@@ -162,36 +169,42 @@ class HttpWrapper:
     async def _handle_request_exception(self, context, response):
         try:
             if self._file_manager:
-                await self._async_file_log(
+                task1 = self._async_file_log(
                     "response_headers_error", context, response.headers
                 )
-                await self._async_file_log(
+                task2 = self._async_file_log(
                     "response_body_error", context, response.text
                 )
+                task3 = self._async_file_log(
+                    "response_cookies_error", context, response.cookies
+                )
+                await asyncio.gather(task1, task2, task3)
         except Exception as exc:
             _LOGGER.debug(
-                "%s # Unable to write headers and body to files during handling of exception.\n Error message:\n %s",
+                "%s # Unable to write headers, cookies and/or body to file during handling of exception.\n Error message:\n %s",
                 self._config_name,
                 repr(exc),
             )
 
     async def _async_file_log(self, content_name, context, content):
-        try:
-            filename = f"{context}_{content_name}.txt"
-            await self._hass.async_add_executor_job(
-                self._file_manager.write, filename, content
-            )
-        except Exception as ex:
-            _LOGGER.error(
-                "%s # Unable to write %s to file: %s. \nException: %s",
+        """Write content to a file if content is not None."""
+        if content is not None:
+            try:
+                filename = f"{context}_{content_name}.txt"
+                await self._hass.async_add_executor_job(
+                    self._file_manager.write, filename, content
+                )
+            except Exception as ex:
+                _LOGGER.error(
+                    "%s # Unable to write %s to file: %s. \nException: %s",
+                    self._config_name,
+                    content_name,
+                    filename,
+                    ex,
+                )
+            _LOGGER.debug(
+                "%s # %s written to file: %s",
                 self._config_name,
                 content_name,
                 filename,
-                ex,
             )
-        _LOGGER.debug(
-            "%s # %s written to file: %s",
-            self._config_name,
-            content_name,
-            filename,
-        )
