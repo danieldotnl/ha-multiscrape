@@ -87,6 +87,7 @@ class FormSubmitter:
         self._scraper = scraper
         self._parser = parser
         self._should_submit = True
+        self._cookies = None
 
     def notify_scrape_exception(self):
         """Make sure form is re-submitted after an exception."""
@@ -152,6 +153,7 @@ class FormSubmitter:
             submit_resource,
             method=method,
             request_data=input_fields,
+            cookies=self._cookies
         )
         _LOGGER.debug(
             "%s # Form seems to be submitted successfully (to be sure, use log_response and check file). Now continuing to retrieve target page.",
@@ -165,9 +167,9 @@ class FormSubmitter:
             await self._scraper.set_content(response.text)
 
         if not self._form_resource:
-            return response.text
+            return response.text, response.cookies
         else:
-            return None
+            return None, response.cookies
 
     def scrape_variables(self):
         """Scrape header mappings."""
@@ -203,6 +205,7 @@ class FormSubmitter:
             resource,
             "GET",
         )
+        self._cookies = response.cookies
         return response.text
 
     def _get_input_fields(self, form):
