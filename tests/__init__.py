@@ -8,7 +8,7 @@ class MockHttpWrapper:
         self.test_name = test_name
         self.count = 0
 
-    async def async_request(self, context, resource, method=None, request_data=None, variables: dict = {}):
+    async def async_request(self, context, resource, method=None, request_data=None, cookies=None, variables: dict = {}):
         """Return mocked response."""
 
         self.count += 1
