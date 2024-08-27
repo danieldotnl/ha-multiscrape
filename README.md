@@ -184,13 +184,14 @@ multiscrape:
 
 Used to configure scraping options.
 
-| name           | description                                                                                                                                           | required | default | type            |
-| -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- | -------- | ------- | --------------- |
-| select         | CSS selector used for retrieving the value of the attribute. Only required when `select_list` or `value_template` is not provided.                    | False    |         | string/template |
-| select_list    | CSS selector for multiple values of multiple elements which will be returned as csv. Only required when `select` or `value_template` is not provided. | False    |         | string/template |
-| attribute      | Attribute from the selected element to read as value.                                                                                                 | False    |         | string          |
-| value_template | Defines a template applied to extract the value from the result of the selector (if provided) or raw page (if selector not provided)                  | False    |         | string/template |
-| on_error       | See [On-error](#on-error)                                                                                                                             | False    |         |                 |
+| name           | description                                                                                                                                                                                                              | required | default | type            |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------- | ------- | --------------- |
+| select         | CSS selector used for retrieving the value of the attribute. Only required when `select_list` or `value_template` is not provided.                                                                                       | False    |         | string/template |
+| select_list    | CSS selector for multiple values of multiple elements which will be returned as csv. Only required when `select` or `value_template` is not provided.                                                                    | False    |         | string/template |
+| attribute      | Attribute from the selected element to read as value.                                                                                                                                                                    | False    |         | string          |
+| value_template | Defines a template applied to extract the value from the result of the selector (if provided) or raw page (if selector not provided)                                                                                     | False    |         | string/template |
+| extract        | Determines how the result of the CSS selector is extracted. Only applicable to HTML. `text` returns just text, `content` returns the html content of the selected tag and `tag` returns html including the selected tag. | False    | text    | string          |
+| on_error       | See [On-error](#on-error)                                                                                                                                                                                                | False    |         |                 |
 
 ### On-error
 
