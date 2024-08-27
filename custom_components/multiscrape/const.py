@@ -33,7 +33,10 @@ CONF_FORM_SUBMIT_ONCE = "submit_once"
 CONF_FORM_RESUBMIT_ERROR = "resubmit_on_error"
 CONF_FORM_VARIABLES = "variables"
 CONF_LOG_RESPONSE = "log_response"
+CONF_EXTRACT = "extract"
+EXTRACT_OPTIONS = ["text", "content", "tag"]
 DEFAULT_PARSER = "lxml"
+DEFAULT_EXTRACT = "text"
 
 CONF_FIELDS = "fields"
 
