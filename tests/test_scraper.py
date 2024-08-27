@@ -80,7 +80,7 @@ async def test_scrape_extract_tag(hass: HomeAssistant) -> None:
     assert value == '<div class="links" style="links"><a href="/latest-release-notes/">Release notes</a></div>'
 
 async def test_scrape_extract_attribute(hass: HomeAssistant) -> None:
-    """Test scraping and extract an attribute value."""
+    """Test scraping and extract an HTML attribute value."""
     scraper = Scraper("test_scraper", hass, None, "lxml", DEFAULT_SEPARATOR)
     await scraper.set_content(
         "<div class='current-version material-card text'>"
