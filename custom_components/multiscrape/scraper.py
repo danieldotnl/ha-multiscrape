@@ -168,7 +168,7 @@ class Scraper:
             elif selector.extract == "content":
                 return ''.join(map(str, tag.contents))
             elif selector.extract == "tag":
-                return tag
+                return str(tag)
 
     async def _async_file_log(self, content_name, content):
         try:
