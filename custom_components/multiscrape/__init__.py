@@ -7,6 +7,7 @@ import voluptuous as vol
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (CONF_NAME, CONF_RESOURCE,
                                  CONF_RESOURCE_TEMPLATE,
+                                 EVENT_HOMEASSISTANT_STARTED,
                                  EVENT_HOMEASSISTANT_STOP, SERVICE_RELOAD,
                                  Platform)
 from homeassistant.core import Event, HomeAssistant
@@ -124,7 +125,13 @@ async def _async_process_config(hass: HomeAssistant, config) -> bool:
 
         hass.bus.async_listen_once(EVENT_HOMEASSISTANT_STOP, _async_on_hass_stop)
 
-        refresh_tasks.append(coordinator.async_refresh())
+        async def _on_hass_start(_: Event) -> None:
+            """Trigger scrape on startup."""
+            _LOGGER.debug("Home assistant started, triggering scrape on startup")
+            await coordinator.async_refresh()
+
+        hass.bus.async_listen_once(EVENT_HOMEASSISTANT_STARTED, _on_hass_start)
+
         hass.data[DOMAIN][SCRAPER_DATA].append(
             {SCRAPER: scraper, COORDINATOR: coordinator}
         )
