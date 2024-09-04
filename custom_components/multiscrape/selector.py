@@ -3,10 +3,10 @@ from collections import namedtuple
 
 from homeassistant.const import CONF_VALUE_TEMPLATE
 
-from .const import (CONF_ATTR, CONF_ON_ERROR, CONF_ON_ERROR_DEFAULT,
-                    CONF_ON_ERROR_LOG, CONF_ON_ERROR_VALUE, CONF_SELECT,
-                    CONF_SELECT_LIST, DEFAULT_ON_ERROR_LOG,
-                    DEFAULT_ON_ERROR_VALUE)
+from .const import (CONF_ATTR, CONF_EXTRACT, CONF_ON_ERROR,
+                    CONF_ON_ERROR_DEFAULT, CONF_ON_ERROR_LOG,
+                    CONF_ON_ERROR_VALUE, CONF_SELECT, CONF_SELECT_LIST,
+                    DEFAULT_ON_ERROR_LOG, DEFAULT_ON_ERROR_VALUE)
 
 
 class Selector:
@@ -27,6 +27,7 @@ class Selector:
         if self.value_template and self.value_template.hass is None:
             self.value_template.hass = hass
 
+        self.extract = conf.get(CONF_EXTRACT)
         self.on_error = self.create_on_error(conf.get(CONF_ON_ERROR), hass)
 
         if (

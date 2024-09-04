@@ -126,7 +126,7 @@ class Scraper:
                 )
                 values = [tag[selector.attribute] for tag in tags]
             else:
-                values = [tag.text for tag in tags]
+                values = [self.extract_tag_value(tag, selector) for tag in tags]
             value = self._separator.join(values)
             _LOGGER.debug("%s # List selector csv: %s", log_prefix, value)
 
@@ -142,10 +142,7 @@ class Scraper:
                 )
                 value = tag[selector.attribute]
             else:
-                if tag.name in ("style", "script", "template"):
-                    value = tag.string
-                else:
-                    value = tag.text
+                value = self.extract_tag_value(tag, selector)
             _LOGGER.debug("%s # Selector result: %s", log_prefix, value)
 
         if value is not None and selector.value_template is not None:
@@ -160,6 +157,18 @@ class Scraper:
                 value)
         )
         return value
+
+    def extract_tag_value(self, tag, selector):
+        """Extract value from a tag."""
+        if tag.name in ("style", "script", "template"):
+            return tag.string
+        else:
+            if selector.extract == "text":
+                return tag.text
+            elif selector.extract == "content":
+                return ''.join(map(str, tag.contents))
+            elif selector.extract == "tag":
+                return str(tag)
 
     async def _async_file_log(self, content_name, content):
         try:
