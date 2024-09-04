@@ -6,11 +6,9 @@ import logging
 import voluptuous as vol
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (CONF_NAME, CONF_RESOURCE,
-                                 CONF_RESOURCE_TEMPLATE,
-                                 EVENT_HOMEASSISTANT_STARTED,
-                                 EVENT_HOMEASSISTANT_STOP, SERVICE_RELOAD,
+                                 CONF_RESOURCE_TEMPLATE, SERVICE_RELOAD,
                                  Platform)
-from homeassistant.core import Event, HomeAssistant
+from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import discovery
 from homeassistant.helpers.reload import (async_integration_yaml_config,
@@ -118,19 +116,7 @@ async def _async_process_config(hass: HomeAssistant, config) -> bool:
             file_manager,
             scraper,
         )
-
-        async def _async_on_hass_stop(_: Event) -> None:
-            """Close connection when hass stops."""
-            await coordinator.async_shutdown()
-
-        hass.bus.async_listen_once(EVENT_HOMEASSISTANT_STOP, _async_on_hass_stop)
-
-        async def _on_hass_start(_: Event) -> None:
-            """Trigger scrape on startup."""
-            _LOGGER.debug("Home assistant started, triggering scrape on startup")
-            await coordinator.async_refresh()
-
-        hass.bus.async_listen_once(EVENT_HOMEASSISTANT_STARTED, _on_hass_start)
+        await coordinator.async_register_shutdown()
 
         hass.data[DOMAIN][SCRAPER_DATA].append(
             {SCRAPER: scraper, COORDINATOR: coordinator}

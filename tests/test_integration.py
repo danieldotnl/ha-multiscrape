@@ -15,20 +15,34 @@ from . import MockHttpWrapper
 async def test_scrape_html(hass: HomeAssistant) -> None:
     """Test the scrape sensor."""
     config = {
-        "multiscrape": {
-              "name": "HA scraper",
-              "resource": "https://www.home-assistant.io",
-              "scan_interval": 3600,
-              "sensor": [
-                  {
+        "multiscrape": [
+            {
+                "name": "HA scraper",
+                "resource": "https://www.home-assistant.io",
+                "scan_interval": 3600,
+                "sensor": [
+                    {
                         "unique_id": "ha_latest_version",
                         "name": "Latest version",
                         "select": ".current-version h1",
                         "value_template": "{{ value.split(': ')[1] }}",
-                  }
-            ]
-        }
-
+                    }
+                ]
+            },
+            {
+                "name": "HA scraper2",
+                "resource": "https://www.home-assistant.io",
+                "scan_interval": 3600,
+                "sensor": [
+                    {
+                        "unique_id": "ha_latest_version2",
+                        "name": "Latest version2",
+                        "select": ".current-version h1",
+                        "value_template": "{{ value.split(': ')[1] }}",
+                    }
+                ]
+            }
+        ]
     }
 
     mocker = MockHttpWrapper("simple_html")
@@ -41,13 +55,13 @@ async def test_scrape_html(hass: HomeAssistant) -> None:
         hass.bus.async_fire(EVENT_HOMEASSISTANT_STARTED)
         await hass.async_block_till_done()
 
-        state = hass.states.get("sensor.ha_latest_version")
+        state = hass.states.get("sensor.ha_latest_version2")
         assert state.state == "2024.8.3"
 
 async def test_scrape_json(hass: HomeAssistant) -> None:
     """Test the scrape sensor."""
     config = {
-        "multiscrape": {
+        "multiscrape": [{
               "name": "HA scraper",
               "resource": "https://www.home-assistant.io",
               "scan_interval": 3600,
@@ -57,7 +71,7 @@ async def test_scrape_json(hass: HomeAssistant) -> None:
                         "value_template": "{{ value_json.age }}",
                   }
             ]
-        }
+        }]
 
     }
 
