@@ -1,7 +1,7 @@
 """Abstraction of the CSS selectors defined in the config."""
 from collections import namedtuple
 
-from homeassistant.const import CONF_VALUE_TEMPLATE
+from homeassistant.const import CONF_NAME, CONF_VALUE_TEMPLATE
 
 from .const import (CONF_ATTR, CONF_EXTRACT, CONF_ON_ERROR,
                     CONF_ON_ERROR_DEFAULT, CONF_ON_ERROR_LOG,
@@ -14,6 +14,8 @@ class Selector:
 
     def __init__(self, hass, conf):
         """Initialize a Selector."""
+        self.name = conf.get(CONF_NAME)
+
         self.select_template = conf.get(CONF_SELECT)
         if self.select_template and self.select_template.hass is None:
             self.select_template.hass = hass

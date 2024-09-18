@@ -5,7 +5,7 @@ from typing import Any
 
 from homeassistant.core import callback
 from homeassistant.exceptions import TemplateError
-from homeassistant.helpers.entity import Entity
+from homeassistant.helpers.restore_state import RestoreEntity
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
 from .const import (CONF_ON_ERROR_VALUE_DEFAULT, CONF_ON_ERROR_VALUE_LAST,
@@ -15,7 +15,7 @@ from .scraper import Scraper
 _LOGGER = logging.getLogger(__name__)
 
 
-class MultiscrapeEntity(Entity):
+class MultiscrapeEntity(RestoreEntity):
     """A class for entities using DataUpdateCoordinator."""
 
     def __init__(
@@ -81,10 +81,8 @@ class MultiscrapeEntity(Entity):
     async def async_added_to_hass(self) -> None:
         """When entity is added to hass."""
         await super().async_added_to_hass()
-        self._update_sensor()
-        self._update_attributes()
         _LOGGER.debug(
-            "%s # %s # Updated sensor and attributes, now adding to HA",
+            "%s # %s # Added sensor to HA",
             self.scraper.name,
             self._name,
         )
@@ -93,6 +91,17 @@ class MultiscrapeEntity(Entity):
                 self.coordinator.async_add_listener(
                     self._handle_coordinator_update)
             )
+
+        if not (state := await self.async_get_last_state()):
+            return
+        _LOGGER.debug("%s # %s # Restoring previous state: %s", self.scraper.name, self._name, state.state)
+        self._attr_native_value = state.state
+
+        for name in self._attribute_selectors:
+            if state.attributes.get(name) is not None:
+                _LOGGER.debug("%s # %s # Restoring attribute `%s` with value: %s", self.scraper.name, self._name, name, state.attributes[name])
+                self._attr_extra_state_attributes[name] = state.attributes[name]
+
 
     @callback
     def _handle_coordinator_update(self) -> None:
