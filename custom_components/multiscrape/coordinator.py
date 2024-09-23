@@ -145,8 +145,9 @@ class MultiscrapeDataUpdateCoordinator(DataUpdateCoordinator):
 
         async def _on_hass_start(_: Event) -> None:
             """Trigger scrape on startup."""
-            _LOGGER.debug("%s # Home assistant started, triggering scrape on startup", self._config_name)
-            await self.async_refresh()
+            if self.update_interval and self.update_interval > timedelta(0):
+                _LOGGER.debug("%s # Home assistant started, triggering scrape on startup", self._config_name)
+                await self.async_refresh()
 
         hass.bus.async_listen_once(EVENT_HOMEASSISTANT_STARTED, _on_hass_start)
 
