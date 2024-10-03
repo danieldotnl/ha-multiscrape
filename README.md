@@ -15,21 +15,23 @@
 [![Discord][discord-shield]][discord]
 [![Community Forum][forum-shield]][forum]
 
-### Multiscrape (paid) support options
-I very often get asked for help with finding the right CSS selectors, so I'm trying out a paid support option.
+## Need help with Multiscrape?
 
-**Sponsor me [here](https://github.com/sponsors/danieldotnl/sponsorships?tier_id=432422), and I'll assist you with your `multiscrape` configuration within 1-2 days.** The support funds will go towards family time, making up for the hours I spend on Home Assistant ☺️
+### Personal (paid) support option
+I very often get asked for help, for example with finding the right CSS selectors or with a login. Actually more often than I can handle, so I'm running an experiment with a paid support option!
 
-**Note:** Scraping isn't always possible. I'd love to offer a "no cure, no pay" service, but GitHub Sponsoring doesn't support that. If you're concerned, please reach out before sponsoring!
+**Sponsor me [here](https://github.com/sponsors/danieldotnl/sponsorships?tier_id=432422), and I'll try to assist you with your `multiscrape` configuration within 1-2 days.** The support funds will go towards family time, making up for the hours I spend on Home Assistant ☺️.
 
-#### Other options
+**Note:** Scraping isn't always possible. I'd love to offer a "no cure, no pay" service, but GitHub Sponsoring doesn't support that. If you're concerned about sponsoring without guarentee, please reach out by email before sponsoring!
+
+### Other options
 
 If you don't manage to scrape the value you are looking for, please [enable debug logging](#debug-logging) and `log_response`. This will provide you with a lot of information for continued investigation. `log_response` will write all responses to files. If the value you want to scrape is not in the files with the output from BeautifulSoup (\*-soup.txt), Multiscrape will not be able to scrape it. Most likely it is retrieved in the background by javascript. Your best chance in this case, is to investigate the network traffic in de developer tools of your browser, and try to find a json response containing the value you are looking for.
 
 If all of this doesn't help, use the home assistant forum. I cannot give everyone personal assistance and please don't create github issues unless you are sure there is a bug.
 Check the [wiki](https://github.com/danieldotnl/ha-multiscrape/wiki) for a scraping guide and other details on the functionality of this component.
 
-### Important note: be a good citizen and be aware of your responsibility
+## Important note: be a good citizen and be aware of your responsibility
 
 You and you alone, are accountable for your scraping activities. Be a good (web) citizen. Set reasonable `scan_interval` timings, seek explicit permission before scraping, and adhere to local and international laws. Respect website policies, handle data ethically, mind resource usage, and regularly monitor your actions. Uphold these principles to ensure ethical and sustainable scraping practices.
 
