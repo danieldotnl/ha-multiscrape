@@ -43,11 +43,6 @@ It is based on both the existing [Rest sensor](https://www.home-assistant.io/int
 
 <a href="https://www.buymeacoffee.com/danieldotnl" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/default-blue.png" alt="Buy Me A Coffee" style="height: 51px !important;width: 217px !important;" ></a>
 
-## Multiscrape is sponsored by CapSolver!
-<img width="960" alt="CapSolver Ads" src="https://github.com/user-attachments/assets/c4f17c1f-ed98-49a8-81d6-097d373dc53d">
-
-[CapSolver](https://www.capsolver.com/?utm_source=github&utm_medium=banner_repo&utm_campaign=scraping&utm_term=multiscrape) is an AI-powered service that automatically solves a range of CAPTCHAs, helping developers tackle CAPTCHA challenges encountered during web scraping. Whether you're extracting data from e-commerce sites, financial platforms, or social media, CapSolver supports CAPTCHAs like [reCAPTCHA V2](https://docs.capsolver.com/guide/captcha/ReCaptchaV2.html?utm_source=github&utm_medium=banner_repo&utm_campaign=scraping&utm_term=multiscrape), [reCAPTCHA V3](https://docs.capsolver.com/guide/captcha/ReCaptchaV3.html?utm_source=github&utm_medium=banner_repo&utm_campaign=scraping&utm_term=multiscrape), [hCaptcha](https://docs.capsolver.com/guide/captcha/HCaptcha.html?utm_source=github&utm_medium=banner_repo&utm_campaign=scraping&utm_term=multiscrape), [ImageToText](https://docs.capsolver.com/guide/recognition/ImageToTextTask.html?utm_source=github&utm_medium=banner_repo&utm_campaign=scraping&utm_term=multiscrape), [DataDome](https://docs.capsolver.com/guide/antibots/datadome.html?utm_source=github&utm_medium=banner_repo&utm_campaign=scraping&utm_term=multiscrape), [AWS](https://docs.capsolver.com/guide/captcha/awsWaf.html?utm_source=github&utm_medium=banner_repo&utm_campaign=scraping&utm_term=multiscrape), [Geetest](https://docs.capsolver.com/guide/captcha/Geetest.html?utm_source=github&utm_medium=banner_repo&utm_campaign=scraping&utm_term=multiscrape), [Cloudflare Turnstile](https://docs.capsolver.com/guide/antibots/cloudflare_turnstile.html?utm_source=github&utm_medium=banner_repo&utm_campaign=scraping&utm_term=multiscrape) and more. With API integration and browser extensions options, and flexible pricing packages, CapSolver adapts to diverse web scraping needs and scenarios.
-
 ## Installation
 
 [![hacs][hacsbadge]][hacs]
