@@ -67,15 +67,18 @@ class ContentRequestManager:
 
         if self._form_submitter:
             try:
-                result, self._cookies = await self._form_submitter.async_submit(resource)
-                self._form_variables = self._form_submitter.scrape_variables()
+                if self._form_submitter.should_submit is True:
+                    result, self._cookies = await self._form_submitter.async_submit(resource)
+                    self._form_variables = self._form_submitter.scrape_variables()
 
-                if result:
-                    _LOGGER.debug(
-                        "%s # Using response from form-submit as content for scraping.",
-                        self._config_name,
-                    )
-                    return result
+                    if result:
+                        _LOGGER.debug(
+                            "%s # Using response from form-submit as content for scraping.",
+                            self._config_name,
+                        )
+                        return result
+                else:
+                    _LOGGER.debug("%s # Skip submitting form", self._config_name)
             except Exception as ex:
                 _LOGGER.error(
                     "%s # Exception in form-submit feature. Will continue trying to scrape target page.\n%s",
