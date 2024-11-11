@@ -99,12 +99,13 @@ class FormSubmitter:
             )
             self._should_submit = True
 
+    @property
+    def should_submit(self):
+        """Return the form variables."""
+        return self._should_submit
+
     async def async_submit(self, main_resource):
         """Submit the form."""
-        if not self._should_submit:
-            _LOGGER.debug("%s # Skip submitting form", self._config_name)
-            return
-
         _LOGGER.debug("%s # Starting with form-submit", self._config_name)
         input_fields = {}
         action, method = None, None
