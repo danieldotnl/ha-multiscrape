@@ -50,7 +50,11 @@ HTTP_SCHEMA = {
     ),
     vol.Optional(CONF_HEADERS): vol.Schema({cv.string: cv.template}),
     vol.Optional(CONF_PARAMS): vol.Schema({cv.string: cv.template}),
-    vol.Optional(CONF_METHOD, default=DEFAULT_METHOD): vol.In(METHODS),
+    vol.Optional(CONF_METHOD, default=DEFAULT_METHOD): vol.All(
+        cv.string,  # Ensure it's a string
+        lambda method: method.lower(),  # Convert to lowercase
+        vol.In([m.lower() for m in METHODS])  # Validate against lowercase methods
+    ),
     vol.Optional(CONF_USERNAME): cv.string,
     vol.Optional(CONF_PASSWORD): cv.string,
     vol.Optional(CONF_PAYLOAD): cv.template,
