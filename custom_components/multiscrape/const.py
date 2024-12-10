@@ -48,7 +48,7 @@ SCRAPER = "scraper"
 
 SCRAPER_DATA = "scraper"
 
-METHODS = ["POST", "GET", "post", "get"]
+METHODS = ["POST", "GET", "PUT"]
 DEFAULT_SEPARATOR = ","
 
 LOG_ERROR = "error"
