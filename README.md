@@ -105,7 +105,7 @@ Based on latest (pre) release.
 | log_response      | Log the HTTP responses and HTML parsed by BeautifulSoup in files. (Will be written to/config/multiscrape/name_of_config)  | False    | False   | boolean         |
 | timeout           | Defines max time to wait data from the endpoint.                                                                          | False    | 10      | int             |
 | scan_interval     | Determines how often the url will be requested.                                                                           | False    | 60      | int             |
-| parser            | Determines the parser to be used with beautifulsoup. Either `lxml` or `html.parser`.                                      | False    | lxml    | string          |
+| parser            | Determines the parser to be used with beautifulsoup. `lxml-xml` for xml recommended and `lxml` for everything else.       | False    | lxml    | string          |
 | list_separator    | Separator to be used in combination with `select_list` features.                                                          | False    | ,       | string          |
 | form_submit       | See [Form-submit](#form-submit)                                                                                           | False    |         |                 |
 | sensor            | See [Sensor](#sensorbinary-sensor)                                                                                        | False    |         | list            |
