@@ -2,6 +2,7 @@
 import asyncio
 import logging
 from collections.abc import Callable
+from urllib.parse import parse_qs, urlencode, urlparse
 
 import httpx
 from homeassistant.const import (CONF_AUTHENTICATION, CONF_HEADERS,
@@ -88,12 +89,15 @@ class HttpWrapper:
         headers = self._headers_renderer(variables)
         params = self._params_renderer(variables)
 
+        # Merging params in multiscrape since httpx doesn't do it anymore: https://github.com/encode/httpx/issues/3433
+        merged_resource = merge_url_with_params(resource, params)
+
         _LOGGER.debug(
             "%s # Executing %s-request with a %s to url: %s with headers: %s and cookies: %s.",
             self._config_name,
             context,
             method,
-            resource,
+            merged_resource,
             headers,
             cookies
         )
@@ -108,9 +112,8 @@ class HttpWrapper:
         try:
             response = await self._client.request(
                 method,
-                resource,
+                merged_resource,
                 headers=headers,
-                params=params,
                 auth=self._auth,
                 data=data,
                 timeout=self._timeout,
@@ -127,8 +130,10 @@ class HttpWrapper:
                 task1 = self._async_file_log(
                     "response_headers", context, response.headers
                 )
-                task2 = self._async_file_log("response_body", context, response.text)
-                task3 = self._async_file_log("response_cookies", context, response.cookies)
+                task2 = self._async_file_log(
+                    "response_body", context, response.text)
+                task3 = self._async_file_log(
+                    "response_cookies", context, response.cookies)
                 await asyncio.gather(task1, task2, task3)
 
             # bit of a hack since httpx also raises an exception for redirects: https://github.com/encode/httpx/blob/c6c8cb1fe2da9380f8046a19cdd5aade586f69c8/CHANGELOG.md#0200-13th-october-2021
@@ -208,3 +213,27 @@ class HttpWrapper:
                 content_name,
                 filename,
             )
+
+
+def merge_url_with_params(url, new_params):
+    """Merge URL with provided parameters."""
+    # Parse the URL
+    if new_params is None or new_params == {}:
+        return url
+
+    parsed = urlparse(url)
+
+    # Get existing query parameters as dict
+    existing_params = parse_qs(parsed.query)
+
+    # Convert existing params from lists to single values
+    existing_params = {k: v[0] for k, v in existing_params.items()}
+
+    # Merge with new parameters (new_params take precedence)
+    merged_params = {**existing_params, **new_params}
+
+    # Reconstruct the URL
+    new_query = urlencode(merged_params)
+    new_url = f"{parsed.scheme}://{parsed.netloc}{parsed.path}?{new_query}"
+
+    return new_url
