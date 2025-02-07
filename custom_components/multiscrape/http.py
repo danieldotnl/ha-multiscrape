@@ -145,7 +145,7 @@ class HttpWrapper:
                 "%s # Timeout error while executing %s request to url: %s.\n Error message:\n %s",
                 self._config_name,
                 method,
-                resource,
+                merged_resource,
                 repr(ex),
             )
             await self._handle_request_exception(context, response)
@@ -155,7 +155,7 @@ class HttpWrapper:
                 "%s # Request error while executing %s request to url: %s.\n Error message:\n %s",
                 self._config_name,
                 method,
-                resource,
+                merged_resource,
                 repr(ex),
             )
             await self._handle_request_exception(context, response)
@@ -165,7 +165,7 @@ class HttpWrapper:
                 "%s # Error executing %s request to url: %s.\n Error message:\n %s",
                 self._config_name,
                 method,
-                resource,
+                merged_resource,
                 repr(ex),
             )
             await self._handle_request_exception(context, response)
@@ -224,4 +224,7 @@ def merge_url_with_params(url, params):
     query = parse_qs(url_parts[4])
     query.update(params)
     url_parts[4] = urlencode(query, doseq=True)
-    return urlunparse(url_parts)
+    try:
+        return urlunparse(url_parts)
+    except Exception as ex:
+        raise ValueError(f"Failed to merge URL with parameters: {ex}") from ex
