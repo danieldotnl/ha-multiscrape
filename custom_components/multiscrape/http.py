@@ -226,14 +226,17 @@ def merge_url_with_params(url, new_params):
     # Get existing query parameters as dict
     existing_params = parse_qs(parsed.query)
 
-    # Convert existing params from lists to single values
-    existing_params = {k: v[0] for k, v in existing_params.items()}
+    # Handle array parameters by keeping all values
+    existing_params = {
+        k: v[0] if len(v) == 1 else v
+        for k, v in existing_params.items()
+    }
 
     # Merge with new parameters (new_params take precedence)
     merged_params = {**existing_params, **new_params}
 
     # Reconstruct the URL
-    new_query = urlencode(merged_params)
+    new_query = urlencode(merged_params, doseq=True)
     new_url = f"{parsed.scheme}://{parsed.netloc}{parsed.path}?{new_query}"
 
     return new_url
