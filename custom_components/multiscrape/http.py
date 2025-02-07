@@ -2,6 +2,7 @@
 import asyncio
 import logging
 from collections.abc import Callable
+from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
 
 import httpx
 from homeassistant.const import (CONF_AUTHENTICATION, CONF_HEADERS,
@@ -88,12 +89,15 @@ class HttpWrapper:
         headers = self._headers_renderer(variables)
         params = self._params_renderer(variables)
 
+        # Merging params in multiscrape since httpx doesn't do it anymore: https://github.com/encode/httpx/issues/3433
+        merged_resource = merge_url_with_params(resource, params)
+
         _LOGGER.debug(
             "%s # Executing %s-request with a %s to url: %s with headers: %s and cookies: %s.",
             self._config_name,
             context,
             method,
-            resource,
+            merged_resource,
             headers,
             cookies
         )
@@ -108,9 +112,8 @@ class HttpWrapper:
         try:
             response = await self._client.request(
                 method,
-                resource,
+                merged_resource,
                 headers=headers,
-                params=params,
                 auth=self._auth,
                 data=data,
                 timeout=self._timeout,
@@ -127,8 +130,10 @@ class HttpWrapper:
                 task1 = self._async_file_log(
                     "response_headers", context, response.headers
                 )
-                task2 = self._async_file_log("response_body", context, response.text)
-                task3 = self._async_file_log("response_cookies", context, response.cookies)
+                task2 = self._async_file_log(
+                    "response_body", context, response.text)
+                task3 = self._async_file_log(
+                    "response_cookies", context, response.cookies)
                 await asyncio.gather(task1, task2, task3)
 
             # bit of a hack since httpx also raises an exception for redirects: https://github.com/encode/httpx/blob/c6c8cb1fe2da9380f8046a19cdd5aade586f69c8/CHANGELOG.md#0200-13th-october-2021
@@ -140,7 +145,7 @@ class HttpWrapper:
                 "%s # Timeout error while executing %s request to url: %s.\n Error message:\n %s",
                 self._config_name,
                 method,
-                resource,
+                merged_resource,
                 repr(ex),
             )
             await self._handle_request_exception(context, response)
@@ -150,7 +155,7 @@ class HttpWrapper:
                 "%s # Request error while executing %s request to url: %s.\n Error message:\n %s",
                 self._config_name,
                 method,
-                resource,
+                merged_resource,
                 repr(ex),
             )
             await self._handle_request_exception(context, response)
@@ -160,7 +165,7 @@ class HttpWrapper:
                 "%s # Error executing %s request to url: %s.\n Error message:\n %s",
                 self._config_name,
                 method,
-                resource,
+                merged_resource,
                 repr(ex),
             )
             await self._handle_request_exception(context, response)
@@ -208,3 +213,18 @@ class HttpWrapper:
                 content_name,
                 filename,
             )
+
+
+def merge_url_with_params(url, params):
+    """Merge URL with parameters."""
+    if not params:
+        return url
+
+    url_parts = list(urlparse(url))
+    query = parse_qs(url_parts[4])
+    query.update(params)
+    url_parts[4] = urlencode(query, doseq=True)
+    try:
+        return urlunparse(url_parts)
+    except Exception as ex:
+        raise ValueError(f"Failed to merge URL with parameters: {ex}") from ex
