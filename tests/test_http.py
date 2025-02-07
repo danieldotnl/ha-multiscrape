@@ -71,3 +71,18 @@ def test_merge_url_with_params_special_characters():
               "param2": "value&with&special&chars"}
     result = merge_url_with_params(url, params)
     assert result == "https://example.com?param1=value+with+spaces&param2=value%26with%26special%26chars"
+
+
+def test_merge_url_with_params_url_components():
+    """Test merge_url_with_params with various URL components."""
+    # Test URL with port
+    url = "https://example.com:8080"
+    params = {"param1": "value1"}
+    result = merge_url_with_params(url, params)
+    assert result == "https://example.com:8080?param1=value1"
+
+    # Test URL with fragment
+    url = "https://example.com#section1"
+    params = {"param1": "value1"}
+    result = merge_url_with_params(url, params)
+    assert result == "https://example.com?param1=value1#section1"

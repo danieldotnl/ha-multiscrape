@@ -2,7 +2,7 @@
 import asyncio
 import logging
 from collections.abc import Callable
-from urllib.parse import parse_qs, urlencode, urlparse
+from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
 
 import httpx
 from homeassistant.const import (CONF_AUTHENTICATION, CONF_HEADERS,
@@ -215,28 +215,13 @@ class HttpWrapper:
             )
 
 
-def merge_url_with_params(url, new_params):
-    """Merge URL with provided parameters."""
-    # Parse the URL
-    if new_params is None or new_params == {}:
+def merge_url_with_params(url, params):
+    """Merge URL with parameters."""
+    if not params:
         return url
 
-    parsed = urlparse(url)
-
-    # Get existing query parameters as dict
-    existing_params = parse_qs(parsed.query)
-
-    # Handle array parameters by keeping all values
-    existing_params = {
-        k: v[0] if len(v) == 1 else v
-        for k, v in existing_params.items()
-    }
-
-    # Merge with new parameters (new_params take precedence)
-    merged_params = {**existing_params, **new_params}
-
-    # Reconstruct the URL
-    new_query = urlencode(merged_params, doseq=True)
-    new_url = f"{parsed.scheme}://{parsed.netloc}{parsed.path}?{new_query}"
-
-    return new_url
+    url_parts = list(urlparse(url))
+    query = parse_qs(url_parts[4])
+    query.update(params)
+    url_parts[4] = urlencode(query, doseq=True)
+    return urlunparse(url_parts)
