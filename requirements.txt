@@ -1,5 +1,5 @@
 colorlog==6.9.0
-pytest-homeassistant-custom-component==0.13.237
+pytest-homeassistant-custom-component==0.13.244
 pip>=25,<26
 lxml>=4.9.1
 beautifulsoup4>=4.12.2
