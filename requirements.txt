@@ -3,4 +3,4 @@ pytest-homeassistant-custom-component==0.13.287
 pip>=25,<26
 lxml>=4.9.1
 beautifulsoup4>=4.12.2
-ruff==0.13.1
+ruff==0.14.0
