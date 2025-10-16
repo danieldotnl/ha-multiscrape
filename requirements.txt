@@ -1,4 +1,4 @@
-colorlog==6.9.0
+colorlog==6.10.1
 pytest-homeassistant-custom-component==0.13.287
 pip>=25,<26
 lxml>=4.9.1
