@@ -1,5 +1,20 @@
 # Multiscrape
 
+---
+
+> ## 👋 A quick note
+>
+> I run **[Smart Home Newsletter](https://smarthomenewsletter.com/?utm_source=github&utm_medium=readme&utm_campaign=multiscrape)** — a weekly curated digest for smart home enthusiasts.
+>
+> Each issue highlights the most relevant smart home **articles, news, and projects** from the past week.
+>
+> Since you're here, you're clearly into home automation — so you might genuinely enjoy the newsletter.
+>
+> 👉 [Subscribe at smarthomenewsletter.com](https://smarthomenewsletter.com/?utm_source=github&utm_medium=readme&utm_campaign=multiscrape)
+>
+---
+
+
 [![GitHub Release][releases-shield]][releases]
 [![License][license-shield]](LICENSE)
 
