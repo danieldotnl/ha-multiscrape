@@ -443,9 +443,8 @@ async def test_binary_sensor_on_error_value_default(hass: HomeAssistant, coordin
     # Act
     binary_sensor._update_sensor()
 
-    # Assert - default value is set as-is (string "true"), not converted to boolean
-    # This is different from sensor.py which keeps the rendered template value
-    assert binary_sensor._attr_is_on == "true"
+    # Assert - default value "true" should be converted to boolean True
+    assert binary_sensor._attr_is_on is True
     assert binary_sensor._attr_available is True
 
 

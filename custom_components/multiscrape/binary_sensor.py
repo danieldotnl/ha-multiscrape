@@ -177,12 +177,26 @@ class MultiscrapeBinarySensor(MultiscrapeEntity, BinarySensorEntity):
                 )
                 return
             elif self._sensor_selector.on_error.value == CONF_ON_ERROR_VALUE_DEFAULT:
-                self._attr_is_on = self._sensor_selector.on_error_default
+                default_value = self._sensor_selector.on_error_default
+                # Convert default value to boolean using the same logic as regular values
+                try:
+                    self._attr_is_on = bool(int(default_value))
+                except (ValueError, TypeError):
+                    if isinstance(default_value, str):
+                        self._attr_is_on = {
+                            "true": True,
+                            "on": True,
+                            "open": True,
+                            "yes": True,
+                        }.get(default_value.lower(), False)
+                    else:
+                        self._attr_is_on = bool(default_value)
                 _LOGGER.debug(
-                    "%s # %s # On-error, set default value: %s",
+                    "%s # %s # On-error, set default value: %s (converted to: %s)",
                     self.scraper.name,
                     self._name,
-                    self._sensor_selector.on_error_default,
+                    default_value,
+                    self._attr_is_on,
                 )
         # determine icon after exception so it's also set for on_error cases
         if self._icon_template:

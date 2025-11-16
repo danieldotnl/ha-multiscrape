@@ -215,7 +215,7 @@ class FormSubmitter:
 
     def _get_input_fields(self, form):
         _LOGGER.debug("%s # Finding all input fields in form", self._config_name)
-        elements = form.findAll("input")
+        elements = form.find_all("input")
         input_fields = {
             element.get("name"): element.get("value")
             for element in elements
