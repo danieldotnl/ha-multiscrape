@@ -11,7 +11,7 @@ from homeassistant.helpers.update_coordinator import (DataUpdateCoordinator,
                                                       event)
 from homeassistant.util.dt import utcnow
 
-from .const import DOMAIN
+from .const import DOMAIN, MAX_RETRIES, RETRY_DELAY_SECONDS
 from .file import LoggingFileManager
 from .form import FormSubmitter
 from .http import HttpWrapper
@@ -32,9 +32,9 @@ def create_content_request_manager(
     resource_template = config.get(CONF_RESOURCE_TEMPLATE)
 
     if resource_template is not None:
-        resource_renderer = create_renderer(hass, resource_template)
+        resource_renderer = create_renderer(hass, resource_template, "resource URL template")
     else:
-        resource_renderer = create_renderer(hass, resource)
+        resource_renderer = create_renderer(hass, resource, "resource URL")
     return ContentRequestManager(config_name, http, resource_renderer, form_submitter)
 
 
@@ -133,7 +133,7 @@ class MultiscrapeDataUpdateCoordinator(DataUpdateCoordinator):
         self._update_interval = update_interval
         self.update_error = False
         self._resource = None
-        self._retry: int = 0
+        self._retry_count: int = 0
 
         if self._update_interval == timedelta(seconds=0):
             self._update_interval = None
@@ -141,6 +141,13 @@ class MultiscrapeDataUpdateCoordinator(DataUpdateCoordinator):
         _LOGGER.debug(
             "%s # Scan interval is %s", self._config_name, self._update_interval
         )
+
+        if self._update_interval and self._update_interval > timedelta(days=1):
+            _LOGGER.warning(
+                "%s # Scan interval is very long: %s. This may cause delays in data updates.",
+                self._config_name,
+                self._update_interval,
+            )
 
         super().__init__(
             hass, _LOGGER, name=DOMAIN, update_interval=self._update_interval
@@ -168,7 +175,7 @@ class MultiscrapeDataUpdateCoordinator(DataUpdateCoordinator):
                 "%s # Data successfully refreshed. Sensors will now start scraping to update.",
                 self._config_name,
             )
-            self._retry = 0
+            self._retry_count = 0
 
         except Exception as ex:
             _LOGGER.error(
@@ -180,23 +187,26 @@ class MultiscrapeDataUpdateCoordinator(DataUpdateCoordinator):
             self.update_error = True
             if self._update_interval is None:
                 self._async_unsub_refresh()
-                if self._retry < 3:
+                self._retry_count += 1
+                if self._retry_count <= MAX_RETRIES:
                     self._unsub_refresh = event.async_track_point_in_utc_time(
                         self.hass,
                         self._job,
                         utcnow().replace(microsecond=self._microsecond)
-                        + timedelta(seconds=30),
+                        + timedelta(seconds=RETRY_DELAY_SECONDS),
                     )
                     _LOGGER.warning(
-                        "%s # Since updating failed and scan_interval = 0, retry %s of 3 will be scheduled in 30 seconds",
+                        "%s # Since updating failed and scan_interval = 0, retry %s of %s will be scheduled in %s seconds",
                         self._config_name,
-                        self._retry + 1,
+                        self._retry_count,
+                        MAX_RETRIES,
+                        RETRY_DELAY_SECONDS,
                     )
-                    self._retry = self._retry + 1
                 else:
                     _LOGGER.error(
-                        "%s # Updating and 3 retries failed and scan_interval = 0, please manually retry with trigger service.",
+                        "%s # Updating and %s retries failed and scan_interval = 0, please manually retry with trigger service.",
                         self._config_name,
+                        MAX_RETRIES,
                     )
 
     async def _prepare_new_run(self):

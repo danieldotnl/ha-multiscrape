@@ -38,7 +38,7 @@ def create_http_wrapper(config_name, config, hass, file_manager):
         method,
         params_renderer=create_dict_renderer(hass, params),
         headers_renderer=create_dict_renderer(hass, headers),
-        data_renderer=create_renderer(hass, payload),
+        data_renderer=create_renderer(hass, payload, "request payload"),
     )
     if username and password:
         http.set_authentication(username, password, auth_type)

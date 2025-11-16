@@ -68,7 +68,9 @@ class Scraper:
         """Set the content to be scraped."""
         self._data = content
 
-        if content[0] in ["{", "["]:
+        # Try to detect JSON more robustly
+        content_stripped = content.lstrip() if content else ""
+        if content_stripped and content_stripped[0] in ["{", "["]:
             _LOGGER.debug(
                 "%s # Response seems to be json. Skip parsing with BeautifulSoup.",
                 self._config_name,
@@ -109,7 +111,9 @@ class Scraper:
             )
             return selector.value_template._parse_result(result)
 
-        if self._data[0] in ["{", "["]:
+        # Check if content is JSON
+        content_stripped = self._data.lstrip() if self._data else ""
+        if content_stripped and content_stripped[0] in ["{", "["]:
             raise ValueError(
                 "JSON cannot be scraped. Please provide a value template to parse JSON response."
             )

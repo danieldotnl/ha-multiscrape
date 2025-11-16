@@ -130,13 +130,16 @@ class MultiscrapeBinarySensor(MultiscrapeEntity, BinarySensorEntity):
                 self._sensor_selector, self._name, variables=self.coordinator.form_variables)
             try:
                 self._attr_is_on = bool(int(value))
-            except ValueError:
-                self._attr_is_on = {
-                    "true": True,
-                    "on": True,
-                    "open": True,
-                    "yes": True,
-                }.get(value.lower(), False)
+            except (ValueError, TypeError):
+                if isinstance(value, str):
+                    self._attr_is_on = {
+                        "true": True,
+                        "on": True,
+                        "open": True,
+                        "yes": True,
+                    }.get(value.lower(), False)
+                else:
+                    self._attr_is_on = bool(value)
 
             _LOGGER.debug(
                 "%s # %s # Selected: %s, set sensor to: %s",

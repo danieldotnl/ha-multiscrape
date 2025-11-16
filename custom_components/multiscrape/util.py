@@ -7,8 +7,14 @@ from homeassistant.helpers.template import Template
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
 
-def create_renderer(hass, value_template):
-    """Create a template renderer based on value_template."""
+def create_renderer(hass, value_template, context=""):
+    """Create a template renderer based on value_template.
+
+    Args:
+        hass: Home Assistant instance
+        value_template: Template string or Template object
+        context: Optional context description for better error messages (e.g., "resource URL", "header value")
+    """
     if value_template is None:
         return lambda variables={}, parse_result=None: None
 
@@ -22,7 +28,10 @@ def create_renderer(hass, value_template):
             return value_template.async_render(variables, parse_result)
         except TemplateError:
             _LOGGER.exception(
-                "Error rendering template: %s with variables %s", value_template, variables
+                "Error rendering template%s: %s with variables %s",
+                f" in {context}" if context else "",
+                value_template,
+                variables,
             )
             raise
 

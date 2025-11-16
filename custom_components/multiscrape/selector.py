@@ -81,5 +81,7 @@ class Selector:
 
     @property
     def on_error_default(self):
-        """Return the default on_error value in case as defined in the config."""
+        """Return the default on_error value as defined in the config."""
+        if self.on_error.default is None:
+            return None
         return self.on_error.default.async_render(parse_result=True)

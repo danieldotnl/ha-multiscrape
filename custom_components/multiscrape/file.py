@@ -32,12 +32,7 @@ class LoggingFileManager:
 
     def create_folders(self):
         """Create folders for the logging files."""
-        if not os.path.exists(os.path.dirname(self.folder)):
-            try:
-                os.makedirs(os.path.dirname(self.folder))
-            except OSError as exc:  # Guard against race condition
-                if exc.errno != errno.EEXIST:  # noqa: F821
-                    raise
+        os.makedirs(self.folder, exist_ok=True)
 
     def empty_folder(self):
         """Empty the logging folders (typically called before a new run)."""

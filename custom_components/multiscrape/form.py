@@ -115,7 +115,7 @@ class FormSubmitter:
                 page = await self._fetch_form_page(self._form_resource)
             else:
                 page = await self._fetch_form_page(main_resource)
-            form = await self._async_substract_form(page)
+            form = await self._async_extract_form(page)
 
             input_fields = self._get_input_fields(form)
             for field in self._input_filter:
@@ -217,7 +217,9 @@ class FormSubmitter:
         _LOGGER.debug("%s # Finding all input fields in form", self._config_name)
         elements = form.findAll("input")
         input_fields = {
-            element.get("name"): element.get("value") for element in elements
+            element.get("name"): element.get("value")
+            for element in elements
+            if element.get("name") is not None
         }
         _LOGGER.debug(
             "%s # Found the following input fields: %s", self._config_name, input_fields
@@ -243,7 +245,7 @@ class FormSubmitter:
             filename,
         )
 
-    async def _async_substract_form(self, page):
+    async def _async_extract_form(self, page):
         try:
             _LOGGER.debug(
                 "%s # Parse page with form with BeautifulSoup parser %s",
