@@ -1,7 +1,7 @@
 # Multiscrape
 
 ---
-
+> [!TIP]
 > ## 👋 A quick note
 >
 > I run **[Smart Home Newsletter](https://smarthomenewsletter.com/?utm_source=github&utm_medium=readme&utm_campaign=multiscrape)** — a weekly curated digest for smart home enthusiasts.
