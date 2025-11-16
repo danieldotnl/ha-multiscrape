@@ -83,7 +83,14 @@ class HttpWrapper:
             "%s # Authentication configuration processed", self._config_name)
 
     async def async_request(self, context, resource, method=None, request_data=None, cookies=None, variables: dict = {}):
-        """Execute a HTTP request."""
+        """Execute a HTTP request.
+
+        Note: We use per-request cookies (despite httpx deprecation warning) because:
+        - Cookies come dynamically from form submissions during scraping
+        - Each integration instance may have different session cookies
+        - We can't modify the shared HA httpx client's cookie jar
+        This is the correct pattern for stateful multi-page web scraping.
+        """
         data = request_data or self._data_renderer(variables)
         method = method or self._method or "GET"
         headers = self._headers_renderer(variables)
@@ -110,16 +117,26 @@ class HttpWrapper:
         response = None
 
         try:
-            response = await self._client.request(
-                method,
-                merged_resource,
-                headers=headers,
-                auth=self._auth,
-                data=data,
-                timeout=self._timeout,
-                follow_redirects=True,
-                cookies=cookies
-            )
+            # Use the appropriate parameter based on data type:
+            # - dict: use data= for form-encoded POST
+            # - str/bytes: use content= for raw content
+            request_params = {
+                "method": method,
+                "url": merged_resource,
+                "headers": headers,
+                "auth": self._auth,
+                "timeout": self._timeout,
+                "follow_redirects": True,
+                "cookies": cookies,
+            }
+
+            if data is not None:
+                if isinstance(data, dict):
+                    request_params["data"] = data
+                else:
+                    request_params["content"] = data
+
+            response = await self._client.request(**request_params)
 
             _LOGGER.debug(
                 "%s # Response status code received: %s",
