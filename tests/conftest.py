@@ -75,6 +75,29 @@ def mock_http_response():
 
 
 @pytest.fixture
+async def http_wrapper(hass):
+    """Create a real HttpWrapper instance for testing (requires respx mocking)."""
+    from homeassistant.helpers.httpx_client import get_async_client
+
+    from custom_components.multiscrape.http import HttpWrapper
+    from custom_components.multiscrape.util import (create_dict_renderer,
+                                                    create_renderer)
+
+    client = get_async_client(hass, verify_ssl=True)
+    wrapper = HttpWrapper(
+        config_name="test_wrapper",
+        hass=hass,
+        client=client,
+        file_manager=None,
+        timeout=10,
+        params_renderer=create_dict_renderer(hass, None),
+        headers_renderer=create_dict_renderer(hass, None),
+        data_renderer=create_renderer(hass, None),
+    )
+    return wrapper
+
+
+@pytest.fixture
 def mock_http_wrapper(mock_http_response):
     """Create a mock HttpWrapper with proper async behavior."""
     mock = AsyncMock()
