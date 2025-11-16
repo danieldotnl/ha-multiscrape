@@ -1,6 +1,6 @@
 """Tests for the coordinator module."""
 from datetime import timedelta
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from homeassistant.core import HomeAssistant
@@ -35,8 +35,6 @@ async def test_content_request_manager_with_form_submission(
 ):
     """Test content retrieval with form submission."""
     # Arrange
-    from unittest.mock import MagicMock
-
     mock_form = AsyncMock()
     mock_form.should_submit = True
     mock_form.async_submit = AsyncMock(
@@ -69,8 +67,6 @@ async def test_content_request_manager_form_submission_no_result(
 ):
     """Test content retrieval when form submission returns None."""
     # Arrange
-    from unittest.mock import MagicMock
-
     mock_form = AsyncMock()
     mock_form.should_submit = True
     mock_form.async_submit = AsyncMock(return_value=(None, {"cookie": "value"}))
@@ -151,8 +147,14 @@ async def test_coordinator_with_zero_scan_interval(
     content_request_manager,
     mock_file_manager,
     scraper,
+    mock_http_wrapper,
 ):
-    """Test coordinator with scan_interval set to zero (manual updates only)."""
+    """Test coordinator with scan_interval set to zero (manual updates only).
+
+    When scan_interval is 0, the coordinator should:
+    1. Set _update_interval to None (disables automatic updates)
+    2. Only update when manually triggered via async_request_refresh()
+    """
     # Arrange
     coordinator = MultiscrapeDataUpdateCoordinator(
         config_name="test_coordinator",
@@ -163,6 +165,13 @@ async def test_coordinator_with_zero_scan_interval(
         update_interval=timedelta(seconds=0),
     )
 
-    # Assert
+    # Assert - interval is disabled
     assert coordinator._update_interval is None
-    # With no interval, updates must be triggered manually
+
+    # Verify manual update still works
+    mock_http_wrapper.async_request.return_value.text = "<html>Manual Update</html>"
+    await coordinator.async_request_refresh()
+    await hass.async_block_till_done()
+
+    assert scraper._data == "<html>Manual Update</html>"
+    assert coordinator.last_update_success
