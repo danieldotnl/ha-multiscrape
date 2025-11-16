@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from unittest.mock import patch
 
+import pytest
 from homeassistant.const import EVENT_HOMEASSISTANT_STARTED
 from homeassistant.core import HomeAssistant
 from homeassistant.setup import async_setup_component
@@ -12,6 +13,10 @@ from custom_components.multiscrape.const import DOMAIN
 from . import MockHttpWrapper
 
 
+@pytest.mark.integration
+@pytest.mark.async_test
+@pytest.mark.http
+@pytest.mark.timeout(10)
 async def test_scrape_html(hass: HomeAssistant) -> None:
     """Test the scrape sensor."""
     config = {
@@ -58,6 +63,10 @@ async def test_scrape_html(hass: HomeAssistant) -> None:
         state = hass.states.get("sensor.ha_latest_version2")
         assert state.state == "2024.8.3"
 
+@pytest.mark.integration
+@pytest.mark.async_test
+@pytest.mark.http
+@pytest.mark.timeout(10)
 async def test_scrape_json(hass: HomeAssistant) -> None:
     """Test the scrape sensor."""
     config = {

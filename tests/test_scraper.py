@@ -1,4 +1,5 @@
 """Tests for scraper class."""
+import pytest
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.template import Template
 
@@ -7,6 +8,9 @@ from custom_components.multiscrape.scraper import Scraper
 from custom_components.multiscrape.selector import Selector
 
 
+@pytest.mark.unit
+@pytest.mark.async_test
+@pytest.mark.timeout(5)
 async def test_scrape_extract_text(hass: HomeAssistant) -> None:
     """Test scraping and extract text method."""
     scraper = Scraper("test_scraper", hass, None, "lxml", DEFAULT_SEPARATOR)
@@ -31,6 +35,9 @@ async def test_scrape_extract_text(hass: HomeAssistant) -> None:
     value = scraper.scrape(selector, "test_sensor")
     assert value == "Current Version: 2024.8.3"
 
+@pytest.mark.unit
+@pytest.mark.async_test
+@pytest.mark.timeout(5)
 async def test_scrape_extract_content(hass: HomeAssistant) -> None:
     """Test scraping and extract contents method."""
     scraper = Scraper("test_scraper", hass, None, "lxml", DEFAULT_SEPARATOR)
@@ -55,6 +62,9 @@ async def test_scrape_extract_content(hass: HomeAssistant) -> None:
     value = scraper.scrape(selector, "test_sensor")
     assert value == '<a href="/latest-release-notes/">Release notes</a>'
 
+@pytest.mark.unit
+@pytest.mark.async_test
+@pytest.mark.timeout(5)
 async def test_scrape_extract_tag(hass: HomeAssistant) -> None:
     """Test scraping and extract tag method."""
     scraper = Scraper("test_scraper", hass, None, "lxml", DEFAULT_SEPARATOR)
@@ -79,6 +89,9 @@ async def test_scrape_extract_tag(hass: HomeAssistant) -> None:
     value = scraper.scrape(selector, "test_sensor")
     assert value == '<div class="links" style="links"><a href="/latest-release-notes/">Release notes</a></div>'
 
+@pytest.mark.unit
+@pytest.mark.async_test
+@pytest.mark.timeout(5)
 async def test_scrape_extract_attribute(hass: HomeAssistant) -> None:
     """Test scraping and extract an HTML attribute value."""
     scraper = Scraper("test_scraper", hass, None, "lxml", DEFAULT_SEPARATOR)
