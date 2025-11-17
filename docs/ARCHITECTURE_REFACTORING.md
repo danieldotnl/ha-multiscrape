@@ -46,7 +46,14 @@ This causes several issues:
 3. **Confusing Control Flow**: Sometimes `ContentRequestManager.get_content()` returns form submit response, sometimes it makes a new request
 4. **Resource URL Confusion**: Form submitter receives the main resource URL as a parameter but should use its own URL
 
-**Note**: Both HTTP wrappers correctly use the shared `get_async_client(hass)` for connection pooling, so there's no performance issue there. The problem is the cookie/session state management on top of that shared client.
+**Note**: Both HTTP wrappers use the shared `get_async_client(hass)` which is meant for **stateless** HTTP requests. However, web scraping with form login is inherently **stateful** (requires session cookies). The current code fights against httpx's design by manually extracting and passing cookies, when httpx is perfectly capable of managing this automatically via its cookie jar - you just need to use a dedicated client instance instead of the shared one.
+
+**Why the current approach is problematic**:
+
+- httpx **has** a cookie jar built-in (`client.cookies`)
+- Using the shared HA client means you can't use that cookie jar (it's shared by all integrations)
+- So the code manually extracts cookies (`response.cookies`) and passes them back (`cookies=...`) on every request
+- This defeats the purpose of using an HTTP library that handles sessions!
 
 **Current Flow Diagram**:
 
@@ -79,7 +86,7 @@ This causes several issues:
 
 ### Proposed Solution
 
-**Create a unified `HttpSession` class** that manages authentication state, cookies, and all HTTP requests:
+**Create a unified `HttpSession` class** with a **dedicated httpx client** that manages cookies naturally:
 
 ```python
 # New file: custom_components/multiscrape/http_session.py
@@ -100,14 +107,34 @@ class FormAuthConfig:
     variables: list[dict] = field(default_factory=list)
 
 
+@dataclass
+class HttpConfig:
+    """HTTP client configuration."""
+    verify_ssl: bool = True
+    timeout: int = 10
+    username: str | None = None
+    password: str | None = None
+    auth_type: str | None = None
+    headers: dict[str, Any] = field(default_factory=dict)
+    params: dict[str, Any] = field(default_factory=dict)
+
+
 class HttpSession:
-    """Unified HTTP session manager with authentication support."""
+    """Unified HTTP session manager with authentication support.
+
+    Key Design Decision: Uses a dedicated httpx.AsyncClient instead of the shared
+    HA client (get_async_client). This allows httpx to manage cookies naturally
+    via its built-in cookie jar, eliminating manual cookie extraction/passing.
+
+    Trade-off: Slightly more connection pools, but much simpler code and natural
+    session management. Each multiscrape instance gets its own client.
+    """
 
     def __init__(
         self,
         hass: HomeAssistant,
         config_name: str,
-        verify_ssl: bool = True,
+        http_config: HttpConfig,
         file_manager: LoggingFileManager | None = None,
         auth_config: FormAuthConfig | None = None,
     ):
@@ -116,13 +143,26 @@ class HttpSession:
         self._config_name = config_name
         self._file_manager = file_manager
         self._auth_config = auth_config
+        self._http_config = http_config
 
-        # Use Home Assistant's shared httpx client for connection pooling
-        # (same as current implementation in http.py:31)
-        self._client = get_async_client(hass, verify_ssl)
+        # Create dedicated httpx client with its own cookie jar
+        # This is simpler than manual cookie management and is how httpx is meant to be used
+        self._client = httpx.AsyncClient(
+            cookies=httpx.Cookies(),  # Own cookie jar - httpx manages cookies automatically!
+            verify=http_config.verify_ssl,
+            timeout=http_config.timeout,
+            follow_redirects=True,
+        )
 
-        # Per-integration session state (can't use client's cookie jar as it's shared)
-        self._session_cookies: dict[str, str] = {}
+        # Set authentication if configured
+        if http_config.username and http_config.password:
+            if http_config.auth_type == "digest":
+                self._client.auth = httpx.DigestAuth(
+                    http_config.username,
+                    http_config.password
+                )
+            else:
+                self._client.auth = (http_config.username, http_config.password)
 
         # Authentication state
         self._authenticated = False
@@ -160,15 +200,14 @@ class HttpSession:
 
         # 4. Submit the form
         form_action = form_element.get("action", self._auth_config.resource)
-        submit_response = await self._raw_request(
+        submit_response = await self._client.request(
             "POST",
             form_action,
             data=form_data
         )
 
-        # 5. Store session cookies from login response
-        # (httpx returns CookieJar, convert to dict for per-request usage)
-        self._session_cookies = dict(submit_response.cookies)
+        # 5. Cookies are automatically stored in self._client.cookies by httpx!
+        # No manual extraction needed - this is the whole point of using a dedicated client
 
         # 6. Scrape variables from response if configured
         if self._auth_config.variables:
@@ -184,7 +223,11 @@ class HttpSession:
         url: str,
         **kwargs
     ) -> httpx.Response:
-        """Make an authenticated HTTP request."""
+        """Make an authenticated HTTP request.
+
+        Cookies are automatically included by httpx from self._client.cookies.
+        No manual cookie passing needed!
+        """
         await self.ensure_authenticated()
 
         # Merge auth variables into headers if needed
@@ -194,22 +237,7 @@ class HttpSession:
             rendered_headers = self._render_headers(headers, self._auth_variables)
             kwargs["headers"] = rendered_headers
 
-        # Automatically include session cookies from authentication
-        # (per-request cookies since we can't modify shared HA client's jar)
-        if self._session_cookies:
-            request_cookies = kwargs.get("cookies", {})
-            kwargs["cookies"] = {**self._session_cookies, **request_cookies}
-
-        return await self._raw_request(method, url, **kwargs)
-
-    async def _raw_request(
-        self,
-        method: str,
-        url: str,
-        **kwargs
-    ) -> httpx.Response:
-        """Make raw HTTP request using shared HA client."""
-        # Client is already set in __init__ via get_async_client()
+        # Make request - cookies automatically included by httpx!
         response = await self._client.request(method, url, **kwargs)
 
         if self._file_manager:
@@ -227,12 +255,8 @@ class HttpSession:
         return self._auth_variables
 
     async def close(self) -> None:
-        """Cleanup session state.
-
-        Note: We don't close the HTTP client as it's shared across all of Home Assistant.
-        We only clean up our per-integration session state.
-        """
-        self._session_cookies.clear()
+        """Close the HTTP client and cleanup session state."""
+        await self._client.aclose()  # Close our dedicated client
         self._auth_variables.clear()
         self._authenticated = False
 ```
@@ -337,13 +361,21 @@ async def _async_process_config(hass: HomeAssistant, config) -> bool:
 
 ### Benefits
 
-1. **Shared HTTP Client**: Continues using Home Assistant's `get_async_client()` for connection pooling (no change from current implementation)
-2. **Automatic Cookie Management**: Session cookies automatically included in all requests after authentication
+1. **Natural Cookie Management**: httpx's built-in cookie jar handles cookies automatically - this is how httpx is designed to work!
+2. **Zero Manual Cookie Code**: Eliminates all cookie extraction, storage, and passing logic
 3. **Clear Responsibility**: `HttpSession` handles ALL HTTP concerns including session state
 4. **Simpler Logic**: `ContentRequestManager` just fetches content, no cookie juggling
 5. **Session Invalidation**: Clean pattern for re-authentication on errors
 6. **Better Testing**: Can mock `HttpSession` easily
-7. **No Manual Cookie Passing**: Eliminates the `cookies=None` parameter throughout the codebase
+7. **Standards Compliant**: Uses httpx the way it's documented and intended
+
+**Trade-off**: Each multiscrape instance gets its own httpx.AsyncClient instead of using Home Assistant's shared client. This means:
+
+- ✅ **Pro**: Natural session/cookie management per instance
+- ✅ **Pro**: No risk of cookie conflicts between instances
+- ✅ **Pro**: Simpler code (let httpx do its job)
+- ⚠️ **Con**: Slightly more connection pools (but connection pooling still works within each instance)
+- ⚠️ **Con**: Deviates from HA's `get_async_client()` pattern (but for good reason)
 
 ### Migration Path
 
