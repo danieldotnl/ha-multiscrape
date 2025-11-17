@@ -385,7 +385,16 @@ async def _async_process_config(hass: HomeAssistant, config) -> bool:
 - ⚠️ **Con**: Slightly more connection pools (but connection pooling still works within each instance)
 - ⚠️ **Con**: Deviates from HA's `get_async_client()` pattern (but for good reason)
 
-**Note on Home Assistant's Design**: HA's `get_async_client()` is designed for integrations making **stateless HTTP requests** (like fetching weather data, calling APIs without session requirements). For **stateful scraping** with login flows and session management, a dedicated client per integration instance is the correct pattern. Home Assistant's own documentation says `create_async_httpx_client` accepts `**kwargs` "i.e. for cookies", acknowledging that custom clients may be needed for cookie-based workflows.
+**Note on Home Assistant's Design**: HA's `get_async_client()` (httpx) and `async_get_clientsession()` (aiohttp) are both designed for integrations making **stateless HTTP requests** (like fetching weather data, calling APIs without session requirements).
+
+**Important**: Both shared clients have **active cookie jars** by default:
+
+- httpx: Creates `Cookies()` instance automatically unless disabled
+- aiohttp: Creates `CookieJar()` instance automatically unless `DummyCookieJar()` is passed
+
+Neither HA helper disables cookies, meaning all integrations share the same cookie jar. This is fine for stateless requests but problematic for session-based scraping.
+
+For **stateful scraping** with login flows and session management, a dedicated client per integration instance is the correct pattern. Home Assistant's own documentation says both helpers accept `**kwargs` "i.e. for cookies", acknowledging that custom clients may be needed for cookie-based workflows.
 
 ### Migration Path
 
