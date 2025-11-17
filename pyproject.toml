@@ -4,3 +4,12 @@ requires-python = ">=3.13"
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+timeout = 10
+markers = [
+    "unit: Unit tests that test individual functions/classes in isolation",
+    "integration: Integration tests that test multiple components together",
+    "slow: Tests that take a long time to run (>1s)",
+    "async_test: Tests that involve async operations",
+    "http: Tests that make HTTP requests or mock them",
+]

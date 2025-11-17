@@ -14,6 +14,7 @@ def create_renderer(hass, value_template, context=""):
         hass: Home Assistant instance
         value_template: Template string or Template object
         context: Optional context description for better error messages (e.g., "resource URL", "header value")
+
     """
     if value_template is None:
         return lambda variables={}, parse_result=None: None

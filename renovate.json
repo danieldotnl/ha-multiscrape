@@ -1,6 +1,11 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": [
-    "config:recommended"
+  "extends": ["config:recommended"],
+  "packageRules": [
+    {
+      "groupName": "ruff",
+      "matchPackageNames": ["ruff"],
+      "matchManagers": ["pip_requirements", "pre-commit"]
+    }
   ]
 }
