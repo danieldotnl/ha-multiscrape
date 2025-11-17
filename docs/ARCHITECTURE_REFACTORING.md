@@ -41,10 +41,12 @@ http = create_http_wrapper(config_name, conf, hass, file_manager)  # Second HTTP
 
 This causes several issues:
 
-1. **Cookie Management Chaos**: Cookies obtained from form login must be manually passed between objects
-2. **Session State Loss**: Two separate httpx clients means no shared connection pooling or session state
+1. **Cookie Management Chaos**: Cookies obtained from form login must be manually extracted, stored, and passed to every subsequent request because the shared HA httpx client can't maintain per-integration session state
+2. **Stateful Scraping Complexity**: Per-request cookies must be manually managed (see `http.py:85-92` comment) rather than using natural session flow
 3. **Confusing Control Flow**: Sometimes `ContentRequestManager.get_content()` returns form submit response, sometimes it makes a new request
 4. **Resource URL Confusion**: Form submitter receives the main resource URL as a parameter but should use its own URL
+
+**Note**: Both HTTP wrappers correctly use the shared `get_async_client(hass)` for connection pooling, so there's no performance issue there. The problem is the cookie/session state management on top of that shared client.
 
 **Current Flow Diagram**:
 
@@ -105,6 +107,7 @@ class HttpSession:
         self,
         hass: HomeAssistant,
         config_name: str,
+        verify_ssl: bool = True,
         file_manager: LoggingFileManager | None = None,
         auth_config: FormAuthConfig | None = None,
     ):
@@ -114,8 +117,12 @@ class HttpSession:
         self._file_manager = file_manager
         self._auth_config = auth_config
 
-        # Single httpx client for all requests
-        self._client: httpx.AsyncClient | None = None
+        # Use Home Assistant's shared httpx client for connection pooling
+        # (same as current implementation in http.py:31)
+        self._client = get_async_client(hass, verify_ssl)
+
+        # Per-integration session state (can't use client's cookie jar as it's shared)
+        self._session_cookies: dict[str, str] = {}
 
         # Authentication state
         self._authenticated = False
@@ -159,7 +166,11 @@ class HttpSession:
             data=form_data
         )
 
-        # 5. Scrape variables from response if configured
+        # 5. Store session cookies from login response
+        # (httpx returns CookieJar, convert to dict for per-request usage)
+        self._session_cookies = dict(submit_response.cookies)
+
+        # 6. Scrape variables from response if configured
         if self._auth_config.variables:
             self._auth_variables = self._scrape_variables(submit_response.text)
 
@@ -183,6 +194,12 @@ class HttpSession:
             rendered_headers = self._render_headers(headers, self._auth_variables)
             kwargs["headers"] = rendered_headers
 
+        # Automatically include session cookies from authentication
+        # (per-request cookies since we can't modify shared HA client's jar)
+        if self._session_cookies:
+            request_cookies = kwargs.get("cookies", {})
+            kwargs["cookies"] = {**self._session_cookies, **request_cookies}
+
         return await self._raw_request(method, url, **kwargs)
 
     async def _raw_request(
@@ -191,10 +208,8 @@ class HttpSession:
         url: str,
         **kwargs
     ) -> httpx.Response:
-        """Make raw HTTP request using shared client."""
-        if self._client is None:
-            self._client = httpx.AsyncClient()
-
+        """Make raw HTTP request using shared HA client."""
+        # Client is already set in __init__ via get_async_client()
         response = await self._client.request(method, url, **kwargs)
 
         if self._file_manager:
@@ -212,9 +227,14 @@ class HttpSession:
         return self._auth_variables
 
     async def close(self) -> None:
-        """Close the HTTP client."""
-        if self._client:
-            await self._client.aclose()
+        """Cleanup session state.
+
+        Note: We don't close the HTTP client as it's shared across all of Home Assistant.
+        We only clean up our per-integration session state.
+        """
+        self._session_cookies.clear()
+        self._auth_variables.clear()
+        self._authenticated = False
 ```
 
 **Updated ContentRequestManager** (now much simpler):
@@ -317,12 +337,13 @@ async def _async_process_config(hass: HomeAssistant, config) -> bool:
 
 ### Benefits
 
-1. **Single HTTP Client**: One httpx client with proper connection pooling
-2. **Natural Cookie Flow**: Cookies managed internally by httpx
-3. **Clear Responsibility**: `HttpSession` handles ALL HTTP concerns
-4. **Simpler Logic**: `ContentRequestManager` just fetches content
+1. **Shared HTTP Client**: Continues using Home Assistant's `get_async_client()` for connection pooling (no change from current implementation)
+2. **Automatic Cookie Management**: Session cookies automatically included in all requests after authentication
+3. **Clear Responsibility**: `HttpSession` handles ALL HTTP concerns including session state
+4. **Simpler Logic**: `ContentRequestManager` just fetches content, no cookie juggling
 5. **Session Invalidation**: Clean pattern for re-authentication on errors
 6. **Better Testing**: Can mock `HttpSession` easily
+7. **No Manual Cookie Passing**: Eliminates the `cookies=None` parameter throughout the codebase
 
 ### Migration Path
 
