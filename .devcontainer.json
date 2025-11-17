@@ -9,6 +9,9 @@
       "onAutoForward": "notify"
     }
   },
+  "features": {
+    "ghcr.io/devcontainers/features/github-cli:1.0.15": {}
+  },
   "customizations": {
     "vscode": {
       "extensions": [
