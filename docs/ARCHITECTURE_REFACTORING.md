@@ -46,14 +46,20 @@ This causes several issues:
 3. **Confusing Control Flow**: Sometimes `ContentRequestManager.get_content()` returns form submit response, sometimes it makes a new request
 4. **Resource URL Confusion**: Form submitter receives the main resource URL as a parameter but should use its own URL
 
-**Note**: Both HTTP wrappers use the shared `get_async_client(hass)` which is meant for **stateless** HTTP requests. However, web scraping with form login is inherently **stateful** (requires session cookies). The current code fights against httpx's design by manually extracting and passing cookies, when httpx is perfectly capable of managing this automatically via its cookie jar - you just need to use a dedicated client instance instead of the shared one.
+**Note**: Both HTTP wrappers use the shared `get_async_client(hass)` which is meant for **stateless** HTTP requests. However, there's a critical issue here:
+
+**The Actual Problem**:
+
+- httpx **automatically persists cookies** - any `Set-Cookie` from responses goes into `client.cookies` and is sent with future requests
+- Home Assistant's shared client **does NOT disable this** - it has a live cookie jar shared by ALL integrations
+- The current code tries to work around this by passing `cookies=...` per-request, but this is **deprecated in httpx** and creates confusion
 
 **Why the current approach is problematic**:
 
-- httpx **has** a cookie jar built-in (`client.cookies`)
-- Using the shared HA client means you can't use that cookie jar (it's shared by all integrations)
-- So the code manually extracts cookies (`response.cookies`) and passes them back (`cookies=...`) on every request
-- This defeats the purpose of using an HTTP library that handles sessions!
+1. **Shared Cookie Jar Risk**: If multiscrape relied on httpx's automatic cookies, all integrations using `get_async_client(hass)` would share the same cookie jar - creating potential conflicts and security issues
+2. **Per-Request Cookies Deprecated**: httpx deprecated per-request cookies (see `http.py:85-92` comment) because cookies should be managed by the client's jar, not passed per-request
+3. **Fighting the Library**: The code manually extracts cookies and passes them back, defeating httpx's built-in session management
+4. **No Isolation**: Multiple multiscrape instances would interfere with each other if they used the shared cookie jar
 
 **Current Flow Diagram**:
 
@@ -373,9 +379,13 @@ async def _async_process_config(hass: HomeAssistant, config) -> bool:
 
 - ✅ **Pro**: Natural session/cookie management per instance
 - ✅ **Pro**: No risk of cookie conflicts between instances
+- ✅ **Pro**: No accidental cookie pollution of shared HA client
 - ✅ **Pro**: Simpler code (let httpx do its job)
+- ✅ **Pro**: Follows httpx best practices (client-level cookies, not per-request)
 - ⚠️ **Con**: Slightly more connection pools (but connection pooling still works within each instance)
 - ⚠️ **Con**: Deviates from HA's `get_async_client()` pattern (but for good reason)
+
+**Note on Home Assistant's Design**: HA's `get_async_client()` is designed for integrations making **stateless HTTP requests** (like fetching weather data, calling APIs without session requirements). For **stateful scraping** with login flows and session management, a dedicated client per integration instance is the correct pattern. Home Assistant's own documentation says `create_async_httpx_client` accepts `**kwargs` "i.e. for cookies", acknowledging that custom clients may be needed for cookie-based workflows.
 
 ### Migration Path
 
