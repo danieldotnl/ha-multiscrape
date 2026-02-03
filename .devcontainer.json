@@ -10,7 +10,7 @@
     }
   },
   "features": {
-    "ghcr.io/devcontainers/features/github-cli:1.0.15": {}
+    "ghcr.io/devcontainers/features/github-cli:1.1.0": {}
   },
   "customizations": {
     "vscode": {
