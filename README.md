@@ -102,6 +102,7 @@ multiscrape:
 ```
 ### Advanced Example Configuration (YAML)
 [HA Documentation](https://www.home-assistant.io/docs/configuration/splitting_configuration/)
+
 *Inside the configuration.yaml file*
 ```yaml
 multiscrape: !include multiscrape.yaml
