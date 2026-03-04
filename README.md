@@ -67,6 +67,7 @@ It is based on both the existing [Rest sensor](https://www.home-assistant.io/int
 Install via HACS (default store) or install manually by copying the files in a new 'custom_components/multiscrape' directory.
 
 ## Example configuration (YAML)
+*This code example is to be placed into /config/configuration.yaml*
 
 ```yaml
 multiscrape:
@@ -98,6 +99,22 @@ multiscrape:
           - name: Release notes link
             select: ".release-date"
             attribute: href
+```
+### Advanced Example Configuration (YAML)
+[HA Documentation](https://www.home-assistant.io/docs/configuration/splitting_configuration/)
+
+*Inside the configuration.yaml file*
+```yaml
+multiscrape: !include multiscrape.yaml
+```
+
+Make a new file named /config/multiscrape.yaml
+*Inside the multiscrape.yaml file. Syntax is the same but starting at the resource level*
+```yaml
+- resource: https://www.home-assistant.io
+  scan_interval: 3600
+  sensor:
+    - unique_id: ha_latest_version
 ```
 
 ## Options
