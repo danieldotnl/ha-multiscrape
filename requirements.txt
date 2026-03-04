@@ -1,6 +1,6 @@
 colorlog==6.10.1
 pytest-homeassistant-custom-component==0.13.310
-pip>=25,<26
+pip>=26.0,<27
 lxml>=4.9.1
 beautifulsoup4>=4.12.2
 ruff==0.14.14
