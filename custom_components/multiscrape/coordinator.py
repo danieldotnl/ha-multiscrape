@@ -15,8 +15,7 @@ from homeassistant.util.dt import utcnow
 
 from .const import DOMAIN, MAX_RETRIES, RETRY_DELAY_SECONDS
 from .file import LoggingFileManager
-from .form import FormSubmitter
-from .http import HttpWrapper
+from .http_session import HttpSession
 from .scraper import Scraper
 from .util import create_renderer
 
@@ -26,7 +25,7 @@ DEFAULT_SCAN_INTERVAL = timedelta(seconds=60)
 
 
 def create_content_request_manager(
-    config_name, config, hass: HomeAssistant, http, form_submitter
+    config_name, config, hass: HomeAssistant, session
 ):
     """Create a content request manager instance."""
     _LOGGER.debug("%s # Creating ContentRequestManager", config_name)
@@ -37,64 +36,55 @@ def create_content_request_manager(
         resource_renderer = create_renderer(hass, resource_template, "resource URL template")
     else:
         resource_renderer = create_renderer(hass, resource, "resource URL")
-    return ContentRequestManager(config_name, http, resource_renderer, form_submitter)
+    return ContentRequestManager(config_name, session, resource_renderer)
 
 
 class ContentRequestManager:
-    """Responsible for orchestrating all request required to retrieve the desired content."""
+    """Responsible for orchestrating all requests required to retrieve the desired content."""
 
     def __init__(
         self,
         config_name: str,
-        http: HttpWrapper,
+        session: HttpSession,
         resource_renderer: Callable,
-        form: FormSubmitter = None,
     ) -> None:
         """Initialize ContentRequestManager."""
         self._config_name = config_name
-        self._http = http
-        self._form_submitter = form
+        self._session = session
         self._resource_renderer = resource_renderer
-        self._cookies = None
-        self._form_variables = {}
 
     def notify_scrape_exception(self):
-        """Notify the form_submitter of an exception so it will re-submit next trigger."""
-        if self._form_submitter:
-            self._form_submitter.notify_scrape_exception()
+        """Notify the session of an exception so it will re-submit next trigger."""
+        self._session.notify_scrape_exception()
 
     async def get_content(self) -> str:
         """Retrieve the content of a url and first submit a form if required."""
         resource = self._resource_renderer()
 
-        if self._form_submitter:
-            try:
-                if self._form_submitter.should_submit is True:
-                    result, self._cookies = await self._form_submitter.async_submit(resource)
-                    self._form_variables = self._form_submitter.scrape_variables()
-
-                    if result:
-                        _LOGGER.debug(
-                            "%s # Using response from form-submit as content for scraping.",
-                            self._config_name,
-                        )
-                        return result
-                else:
-                    _LOGGER.debug("%s # Skip submitting form", self._config_name)
-            except Exception as ex:
-                _LOGGER.error(
-                    "%s # Exception in form-submit feature. Will continue trying to scrape target page.\n%s",
+        try:
+            result = await self._session.ensure_authenticated(resource)
+            if result:
+                _LOGGER.debug(
+                    "%s # Using response from form-submit as content for scraping.",
                     self._config_name,
-                    ex,
                 )
+                return result
+        except Exception as ex:
+            _LOGGER.error(
+                "%s # Exception in form-submit feature. Will continue trying to scrape target page.\n%s",
+                self._config_name,
+                ex,
+            )
 
-        response = await self._http.async_request("page", resource, cookies=self._cookies, variables=self._form_variables)
+        response = await self._session.async_request(
+            "page", resource, variables=self._session.form_variables
+        )
         return response.text
 
     @property
     def form_variables(self):
         """Return the form variables."""
-        return self._form_variables
+        return self._session.form_variables
 
 
 def create_multiscrape_coordinator(

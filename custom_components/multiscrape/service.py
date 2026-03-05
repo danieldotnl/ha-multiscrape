@@ -13,12 +13,11 @@ from homeassistant.helpers.template import Template
 from homeassistant.util import slugify
 
 from .const import (CONF_FIELDS, CONF_FORM_SUBMIT, CONF_FORM_VARIABLES,
-                    CONF_LOG_RESPONSE, CONF_PARSER, CONF_SENSOR_ATTRS, DOMAIN)
+                    CONF_LOG_RESPONSE, CONF_SENSOR_ATTRS, DOMAIN)
 from .coordinator import (MultiscrapeDataUpdateCoordinator,
                           create_content_request_manager)
 from .file import create_file_manager
-from .form import create_form_submitter
-from .http import create_http_wrapper
+from .http_session import create_http_session
 from .schema import SERVICE_COMBINED_SCHEMA
 from .scraper import create_scraper
 from .selector import Selector
@@ -72,12 +71,15 @@ async def setup_get_content_service(hass: HomeAssistant):
         _LOGGER.info("Get_content service triggered: %s", service.__repr__())
         config_name = "get_content_service"
         conf = _restore_templates(service.data)
-        request_manager, scraper = await _prepare_service_request(
+        request_manager, scraper, session = await _prepare_service_request(
             hass, conf, config_name
         )
-        result = await request_manager.get_content()
-        await scraper.set_content(result)
-        return {"content": str(scraper.formatted_content)}
+        try:
+            result = await request_manager.get_content()
+            await scraper.set_content(result)
+            return {"content": str(scraper.formatted_content)}
+        finally:
+            await session.async_close()
 
     hass.services.async_register(
         DOMAIN,
@@ -95,33 +97,36 @@ async def setup_scrape_service(hass: HomeAssistant):
         _LOGGER.info("Scrape service triggered: %s", service.__repr__())
         conf = _restore_templates(service.data)
         config_name = "scrape_service"
-        request_manager, scraper = await _prepare_service_request(
+        request_manager, scraper, session = await _prepare_service_request(
             hass, conf, config_name
         )
-        result = await request_manager.get_content()
-        await scraper.set_content(result)
+        try:
+            result = await request_manager.get_content()
+            await scraper.set_content(result)
 
-        response = {}
+            response = {}
 
-        for platform in [Platform.SENSOR, Platform.BINARY_SENSOR]:
-            for sensor in conf.get(platform) or []:
-                name = sensor.get(CONF_UNIQUE_ID) or slugify(sensor.get(CONF_NAME))
-                sensor_selector = Selector(hass, sensor)
-                response[name] = {"value": scraper.scrape(sensor_selector, config_name)}
+            for platform in [Platform.SENSOR, Platform.BINARY_SENSOR]:
+                for sensor in conf.get(platform) or []:
+                    name = sensor.get(CONF_UNIQUE_ID) or slugify(sensor.get(CONF_NAME))
+                    sensor_selector = Selector(hass, sensor)
+                    response[name] = {"value": scraper.scrape(sensor_selector, config_name)}
 
-                if sensor.get(CONF_ICON):
-                    response[CONF_ICON] = sensor.get(CONF_ICON).async_render(
-                        variables={"value": response[name]}, parse_result=False
-                    )
+                    if sensor.get(CONF_ICON):
+                        response[CONF_ICON] = sensor.get(CONF_ICON).async_render(
+                            variables={"value": response[name]}, parse_result=False
+                        )
 
-                for attr_conf in sensor.get(CONF_SENSOR_ATTRS) or []:
-                    attr_name = slugify(attr_conf[CONF_NAME])
-                    attr_selector = Selector(hass, attr_conf)
-                    response[name].setdefault(CONF_SENSOR_ATTRS, {}).update(
-                        {attr_name: scraper.scrape(attr_selector, config_name)}
-                    )
+                    for attr_conf in sensor.get(CONF_SENSOR_ATTRS) or []:
+                        attr_name = slugify(attr_conf[CONF_NAME])
+                        attr_selector = Selector(hass, attr_conf)
+                        response[name].setdefault(CONF_SENSOR_ATTRS, {}).update(
+                            {attr_name: scraper.scrape(attr_selector, config_name)}
+                        )
 
-        return response
+            return response
+        finally:
+            await session.async_close()
 
     hass.services.async_register(
         DOMAIN,
@@ -134,21 +139,12 @@ async def setup_scrape_service(hass: HomeAssistant):
 
 async def _prepare_service_request(hass: HomeAssistant, conf, config_name):
     file_manager = await create_file_manager(hass, config_name, conf.get(CONF_LOG_RESPONSE))
-    http = create_http_wrapper(config_name, conf, hass, file_manager)
-    form_submitter = None
-    form_submit_config = conf.get(CONF_FORM_SUBMIT)
-    parser = conf.get(CONF_PARSER)
-    if form_submit_config:
-        form_http = create_http_wrapper(
-            config_name, form_submit_config, hass, file_manager)
-        form_submitter = create_form_submitter(
-            config_name, form_submit_config, hass, form_http, file_manager, parser
-        )
+    session = create_http_session(config_name, conf, hass, file_manager)
     request_manager = create_content_request_manager(
-        config_name, conf, hass, http, form_submitter
+        config_name, conf, hass, session
     )
     scraper = create_scraper(config_name, conf, hass, file_manager)
-    return request_manager, scraper
+    return request_manager, scraper, session
 
 
 def _restore_templates(config):

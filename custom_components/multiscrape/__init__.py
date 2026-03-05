@@ -6,7 +6,8 @@ import logging
 import voluptuous as vol
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (CONF_NAME, CONF_RESOURCE,
-                                 CONF_RESOURCE_TEMPLATE, SERVICE_RELOAD,
+                                 CONF_RESOURCE_TEMPLATE,
+                                 EVENT_HOMEASSISTANT_STOP, SERVICE_RELOAD,
                                  Platform)
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
@@ -14,14 +15,12 @@ from homeassistant.helpers import discovery
 from homeassistant.helpers.reload import (async_integration_yaml_config,
                                           async_reload_integration_platforms)
 
-from .const import (CONF_FORM_SUBMIT, CONF_LOG_RESPONSE, CONF_PARSER,
-                    COORDINATOR, DOMAIN, PLATFORM_IDX, SCRAPER, SCRAPER_DATA,
-                    SCRAPER_IDX)
+from .const import (CONF_LOG_RESPONSE, COORDINATOR, DOMAIN, PLATFORM_IDX,
+                    SCRAPER, SCRAPER_DATA, SCRAPER_IDX)
 from .coordinator import (create_content_request_manager,
                           create_multiscrape_coordinator)
 from .file import create_file_manager
-from .form import create_form_submitter
-from .http import create_http_wrapper
+from .http_session import create_http_session
 from .schema import COMBINED_SCHEMA, CONFIG_SCHEMA  # noqa: F401
 from .scraper import create_scraper
 from .service import setup_config_services, setup_integration_services
@@ -91,23 +90,9 @@ async def _async_process_config(hass: HomeAssistant, config) -> bool:
         )
 
         file_manager = await create_file_manager(hass, config_name, conf.get(CONF_LOG_RESPONSE))
-        form_submit_config = conf.get(CONF_FORM_SUBMIT)
-        form_submitter = None
-        if form_submit_config:
-            parser = conf.get(CONF_PARSER)
-            form_http = create_http_wrapper(config_name, form_submit_config, hass, file_manager)
-            form_submitter = create_form_submitter(
-                config_name,
-                form_submit_config,
-                hass,
-                form_http,
-                file_manager,
-                parser,
-            )
-
-        http = create_http_wrapper(config_name, conf, hass, file_manager)
+        session = create_http_session(config_name, conf, hass, file_manager)
         scraper = create_scraper(config_name, conf, hass, file_manager)
-        request_manager = create_content_request_manager(config_name, conf, hass, http, form_submitter)
+        request_manager = create_content_request_manager(config_name, conf, hass, session)
         coordinator = create_multiscrape_coordinator(
             config_name,
             conf,
@@ -117,6 +102,11 @@ async def _async_process_config(hass: HomeAssistant, config) -> bool:
             scraper,
         )
         await coordinator.async_register_shutdown()
+
+        async def _shutdown_session(_event, _session=session):
+            await _session.async_close()
+
+        hass.bus.async_listen_once(EVENT_HOMEASSISTANT_STOP, _shutdown_session)
 
         hass.data[DOMAIN][SCRAPER_DATA].append(
             {SCRAPER: scraper, COORDINATOR: coordinator}
