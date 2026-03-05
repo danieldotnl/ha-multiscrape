@@ -30,7 +30,7 @@ def create_form_submitter(config_name, config, hass, http, file_manager, parser)
     scraper = None
     variables_selectors = {}
     variables = config.get(CONF_FORM_VARIABLES)
-    if (variables != []):
+    if variables:
         scraper = create_scraper(config_name, config, hass, file_manager)
         for variables_conf in variables:
             variables_selectors[variables_conf.get(CONF_NAME)] = Selector(hass, variables_conf)

@@ -189,6 +189,8 @@ class HttpWrapper:
             raise
 
     async def _handle_request_exception(self, context, response):
+        if response is None:
+            return
         try:
             if self._file_manager:
                 task1 = self._async_file_log(

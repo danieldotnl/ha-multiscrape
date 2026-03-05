@@ -1,5 +1,7 @@
 """Integration tests for HTTP async request functionality."""
 
+from unittest.mock import MagicMock
+
 import pytest
 import respx
 from homeassistant.const import HTTP_DIGEST_AUTHENTICATION
@@ -427,3 +429,127 @@ async def test_http_wrapper_with_variables(hass: HomeAssistant):
     assert response.text == "OK"
     assert route.called
     assert route.calls.last.request.headers["X-Session"] == "sess123"
+
+
+# ============================================================================
+# _handle_request_exception tests
+# ============================================================================
+
+
+@pytest.fixture
+async def http_wrapper_with_file_manager(hass: HomeAssistant, mock_file_manager):
+    """Create an HttpWrapper with a file manager for error-path testing."""
+    from custom_components.multiscrape.util import (create_dict_renderer,
+                                                    create_renderer)
+
+    client = get_async_client(hass, verify_ssl=True)
+    wrapper = HttpWrapper(
+        config_name="test_error",
+        hass=hass,
+        client=client,
+        file_manager=mock_file_manager,
+        timeout=10,
+        params_renderer=create_dict_renderer(hass, None),
+        headers_renderer=create_dict_renderer(hass, None),
+        data_renderer=create_renderer(hass, None),
+    )
+    return wrapper
+
+
+@pytest.mark.integration
+@pytest.mark.async_test
+@pytest.mark.timeout(10)
+async def test_handle_request_exception_with_none_response(
+    http_wrapper_with_file_manager,
+):
+    """Test _handle_request_exception gracefully handles None response.
+
+    When a timeout occurs before any response is received, response is None.
+    The fix adds a `if response is None: return` guard so file logging is
+    skipped cleanly instead of crashing into the catch-all.
+    """
+    # Act - should not raise
+    await http_wrapper_with_file_manager._handle_request_exception("page", None)
+
+    # Assert - no file writes attempted since response was None
+
+
+@pytest.mark.integration
+@pytest.mark.async_test
+@pytest.mark.timeout(10)
+async def test_handle_request_exception_logs_to_files(
+    hass: HomeAssistant, mock_file_manager,
+):
+    """Test _handle_request_exception logs response details to files."""
+    from custom_components.multiscrape.util import (create_dict_renderer,
+                                                    create_renderer)
+
+    client = get_async_client(hass, verify_ssl=True)
+    wrapper = HttpWrapper(
+        config_name="test_error",
+        hass=hass,
+        client=client,
+        file_manager=mock_file_manager,
+        timeout=10,
+        params_renderer=create_dict_renderer(hass, None),
+        headers_renderer=create_dict_renderer(hass, None),
+        data_renderer=create_renderer(hass, None),
+    )
+
+    # Create a mock response with all fields
+    mock_response = MagicMock()
+    mock_response.headers = {"Content-Type": "text/html"}
+    mock_response.text = "Error page"
+    mock_response.cookies = {"session": "abc"}
+
+    # Act
+    await wrapper._handle_request_exception("page", mock_response)
+
+    # Assert - file_manager.write called 3 times (headers, body, cookies)
+    assert mock_file_manager.write.call_count == 3
+
+
+@pytest.mark.integration
+@pytest.mark.async_test
+@pytest.mark.timeout(10)
+async def test_handle_request_exception_no_file_manager(http_wrapper_basic):
+    """Test _handle_request_exception is a no-op without file_manager."""
+    mock_response = MagicMock()
+    mock_response.headers = {"Content-Type": "text/html"}
+    mock_response.text = "Error page"
+    mock_response.cookies = {}
+
+    # Act - should not raise (file_manager is None)
+    await http_wrapper_basic._handle_request_exception("page", mock_response)
+
+
+# ============================================================================
+# _async_file_log tests
+# ============================================================================
+
+
+@pytest.mark.integration
+@pytest.mark.async_test
+@pytest.mark.timeout(10)
+async def test_async_file_log_skips_none_content(http_wrapper_with_file_manager, mock_file_manager):
+    """Test _async_file_log does not write when content is None."""
+    await http_wrapper_with_file_manager._async_file_log("test", "page", None)
+
+    # Assert - write was NOT called
+    mock_file_manager.write.assert_not_called()
+
+
+@pytest.mark.integration
+@pytest.mark.async_test
+@pytest.mark.timeout(10)
+async def test_async_file_log_handles_write_exception(
+    http_wrapper_with_file_manager, mock_file_manager, caplog
+):
+    """Test _async_file_log catches and logs write errors without propagating."""
+    mock_file_manager.write.side_effect = OSError("Disk full")
+
+    # Act - should not raise
+    await http_wrapper_with_file_manager._async_file_log("response_body", "page", "some content")
+
+    # Assert - error was logged
+    assert "Unable to write" in caplog.text
