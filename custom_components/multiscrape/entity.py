@@ -1,28 +1,31 @@
 """The base entity for the scraper component."""
+from __future__ import annotations
+
 import logging
 from abc import abstractmethod
 
-from homeassistant.core import callback
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import TemplateError
 from homeassistant.helpers.restore_state import RestoreEntity
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import (CONF_ON_ERROR_VALUE_DEFAULT, CONF_ON_ERROR_VALUE_LAST,
                     CONF_ON_ERROR_VALUE_NONE, LOG_LEVELS)
+from .coordinator import MultiscrapeDataUpdateCoordinator
 from .scraper import Scraper
 
 _LOGGER = logging.getLogger(__name__)
 
 
-class MultiscrapeEntity(CoordinatorEntity, RestoreEntity):
+class MultiscrapeEntity(CoordinatorEntity[MultiscrapeDataUpdateCoordinator], RestoreEntity):
     """A class for entities using DataUpdateCoordinator."""
 
     _unrecorded_attributes = frozenset({"entity_picture"})
 
     def __init__(
         self,
-        hass,
-        coordinator,
+        hass: HomeAssistant,
+        coordinator: MultiscrapeDataUpdateCoordinator,
         scraper: Scraper,
         name,
         device_class,

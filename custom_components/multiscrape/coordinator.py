@@ -1,4 +1,6 @@
 """Coordinator class for multiscrape integration."""
+from __future__ import annotations
+
 import logging
 from collections.abc import Callable
 from datetime import timedelta
@@ -7,8 +9,8 @@ from homeassistant.const import (CONF_RESOURCE, CONF_RESOURCE_TEMPLATE,
                                  CONF_SCAN_INTERVAL,
                                  EVENT_HOMEASSISTANT_STARTED)
 from homeassistant.core import Event, HomeAssistant
-from homeassistant.helpers.update_coordinator import (DataUpdateCoordinator,
-                                                      event)
+from homeassistant.helpers.update_coordinator import (
+    TimestampDataUpdateCoordinator, event)
 from homeassistant.util.dt import utcnow
 
 from .const import DOMAIN, MAX_RETRIES, RETRY_DELAY_SECONDS
@@ -113,7 +115,7 @@ def create_multiscrape_coordinator(
     )
 
 
-class MultiscrapeDataUpdateCoordinator(DataUpdateCoordinator):
+class MultiscrapeDataUpdateCoordinator(TimestampDataUpdateCoordinator[None]):
     """Multiscrape coordinator class."""
 
     def __init__(
@@ -161,11 +163,11 @@ class MultiscrapeDataUpdateCoordinator(DataUpdateCoordinator):
 
         hass.bus.async_listen_once(EVENT_HOMEASSISTANT_STARTED, _on_hass_start)
 
-    def notify_scrape_exception(self):
+    def notify_scrape_exception(self) -> None:
         """Notify the ContentRequestManager of a scrape exception so it can notify the FormSubmitter."""
         self._request_manager.notify_scrape_exception()
 
-    async def _async_update_data(self):
+    async def _async_update_data(self) -> None:
         await self._prepare_new_run()
 
         try:
@@ -209,7 +211,7 @@ class MultiscrapeDataUpdateCoordinator(DataUpdateCoordinator):
                         MAX_RETRIES,
                     )
 
-    async def _prepare_new_run(self):
+    async def _prepare_new_run(self) -> None:
         _LOGGER.debug(
             "%s # New run: start (re)loading data from resource", self._config_name
         )
@@ -230,6 +232,6 @@ class MultiscrapeDataUpdateCoordinator(DataUpdateCoordinator):
         self._scraper.reset()
 
     @property
-    def form_variables(self):
+    def form_variables(self) -> dict:
         """Return the form variables."""
         return self._request_manager.form_variables
