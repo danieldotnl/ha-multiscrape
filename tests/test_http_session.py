@@ -1010,3 +1010,365 @@ async def test_create_http_session_with_auth(hass: HomeAssistant):
     assert session._auth == ("user", "pass")
 
     await session.async_close()
+
+
+# ============================================================================
+# End-to-End Integration Tests
+# ============================================================================
+
+LOGIN_PAGE_HTML = """
+<html>
+<body>
+<form id="loginform" action="/auth/submit" method="post">
+    <input name="username" value="" />
+    <input name="password" value="" />
+    <input name="csrf" value="tok_abc" />
+    <button type="submit">Login</button>
+</form>
+</body>
+</html>
+"""
+
+TARGET_PAGE_HTML = """
+<html>
+<body>
+<div class="temperature">21.5</div>
+<div class="humidity">58</div>
+</body>
+</html>
+"""
+
+
+@pytest.mark.integration
+@pytest.mark.async_test
+@pytest.mark.timeout(10)
+@respx.mock
+async def test_e2e_form_login_then_scrape_separate_resource(hass: HomeAssistant):
+    """End-to-end: form login on separate URL, then scrape target page.
+
+    Flow: GET /login -> parse form -> POST /auth/submit -> GET /data -> scrape
+    Cookies from login must persist to the data page request.
+    """
+    from custom_components.multiscrape.coordinator import \
+        create_content_request_manager
+
+    conf = {
+        "resource": "https://site.com/data",
+        "method": "get",
+        "verify_ssl": True,
+        "timeout": 10,
+        "parser": "html.parser",
+        "form_submit": {
+            "resource": "https://site.com/login",
+            "select": "#loginform",
+            "input": {"username": "admin", "password": "secret"},
+            "input_filter": [],
+            "submit_once": False,
+            "resubmit_on_error": True,
+            "variables": [],
+            "method": "get",
+            "verify_ssl": True,
+            "timeout": 10,
+        },
+    }
+
+    session = create_http_session("e2e_test", conf, hass, None)
+
+    try:
+        # Mock login page
+        respx.get("https://site.com/login").mock(
+            return_value=respx.MockResponse(
+                200,
+                text=LOGIN_PAGE_HTML,
+                headers={"Set-Cookie": "session_id=sess123; Path=/"},
+            )
+        )
+        # Mock form submission — returns a redirect-style page (not the target)
+        respx.post("https://site.com/auth/submit").mock(
+            return_value=respx.MockResponse(
+                200,
+                text="<html><body>Login successful</body></html>",
+                headers={"Set-Cookie": "auth_token=xyz; Path=/"},
+            )
+        )
+        # Mock target data page
+        data_route = respx.get("https://site.com/data").mock(
+            return_value=respx.MockResponse(200, text=TARGET_PAGE_HTML)
+        )
+
+        request_manager = create_content_request_manager(
+            "e2e_test", conf, hass, session
+        )
+        content = await request_manager.get_content()
+
+        # Should have fetched the target page (form has own resource → returns None)
+        assert data_route.called
+        assert "21.5" in content
+        assert "humidity" in content
+
+        # Verify cookies were sent to the data page
+        data_request = data_route.calls.last.request
+        cookie_header = data_request.headers.get("cookie", "")
+        assert "session_id=sess123" in cookie_header
+        assert "auth_token=xyz" in cookie_header
+    finally:
+        await session.async_close()
+
+
+@pytest.mark.integration
+@pytest.mark.async_test
+@pytest.mark.timeout(10)
+@respx.mock
+async def test_e2e_form_login_same_resource(hass: HomeAssistant):
+    """End-to-end: form login on same URL as target — form response IS the content.
+
+    When form_submit has no separate resource, the form response text is used
+    directly as the scraped content (no second GET needed).
+    """
+    from custom_components.multiscrape.coordinator import \
+        create_content_request_manager
+
+    conf = {
+        "resource": "https://site.com/dashboard",
+        "method": "get",
+        "verify_ssl": True,
+        "timeout": 10,
+        "parser": "html.parser",
+        "form_submit": {
+            "select": "#loginform",
+            "input": {"username": "admin", "password": "secret"},
+            "input_filter": [],
+            "submit_once": False,
+            "resubmit_on_error": True,
+            "variables": [],
+            "method": "get",
+            "verify_ssl": True,
+            "timeout": 10,
+        },
+    }
+
+    session = create_http_session("e2e_test", conf, hass, None)
+
+    try:
+        # Form page is the main resource itself
+        respx.get("https://site.com/dashboard").mock(
+            return_value=respx.MockResponse(200, text=LOGIN_PAGE_HTML)
+        )
+        # Form submits to /auth/submit (from form action)
+        respx.post("https://site.com/auth/submit").mock(
+            return_value=respx.MockResponse(200, text=TARGET_PAGE_HTML)
+        )
+
+        request_manager = create_content_request_manager(
+            "e2e_test", conf, hass, session
+        )
+        content = await request_manager.get_content()
+
+        # Form response is used directly as content (no separate GET for target)
+        assert "21.5" in content
+        assert "humidity" in content
+    finally:
+        await session.async_close()
+
+
+@pytest.mark.integration
+@pytest.mark.async_test
+@pytest.mark.timeout(10)
+@respx.mock
+async def test_e2e_form_submit_once_skips_on_second_call(hass: HomeAssistant):
+    """End-to-end: submit_once=True skips form on second coordinator update."""
+    from custom_components.multiscrape.coordinator import \
+        create_content_request_manager
+
+    conf = {
+        "resource": "https://site.com/data",
+        "method": "get",
+        "verify_ssl": True,
+        "timeout": 10,
+        "parser": "html.parser",
+        "form_submit": {
+            "resource": "https://site.com/login",
+            "select": "#loginform",
+            "input": {"username": "admin", "password": "secret"},
+            "input_filter": [],
+            "submit_once": True,
+            "resubmit_on_error": True,
+            "variables": [],
+            "method": "get",
+            "verify_ssl": True,
+            "timeout": 10,
+        },
+    }
+
+    session = create_http_session("e2e_test", conf, hass, None)
+
+    try:
+        login_route = respx.get("https://site.com/login").mock(
+            return_value=respx.MockResponse(200, text=LOGIN_PAGE_HTML)
+        )
+        respx.post("https://site.com/auth/submit").mock(
+            return_value=respx.MockResponse(200, text="OK")
+        )
+        respx.get("https://site.com/data").mock(
+            return_value=respx.MockResponse(200, text=TARGET_PAGE_HTML)
+        )
+
+        request_manager = create_content_request_manager(
+            "e2e_test", conf, hass, session
+        )
+
+        # First call — form login happens
+        await request_manager.get_content()
+        assert login_route.call_count == 1
+
+        # Second call — form login skipped (submit_once=True)
+        await request_manager.get_content()
+        assert login_route.call_count == 1  # Still 1, not 2
+    finally:
+        await session.async_close()
+
+
+@pytest.mark.integration
+@pytest.mark.async_test
+@pytest.mark.timeout(10)
+@respx.mock
+async def test_e2e_form_resubmit_on_error(hass: HomeAssistant):
+    """End-to-end: resubmit_on_error re-submits form after scrape exception."""
+    from custom_components.multiscrape.coordinator import \
+        create_content_request_manager
+
+    conf = {
+        "resource": "https://site.com/data",
+        "method": "get",
+        "verify_ssl": True,
+        "timeout": 10,
+        "parser": "html.parser",
+        "form_submit": {
+            "resource": "https://site.com/login",
+            "select": "#loginform",
+            "input": {"username": "admin", "password": "secret"},
+            "input_filter": [],
+            "submit_once": True,
+            "resubmit_on_error": True,
+            "variables": [],
+            "method": "get",
+            "verify_ssl": True,
+            "timeout": 10,
+        },
+    }
+
+    session = create_http_session("e2e_test", conf, hass, None)
+
+    try:
+        login_route = respx.get("https://site.com/login").mock(
+            return_value=respx.MockResponse(200, text=LOGIN_PAGE_HTML)
+        )
+        respx.post("https://site.com/auth/submit").mock(
+            return_value=respx.MockResponse(200, text="OK")
+        )
+        respx.get("https://site.com/data").mock(
+            return_value=respx.MockResponse(200, text=TARGET_PAGE_HTML)
+        )
+
+        request_manager = create_content_request_manager(
+            "e2e_test", conf, hass, session
+        )
+
+        # First call — form login
+        await request_manager.get_content()
+        assert login_route.call_count == 1
+
+        # Simulate scrape exception notification
+        request_manager.notify_scrape_exception()
+
+        # Third call — form re-submits after error
+        await request_manager.get_content()
+        assert login_route.call_count == 2
+    finally:
+        await session.async_close()
+
+
+@pytest.mark.integration
+@pytest.mark.async_test
+@pytest.mark.timeout(10)
+@respx.mock
+async def test_e2e_no_form_just_scrape(hass: HomeAssistant):
+    """End-to-end: simple scrape without form authentication."""
+    from custom_components.multiscrape.coordinator import \
+        create_content_request_manager
+
+    conf = {
+        "resource": "https://site.com/data",
+        "method": "get",
+        "verify_ssl": True,
+        "timeout": 10,
+    }
+
+    session = create_http_session("e2e_test", conf, hass, None)
+
+    try:
+        respx.get("https://site.com/data").mock(
+            return_value=respx.MockResponse(200, text=TARGET_PAGE_HTML)
+        )
+
+        request_manager = create_content_request_manager(
+            "e2e_test", conf, hass, session
+        )
+        content = await request_manager.get_content()
+
+        assert "21.5" in content
+    finally:
+        await session.async_close()
+
+
+@pytest.mark.integration
+@pytest.mark.async_test
+@pytest.mark.timeout(10)
+@respx.mock
+async def test_e2e_form_auth_error_falls_back_to_page_fetch(hass: HomeAssistant):
+    """End-to-end: when form auth fails, ContentRequestManager still tries to fetch the page."""
+    from custom_components.multiscrape.coordinator import \
+        create_content_request_manager
+
+    conf = {
+        "resource": "https://site.com/data",
+        "method": "get",
+        "verify_ssl": True,
+        "timeout": 10,
+        "parser": "html.parser",
+        "form_submit": {
+            "resource": "https://site.com/login",
+            "select": "#loginform",
+            "input": {"username": "admin", "password": "secret"},
+            "input_filter": [],
+            "submit_once": False,
+            "resubmit_on_error": True,
+            "variables": [],
+            "method": "get",
+            "verify_ssl": True,
+            "timeout": 10,
+        },
+    }
+
+    session = create_http_session("e2e_test", conf, hass, None)
+
+    try:
+        # Form page returns garbage (no form element) — will raise ValueError
+        respx.get("https://site.com/login").mock(
+            return_value=respx.MockResponse(200, text="<html><body>No form here</body></html>")
+        )
+        # But the target page is available
+        data_route = respx.get("https://site.com/data").mock(
+            return_value=respx.MockResponse(200, text=TARGET_PAGE_HTML)
+        )
+
+        request_manager = create_content_request_manager(
+            "e2e_test", conf, hass, session
+        )
+        content = await request_manager.get_content()
+
+        # Should fall back to fetching the target page directly
+        assert data_route.called
+        assert "21.5" in content
+    finally:
+        await session.async_close()
