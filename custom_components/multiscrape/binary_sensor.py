@@ -162,7 +162,7 @@ class MultiscrapeBinarySensor(MultiscrapeEntity, BinarySensorEntity):
                 )
 
             if self._sensor_selector.on_error.value == CONF_ON_ERROR_VALUE_NONE:
-                self._attr_available = False
+                self._scrape_error = True
                 _LOGGER.debug(
                     "%s # %s # On-error, set value to None",
                     self.scraper.name,
