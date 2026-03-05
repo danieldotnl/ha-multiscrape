@@ -465,7 +465,7 @@ async def test_sensor_with_attributes(hass: HomeAssistant, coordinator, scraper)
 @pytest.mark.async_test
 @pytest.mark.timeout(10)
 async def test_async_setup_platform_raises_platform_not_ready(
-    hass: HomeAssistant, coordinator, mock_http_wrapper
+    hass: HomeAssistant, coordinator, mock_http_session
 ):
     """Test async_setup_platform raises PlatformNotReady when coordinator fails."""
     # Arrange

@@ -498,7 +498,7 @@ async def test_handle_coordinator_update_always_writes_state(
 @pytest.mark.async_test
 @pytest.mark.timeout(10)
 async def test_handle_coordinator_update_updates_attributes_with_form_variables(
-    hass: HomeAssistant, coordinator, scraper, content_request_manager
+    hass: HomeAssistant, coordinator, scraper, mock_http_session
 ):
     """Test that form variables from the coordinator are passed to scraper during attribute update."""
     attr_config = {
@@ -510,8 +510,8 @@ async def test_handle_coordinator_update_updates_attributes_with_form_variables(
     sensor = _create_sensor(hass, coordinator, scraper, attribute_selectors=attribute_selectors)
     sensor.async_write_ha_state = MagicMock()
 
-    # Set form variables on the request manager
-    content_request_manager._form_variables = {"token": "abc123"}
+    # Set form variables on the session
+    mock_http_session.form_variables = {"token": "abc123"}
 
     await scraper.set_content(SAMPLE_HTML_FULL)
     coordinator._last_update_success = True

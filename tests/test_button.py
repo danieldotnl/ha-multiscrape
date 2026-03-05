@@ -121,7 +121,7 @@ async def test_button_press_triggers_coordinator_refresh(
 @pytest.mark.async_test
 @pytest.mark.timeout(10)
 async def test_async_setup_platform_creates_button(
-    hass: HomeAssistant, coordinator, mock_http_wrapper, button_config, discovery_info
+    hass: HomeAssistant, coordinator, mock_http_session, button_config, discovery_info
 ):
     """Test async_setup_platform creates button entity."""
     # Arrange

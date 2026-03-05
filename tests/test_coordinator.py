@@ -14,40 +14,40 @@ from custom_components.multiscrape.coordinator import (
 @pytest.mark.async_test
 @pytest.mark.timeout(5)
 async def test_content_request_manager_get_content_basic(
-    content_request_manager, mock_http_wrapper
+    content_request_manager, mock_http_session
 ):
     """Test basic content retrieval without form submission."""
     # Arrange
-    mock_http_wrapper.async_request.return_value.text = "<html>Test Content</html>"
+    mock_http_session.async_request.return_value.text = "<html>Test Content</html>"
 
     # Act
     result = await content_request_manager.get_content()
 
     # Assert
     assert result == "<html>Test Content</html>"
-    mock_http_wrapper.async_request.assert_called_once()
+    mock_http_session.async_request.assert_called_once()
 
 
 @pytest.mark.unit
 @pytest.mark.async_test
 @pytest.mark.timeout(5)
 async def test_content_request_manager_with_form_submission(
-    mock_http_wrapper, mock_resource_renderer, mock_http_response
+    mock_resource_renderer, mock_http_response
 ):
-    """Test content retrieval with form submission."""
+    """Test content retrieval when form submission returns content."""
     # Arrange
-    mock_form = AsyncMock()
-    mock_form.should_submit = True
-    mock_form.async_submit = AsyncMock(
-        return_value=("<html>Form Response</html>", {"cookie": "value"})
+    mock_session = AsyncMock()
+    mock_session.ensure_authenticated = AsyncMock(
+        return_value="<html>Form Response</html>"
     )
-    mock_form.scrape_variables = MagicMock(return_value={"var": "value"})
+    mock_session.form_variables = {"var": "value"}
+    mock_session.notify_scrape_exception = MagicMock()
+    mock_session.async_request = AsyncMock()
 
     manager = ContentRequestManager(
         config_name="test",
-        http=mock_http_wrapper,
+        session=mock_session,
         resource_renderer=mock_resource_renderer,
-        form=mock_form,
     )
 
     # Act
@@ -55,33 +55,31 @@ async def test_content_request_manager_with_form_submission(
 
     # Assert
     assert result == "<html>Form Response</html>"
-    mock_form.async_submit.assert_called_once()
+    mock_session.ensure_authenticated.assert_called_once()
     # HTTP request should NOT be called since form submission returned content
-    mock_http_wrapper.async_request.assert_not_called()
+    mock_session.async_request.assert_not_called()
 
 
 @pytest.mark.unit
 @pytest.mark.async_test
 @pytest.mark.timeout(5)
 async def test_content_request_manager_form_submission_no_result(
-    mock_http_wrapper, mock_resource_renderer, mock_http_response
+    mock_resource_renderer, mock_http_response
 ):
-    """Test content retrieval when form submission returns None."""
+    """Test content retrieval when form submission returns None (form has own resource)."""
     # Arrange
-    mock_form = AsyncMock()
-    mock_form.should_submit = True
-    mock_form.async_submit = AsyncMock(return_value=(None, {"cookie": "value"}))
-    mock_form.scrape_variables = MagicMock(return_value={"var": "value"})
+    mock_session = AsyncMock()
+    mock_session.ensure_authenticated = AsyncMock(return_value=None)
+    mock_session.form_variables = {"var": "value"}
+    mock_session.notify_scrape_exception = MagicMock()
+    mock_session.async_request = AsyncMock(
+        return_value=mock_http_response(text="<html>Page Content</html>")
+    )
 
     manager = ContentRequestManager(
         config_name="test",
-        http=mock_http_wrapper,
+        session=mock_session,
         resource_renderer=mock_resource_renderer,
-        form=mock_form,
-    )
-
-    mock_http_wrapper.async_request.return_value = mock_http_response(
-        text="<html>Page Content</html>"
     )
 
     # Act
@@ -89,16 +87,16 @@ async def test_content_request_manager_form_submission_no_result(
 
     # Assert
     assert result == "<html>Page Content</html>"
-    mock_http_wrapper.async_request.assert_called_once()
+    mock_session.async_request.assert_called_once()
 
 
 @pytest.mark.integration
 @pytest.mark.async_test
 @pytest.mark.timeout(10)
-async def test_coordinator_successful_update(coordinator, mock_http_wrapper, scraper):
+async def test_coordinator_successful_update(coordinator, mock_http_session, scraper):
     """Test successful data update through coordinator."""
     # Arrange
-    mock_http_wrapper.async_request.return_value.text = "<html>Updated Content</html>"
+    mock_http_session.async_request.return_value.text = "<html>Updated Content</html>"
 
     # Act
     await coordinator.async_refresh()
@@ -113,10 +111,10 @@ async def test_coordinator_successful_update(coordinator, mock_http_wrapper, scr
 @pytest.mark.integration
 @pytest.mark.async_test
 @pytest.mark.timeout(10)
-async def test_coordinator_update_failure(coordinator, mock_http_wrapper):
+async def test_coordinator_update_failure(coordinator, mock_http_session):
     """Test coordinator behavior on update failure."""
     # Arrange
-    mock_http_wrapper.async_request.side_effect = Exception("Network error")
+    mock_http_session.async_request.side_effect = Exception("Network error")
 
     # Act
     await coordinator.async_refresh()
@@ -130,14 +128,14 @@ async def test_coordinator_update_failure(coordinator, mock_http_wrapper):
 @pytest.mark.async_test
 @pytest.mark.timeout(5)
 async def test_coordinator_notify_scrape_exception(
-    coordinator, content_request_manager, mock_form_submitter
+    coordinator, mock_http_session
 ):
     """Test that scrape exceptions are properly notified."""
     # Act
     coordinator.notify_scrape_exception()
 
     # Assert
-    mock_form_submitter.notify_scrape_exception.assert_called_once()
+    mock_http_session.notify_scrape_exception.assert_called_once()
 
 
 @pytest.mark.integration
@@ -148,7 +146,7 @@ async def test_coordinator_with_zero_scan_interval(
     content_request_manager,
     mock_file_manager,
     scraper,
-    mock_http_wrapper,
+    mock_http_session,
 ):
     """Test coordinator with scan_interval set to zero (manual updates only).
 
@@ -170,7 +168,7 @@ async def test_coordinator_with_zero_scan_interval(
     assert coordinator._update_interval is None
 
     # Verify manual update still works
-    mock_http_wrapper.async_request.return_value.text = "<html>Manual Update</html>"
+    mock_http_session.async_request.return_value.text = "<html>Manual Update</html>"
     await coordinator.async_request_refresh()
     await hass.async_block_till_done()
 
@@ -191,7 +189,7 @@ async def test_coordinator_zero_interval_retries_on_failure(
     content_request_manager,
     mock_file_manager,
     scraper,
-    mock_http_wrapper,
+    mock_http_session,
 ):
     """Test that zero-interval coordinator schedules a retry on failure.
 
@@ -210,7 +208,7 @@ async def test_coordinator_zero_interval_retries_on_failure(
     assert coordinator._retry_count == 0
 
     # Simulate failed content retrieval
-    mock_http_wrapper.async_request.side_effect = Exception("Network error")
+    mock_http_session.async_request.side_effect = Exception("Network error")
 
     with patch(
         "custom_components.multiscrape.coordinator.event.async_track_point_in_utc_time"
@@ -235,7 +233,7 @@ async def test_coordinator_zero_interval_stops_after_max_retries(
     content_request_manager,
     mock_file_manager,
     scraper,
-    mock_http_wrapper,
+    mock_http_session,
     caplog,
 ):
     """Test that zero-interval coordinator stops retrying after MAX_RETRIES."""
@@ -249,7 +247,7 @@ async def test_coordinator_zero_interval_stops_after_max_retries(
     )
     coordinator._retry_count = MAX_RETRIES
 
-    mock_http_wrapper.async_request.side_effect = Exception("Network error")
+    mock_http_session.async_request.side_effect = Exception("Network error")
 
     with patch(
         "custom_components.multiscrape.coordinator.event.async_track_point_in_utc_time"
@@ -271,7 +269,7 @@ async def test_coordinator_zero_interval_resets_retry_on_success(
     content_request_manager,
     mock_file_manager,
     scraper,
-    mock_http_wrapper,
+    mock_http_session,
 ):
     """Test that a successful update resets the retry counter."""
     coordinator = MultiscrapeDataUpdateCoordinator(
@@ -284,7 +282,7 @@ async def test_coordinator_zero_interval_resets_retry_on_success(
     )
     coordinator._retry_count = 2
 
-    mock_http_wrapper.async_request.return_value.text = "<html>Success</html>"
+    mock_http_session.async_request.return_value.text = "<html>Success</html>"
 
     await coordinator._async_update_data()
 
@@ -297,7 +295,7 @@ async def test_coordinator_zero_interval_resets_retry_on_success(
 @pytest.mark.async_test
 @pytest.mark.timeout(10)
 async def test_coordinator_nonzero_interval_does_not_retry(
-    coordinator, mock_http_wrapper
+    coordinator, mock_http_session
 ):
     """Test that non-zero interval coordinator does not use retry mechanism.
 
@@ -306,7 +304,7 @@ async def test_coordinator_nonzero_interval_does_not_retry(
     """
     assert coordinator._retry_count == 0
 
-    mock_http_wrapper.async_request.side_effect = Exception("Network error")
+    mock_http_session.async_request.side_effect = Exception("Network error")
 
     await coordinator._async_update_data()
 
@@ -345,9 +343,9 @@ async def test_coordinator_prepare_new_run_clears_state(
 @pytest.mark.unit
 @pytest.mark.async_test
 @pytest.mark.timeout(5)
-async def test_coordinator_form_variables_delegates_to_request_manager(
-    coordinator, content_request_manager
+async def test_coordinator_form_variables_delegates_to_session(
+    coordinator, mock_http_session
 ):
-    """Test that coordinator.form_variables returns request_manager.form_variables."""
-    content_request_manager._form_variables = {"x-token": "abc123"}
+    """Test that coordinator.form_variables returns session.form_variables."""
+    mock_http_session.form_variables = {"x-token": "abc123"}
     assert coordinator.form_variables == {"x-token": "abc123"}

@@ -75,39 +75,6 @@ def mock_http_response():
 
 
 @pytest.fixture
-async def http_wrapper(hass):
-    """Create a real HttpWrapper instance for testing (requires respx mocking)."""
-    from homeassistant.helpers.httpx_client import get_async_client
-
-    from custom_components.multiscrape.http import HttpWrapper
-    from custom_components.multiscrape.util import (create_dict_renderer,
-                                                    create_renderer)
-
-    client = get_async_client(hass, verify_ssl=True)
-    wrapper = HttpWrapper(
-        config_name="test_wrapper",
-        hass=hass,
-        client=client,
-        file_manager=None,
-        timeout=10,
-        params_renderer=create_dict_renderer(hass, None),
-        headers_renderer=create_dict_renderer(hass, None),
-        data_renderer=create_renderer(hass, None),
-    )
-    return wrapper
-
-
-@pytest.fixture
-def mock_http_wrapper(mock_http_response):
-    """Create a mock HttpWrapper with proper async behavior."""
-    mock = AsyncMock()
-    mock.async_request = AsyncMock(return_value=mock_http_response(
-        text='<div class="test">Test Content</div>'
-    ))
-    return mock
-
-
-@pytest.fixture
 async def scraper(hass: HomeAssistant):
     """Create a Scraper instance for testing."""
     return Scraper(
@@ -129,13 +96,16 @@ def mock_file_manager():
 
 
 @pytest.fixture
-def mock_form_submitter():
-    """Create a mock form submitter."""
+def mock_http_session(mock_http_response):
+    """Create a mock HttpSession."""
     mock = AsyncMock()
-    mock.should_submit = False
-    mock.async_submit = AsyncMock(return_value=(None, None))
-    mock.scrape_variables = MagicMock(return_value={})
+    mock.async_request = AsyncMock(return_value=mock_http_response(
+        text='<div class="test">Test Content</div>'
+    ))
+    mock.ensure_authenticated = AsyncMock(return_value=None)
+    mock.form_variables = {}
     mock.notify_scrape_exception = MagicMock()
+    mock.async_close = AsyncMock()
     return mock
 
 
@@ -147,14 +117,13 @@ def mock_resource_renderer():
 
 @pytest.fixture
 def content_request_manager(
-    mock_http_wrapper, mock_resource_renderer, mock_form_submitter
+    mock_http_session, mock_resource_renderer
 ):
     """Create a ContentRequestManager for testing."""
     return ContentRequestManager(
         config_name="test_request_manager",
-        http=mock_http_wrapper,
+        session=mock_http_session,
         resource_renderer=mock_resource_renderer,
-        form=mock_form_submitter,
     )
 
 
