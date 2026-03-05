@@ -1,27 +1,31 @@
 """The base entity for the scraper component."""
+from __future__ import annotations
+
 import logging
 from abc import abstractmethod
-from typing import Any
 
-from homeassistant.core import callback
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import TemplateError
 from homeassistant.helpers.restore_state import RestoreEntity
-from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
+from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import (CONF_ON_ERROR_VALUE_DEFAULT, CONF_ON_ERROR_VALUE_LAST,
                     CONF_ON_ERROR_VALUE_NONE, LOG_LEVELS)
+from .coordinator import MultiscrapeDataUpdateCoordinator
 from .scraper import Scraper
 
 _LOGGER = logging.getLogger(__name__)
 
 
-class MultiscrapeEntity(RestoreEntity):
+class MultiscrapeEntity(CoordinatorEntity[MultiscrapeDataUpdateCoordinator], RestoreEntity):
     """A class for entities using DataUpdateCoordinator."""
+
+    _unrecorded_attributes = frozenset({"entity_picture"})
 
     def __init__(
         self,
-        hass,
-        coordinator: DataUpdateCoordinator[Any],
+        hass: HomeAssistant,
+        coordinator: MultiscrapeDataUpdateCoordinator,
         scraper: Scraper,
         name,
         device_class,
@@ -31,15 +35,15 @@ class MultiscrapeEntity(RestoreEntity):
         attribute_selectors,
     ) -> None:
         """Create the entity that may have a coordinator."""
+        super().__init__(coordinator)
 
-        self.coordinator = coordinator
         self.scraper = scraper
         self._name = name
+        self._scrape_error = False
 
         self._attr_name = name
         self._attr_device_class = device_class
         self._attr_force_update = force_update
-        self._attr_should_poll = False
         self._attr_extra_state_attributes = {}
         if picture:
             self._attr_entity_picture = picture
@@ -56,8 +60,6 @@ class MultiscrapeEntity(RestoreEntity):
         self._icon_template = icon_template
         if self._icon_template:
             self._icon_template.hass = hass
-
-        super().__init__()
 
     def _set_icon(self, value):
         try:
@@ -78,6 +80,11 @@ class MultiscrapeEntity(RestoreEntity):
                 exception,
             )
 
+    @property
+    def available(self) -> bool:
+        """Return True if entity is available."""
+        return super().available and not self._scrape_error
+
     async def async_added_to_hass(self) -> None:
         """When entity is added to hass."""
         await super().async_added_to_hass()
@@ -86,11 +93,6 @@ class MultiscrapeEntity(RestoreEntity):
             self.scraper.name,
             self._name,
         )
-        if self.coordinator:
-            self.async_on_remove(
-                self.coordinator.async_add_listener(
-                    self._handle_coordinator_update)
-            )
 
         if not (state := await self.async_get_last_state()):
             return
@@ -112,9 +114,8 @@ class MultiscrapeEntity(RestoreEntity):
                 self.scraper.name,
                 self._name,
             )
-            self._attr_available = False
         else:
-            self._attr_available = True
+            self._scrape_error = False
             self._update_sensor()
             self._update_attributes()
         self.async_write_ha_state()

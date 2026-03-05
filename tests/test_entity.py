@@ -441,7 +441,7 @@ async def test_handle_coordinator_update_success_sets_available_and_updates(
     sensor._handle_coordinator_update()
 
     # Assert
-    assert sensor._attr_available is True
+    assert sensor._scrape_error is False
     assert sensor._attr_native_value == "Current Version: 2024.8.3"
     sensor.async_write_ha_state.assert_called_once()
 
@@ -465,8 +465,8 @@ async def test_handle_coordinator_update_failure_sets_unavailable(
     # Act
     sensor._handle_coordinator_update()
 
-    # Assert - unavailable but value preserved
-    assert sensor._attr_available is False
+    # Assert - unavailable but value preserved (CoordinatorEntity.available returns False)
+    assert sensor.available is False
     assert sensor._attr_native_value == "previous_value"
     sensor.async_write_ha_state.assert_called_once()
 
@@ -585,4 +585,4 @@ async def test_async_added_to_hass_registers_coordinator_listener(
         await sensor.async_added_to_hass()
 
     # Assert - listener was registered with the callback
-    mock_listener.assert_called_once_with(sensor._handle_coordinator_update)
+    mock_listener.assert_called_once_with(sensor._handle_coordinator_update, None)

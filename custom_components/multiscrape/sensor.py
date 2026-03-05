@@ -19,7 +19,9 @@ from . import async_get_config_and_coordinator
 from .const import (CONF_ON_ERROR_VALUE_DEFAULT, CONF_ON_ERROR_VALUE_LAST,
                     CONF_ON_ERROR_VALUE_NONE, CONF_PICTURE, CONF_SENSOR_ATTRS,
                     CONF_STATE_CLASS, LOG_LEVELS)
+from .coordinator import MultiscrapeDataUpdateCoordinator
 from .entity import MultiscrapeEntity
+from .scraper import Scraper
 from .selector import Selector
 
 _LOGGER = logging.getLogger(__name__)
@@ -87,10 +89,10 @@ class MultiscrapeSensor(MultiscrapeEntity, SensorEntity):
 
     def __init__(
         self,
-        hass,
-        coordinator,
-        scraper,
-        unique_id,
+        hass: HomeAssistant,
+        coordinator: MultiscrapeDataUpdateCoordinator,
+        scraper: Scraper,
+        unique_id: str | None,
         name,
         unit_of_measurement,
         device_class,
@@ -128,7 +130,6 @@ class MultiscrapeSensor(MultiscrapeEntity, SensorEntity):
         _LOGGER.debug(
             "%s # %s # Start scraping to update sensor", self.scraper.name, self._name
         )
-        self._attr_available = True
 
         try:
             if self.coordinator.update_error is True:
@@ -165,7 +166,7 @@ class MultiscrapeSensor(MultiscrapeEntity, SensorEntity):
                 )
 
             if self._sensor_selector.on_error.value == CONF_ON_ERROR_VALUE_NONE:
-                self._attr_available = False
+                self._scrape_error = True
                 _LOGGER.debug(
                     "%s # %s # On-error, set value to None",
                     self.scraper.name,
@@ -179,7 +180,7 @@ class MultiscrapeSensor(MultiscrapeEntity, SensorEntity):
                     self._attr_native_value,
                 )
                 if self._attr_native_value is None:
-                    self._attr_available = False
+                    self._scrape_error = True
                 return
             elif self._sensor_selector.on_error.value == CONF_ON_ERROR_VALUE_DEFAULT:
                 self._attr_native_value = self._sensor_selector.on_error_default

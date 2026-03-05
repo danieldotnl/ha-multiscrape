@@ -18,7 +18,9 @@ from . import async_get_config_and_coordinator
 from .const import (CONF_ON_ERROR_VALUE_DEFAULT, CONF_ON_ERROR_VALUE_LAST,
                     CONF_ON_ERROR_VALUE_NONE, CONF_PICTURE, CONF_SENSOR_ATTRS,
                     LOG_LEVELS)
+from .coordinator import MultiscrapeDataUpdateCoordinator
 from .entity import MultiscrapeEntity
+from .scraper import Scraper
 from .selector import Selector
 
 ENTITY_ID_FORMAT = Platform.BINARY_SENSOR + ".{}"
@@ -83,10 +85,10 @@ class MultiscrapeBinarySensor(MultiscrapeEntity, BinarySensorEntity):
 
     def __init__(
         self,
-        hass,
-        coordinator,
-        scraper,
-        unique_id,
+        hass: HomeAssistant,
+        coordinator: MultiscrapeDataUpdateCoordinator,
+        scraper: Scraper,
+        unique_id: str | None,
         name,
         device_class,
         force_update,
@@ -162,7 +164,7 @@ class MultiscrapeBinarySensor(MultiscrapeEntity, BinarySensorEntity):
                 )
 
             if self._sensor_selector.on_error.value == CONF_ON_ERROR_VALUE_NONE:
-                self._attr_available = False
+                self._scrape_error = True
                 _LOGGER.debug(
                     "%s # %s # On-error, set value to None",
                     self.scraper.name,

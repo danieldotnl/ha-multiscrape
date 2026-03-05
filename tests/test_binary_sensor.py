@@ -75,7 +75,7 @@ async def test_binary_sensor_initialization(setup_binary_sensor):
     # Assert
     assert binary_sensor._name == "test_binary_sensor"
     assert binary_sensor._attr_unique_id == "test_binary_sensor_unique_id"
-    assert binary_sensor._attr_should_poll is False
+    assert binary_sensor.should_poll is False
     assert binary_sensor.entity_id == "binary_sensor.test_binary_sensor_unique_id"
 
 
@@ -117,7 +117,7 @@ async def test_binary_sensor_converts_integer_1_to_true(hass: HomeAssistant, coo
 
     # Assert
     assert binary_sensor._attr_is_on is True
-    assert binary_sensor._attr_available is True
+    assert binary_sensor._scrape_error is False
 
 
 @pytest.mark.integration
@@ -158,7 +158,7 @@ async def test_binary_sensor_converts_integer_0_to_false(hass: HomeAssistant, co
 
     # Assert
     assert binary_sensor._attr_is_on is False
-    assert binary_sensor._attr_available is True
+    assert binary_sensor._scrape_error is False
 
 
 @pytest.mark.integration
@@ -200,7 +200,7 @@ async def test_binary_sensor_converts_true_strings(hass: HomeAssistant, coordina
 
     # Assert
     assert binary_sensor._attr_is_on is True
-    assert binary_sensor._attr_available is True
+    assert binary_sensor._scrape_error is False
 
 
 @pytest.mark.integration
@@ -242,7 +242,7 @@ async def test_binary_sensor_converts_false_strings(hass: HomeAssistant, coordin
 
     # Assert
     assert binary_sensor._attr_is_on is False
-    assert binary_sensor._attr_available is True
+    assert binary_sensor._scrape_error is False
 
 
 @pytest.mark.integration
@@ -283,7 +283,7 @@ async def test_binary_sensor_converts_unrecognized_string_to_false(hass: HomeAss
 
     # Assert - unrecognized strings default to False via .get(value.lower(), False)
     assert binary_sensor._attr_is_on is False
-    assert binary_sensor._attr_available is True
+    assert binary_sensor._scrape_error is False
 
 
 @pytest.mark.integration
@@ -321,7 +321,7 @@ async def test_binary_sensor_on_error_value_none(hass: HomeAssistant, coordinato
     binary_sensor._update_sensor()
 
     # Assert
-    assert binary_sensor._attr_available is False
+    assert binary_sensor._scrape_error is True
 
 
 @pytest.mark.integration
@@ -362,7 +362,7 @@ async def test_binary_sensor_on_error_value_last(hass: HomeAssistant, coordinato
 
     # Assert - should keep the last value
     assert binary_sensor._attr_is_on is True
-    assert binary_sensor._attr_available is True
+    assert binary_sensor._scrape_error is False
 
 
 @pytest.mark.integration
@@ -402,7 +402,7 @@ async def test_binary_sensor_on_error_value_last_with_none_value(hass: HomeAssis
 
     # Assert - keeps last value (None) and remains available (returns early, no availability change)
     assert binary_sensor._attr_is_on is None
-    assert binary_sensor._attr_available is True
+    assert binary_sensor._scrape_error is False
 
 
 @pytest.mark.integration
@@ -445,7 +445,7 @@ async def test_binary_sensor_on_error_value_default(hass: HomeAssistant, coordin
 
     # Assert - default value "true" should be converted to boolean True
     assert binary_sensor._attr_is_on is True
-    assert binary_sensor._attr_available is True
+    assert binary_sensor._scrape_error is False
 
 
 @pytest.mark.integration
@@ -462,7 +462,7 @@ async def test_binary_sensor_update_with_coordinator_error(hass: HomeAssistant, 
     binary_sensor._update_sensor()
 
     # Assert - should handle error gracefully
-    assert binary_sensor._attr_available is False
+    assert binary_sensor._scrape_error is True
 
 
 @pytest.mark.integration

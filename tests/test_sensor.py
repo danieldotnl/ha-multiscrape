@@ -81,7 +81,7 @@ async def test_sensor_initialization(setup_sensor):
     assert sensor._name == "test_sensor"
     assert sensor._attr_unique_id == "test_sensor_unique_id"
     assert sensor._attr_native_unit_of_measurement == "version"
-    assert sensor._attr_should_poll is False
+    assert sensor.should_poll is False
     assert sensor.entity_id == "sensor.test_sensor_unique_id"
 
 
@@ -99,7 +99,7 @@ async def test_sensor_update_successful(hass: HomeAssistant, setup_sensor, scrap
 
     # Assert
     assert sensor._attr_native_value == "Current Version: 2024.8.3"
-    assert sensor._attr_available is True
+    assert sensor._scrape_error is False
 
 
 @pytest.mark.integration
@@ -185,7 +185,7 @@ async def test_sensor_on_error_value_none(hass: HomeAssistant, coordinator, scra
     sensor._update_sensor()
 
     # Assert
-    assert sensor._attr_available is False
+    assert sensor._scrape_error is True
 
 
 @pytest.mark.integration
@@ -228,7 +228,7 @@ async def test_sensor_on_error_value_last(hass: HomeAssistant, coordinator, scra
 
     # Assert - should keep the last value
     assert sensor._attr_native_value == "previous_value"
-    assert sensor._attr_available is True
+    assert sensor._scrape_error is False
 
 
 @pytest.mark.integration
@@ -270,7 +270,7 @@ async def test_sensor_on_error_value_last_with_none_value(hass: HomeAssistant, c
 
     # Assert - should be unavailable when trying to keep last value but it's None
     assert sensor._attr_native_value is None
-    assert sensor._attr_available is False
+    assert sensor._scrape_error is True
 
 
 @pytest.mark.integration
@@ -315,7 +315,7 @@ async def test_sensor_on_error_value_default(hass: HomeAssistant, coordinator, s
 
     # Assert
     assert sensor._attr_native_value == "fallback_value"
-    assert sensor._attr_available is True
+    assert sensor._scrape_error is False
 
 
 @pytest.mark.integration
@@ -332,7 +332,7 @@ async def test_sensor_update_with_coordinator_error(hass: HomeAssistant, coordin
     sensor._update_sensor()
 
     # Assert - should handle error gracefully
-    assert sensor._attr_available is False
+    assert sensor._scrape_error is True
 
 
 @pytest.mark.integration
