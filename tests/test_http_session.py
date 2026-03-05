@@ -1372,3 +1372,540 @@ async def test_e2e_form_auth_error_falls_back_to_page_fetch(hass: HomeAssistant)
         assert "21.5" in content
     finally:
         await session.async_close()
+
+
+# ============================================================================
+# End-to-End Cookie Persistence Tests
+# ============================================================================
+
+LOGIN_PAGE_WITH_TOKEN_HTML = """
+<html>
+<body>
+<form id="loginform" action="/auth/submit" method="post">
+    <input name="username" value="" />
+    <input name="password" value="" />
+    <input name="csrf" value="tok_abc" />
+    <button type="submit">Login</button>
+</form>
+<div class="api-token">scraped_token_123</div>
+<div class="session-key">session_key_abc</div>
+</body>
+</html>
+"""
+
+
+@pytest.mark.integration
+@pytest.mark.async_test
+@pytest.mark.timeout(10)
+@respx.mock
+async def test_e2e_cookies_from_form_page_get_persist_to_submit(hass: HomeAssistant):
+    """End-to-end: cookies set during form page GET persist to form POST.
+
+    When fetching the login page, the server sets a cookie. That cookie
+    must be included in the subsequent form POST request.
+    """
+    conf = {
+        "resource": "https://site.com/data",
+        "method": "get",
+        "verify_ssl": True,
+        "timeout": 10,
+        "parser": "html.parser",
+        "form_submit": {
+            "resource": "https://site.com/login",
+            "select": "#loginform",
+            "input": {"username": "admin", "password": "secret"},
+            "input_filter": [],
+            "submit_once": False,
+            "resubmit_on_error": False,
+            "variables": [],
+            "method": "get",
+            "verify_ssl": True,
+            "timeout": 10,
+        },
+    }
+
+    session = create_http_session("cookie_test", conf, hass, None)
+
+    try:
+        # Form page sets a tracking cookie
+        respx.get("https://site.com/login").mock(
+            return_value=respx.MockResponse(
+                200,
+                text=LOGIN_PAGE_HTML,
+                headers={"Set-Cookie": "tracking_id=track_001; Path=/"},
+            )
+        )
+        # Form submission — verify the tracking cookie arrived
+        submit_route = respx.post("https://site.com/auth/submit").mock(
+            return_value=respx.MockResponse(200, text="OK")
+        )
+        respx.get("https://site.com/data").mock(
+            return_value=respx.MockResponse(200, text=TARGET_PAGE_HTML)
+        )
+
+        from custom_components.multiscrape.coordinator import \
+            create_content_request_manager
+
+        request_manager = create_content_request_manager(
+            "cookie_test", conf, hass, session
+        )
+        await request_manager.get_content()
+
+        # The form submit POST should carry the cookie from the GET
+        submit_request = submit_route.calls.last.request
+        cookie_header = submit_request.headers.get("cookie", "")
+        assert "tracking_id=track_001" in cookie_header
+    finally:
+        await session.async_close()
+
+
+@pytest.mark.integration
+@pytest.mark.async_test
+@pytest.mark.timeout(10)
+@respx.mock
+async def test_e2e_cookies_accumulate_across_all_steps(hass: HomeAssistant):
+    """End-to-end: cookies accumulate from GET → POST → data page.
+
+    Three cookies set at different stages must all arrive at the final data page request.
+    """
+    conf = {
+        "resource": "https://site.com/data",
+        "method": "get",
+        "verify_ssl": True,
+        "timeout": 10,
+        "parser": "html.parser",
+        "form_submit": {
+            "resource": "https://site.com/login",
+            "select": "#loginform",
+            "input": {"username": "admin", "password": "secret"},
+            "input_filter": [],
+            "submit_once": False,
+            "resubmit_on_error": False,
+            "variables": [],
+            "method": "get",
+            "verify_ssl": True,
+            "timeout": 10,
+        },
+    }
+
+    session = create_http_session("cookie_accum_test", conf, hass, None)
+
+    try:
+        # Step 1: GET login page sets cookie_a
+        respx.get("https://site.com/login").mock(
+            return_value=respx.MockResponse(
+                200,
+                text=LOGIN_PAGE_HTML,
+                headers={"Set-Cookie": "cookie_a=aaa; Path=/"},
+            )
+        )
+        # Step 2: POST form submission sets cookie_b
+        respx.post("https://site.com/auth/submit").mock(
+            return_value=respx.MockResponse(
+                200,
+                text="OK",
+                headers={"Set-Cookie": "cookie_b=bbb; Path=/"},
+            )
+        )
+        # Step 3: GET data page — should carry both cookie_a and cookie_b
+        data_route = respx.get("https://site.com/data").mock(
+            return_value=respx.MockResponse(200, text=TARGET_PAGE_HTML)
+        )
+
+        from custom_components.multiscrape.coordinator import \
+            create_content_request_manager
+
+        request_manager = create_content_request_manager(
+            "cookie_accum_test", conf, hass, session
+        )
+        await request_manager.get_content()
+
+        data_request = data_route.calls.last.request
+        cookie_header = data_request.headers.get("cookie", "")
+        assert "cookie_a=aaa" in cookie_header
+        assert "cookie_b=bbb" in cookie_header
+    finally:
+        await session.async_close()
+
+
+@pytest.mark.integration
+@pytest.mark.async_test
+@pytest.mark.timeout(10)
+@respx.mock
+async def test_e2e_cookies_persist_across_multiple_scrape_cycles(hass: HomeAssistant):
+    """End-to-end: cookies from auth persist across multiple get_content calls.
+
+    With submit_once=True, cookies established during the first auth
+    must still be present on subsequent data page requests.
+    """
+    conf = {
+        "resource": "https://site.com/data",
+        "method": "get",
+        "verify_ssl": True,
+        "timeout": 10,
+        "parser": "html.parser",
+        "form_submit": {
+            "resource": "https://site.com/login",
+            "select": "#loginform",
+            "input": {"username": "admin", "password": "secret"},
+            "input_filter": [],
+            "submit_once": True,
+            "resubmit_on_error": False,
+            "variables": [],
+            "method": "get",
+            "verify_ssl": True,
+            "timeout": 10,
+        },
+    }
+
+    session = create_http_session("cookie_persist_test", conf, hass, None)
+
+    try:
+        respx.get("https://site.com/login").mock(
+            return_value=respx.MockResponse(
+                200,
+                text=LOGIN_PAGE_HTML,
+                headers={"Set-Cookie": "session_id=sess999; Path=/"},
+            )
+        )
+        respx.post("https://site.com/auth/submit").mock(
+            return_value=respx.MockResponse(
+                200,
+                text="OK",
+                headers={"Set-Cookie": "auth=tok999; Path=/"},
+            )
+        )
+        data_route = respx.get("https://site.com/data").mock(
+            return_value=respx.MockResponse(200, text=TARGET_PAGE_HTML)
+        )
+
+        from custom_components.multiscrape.coordinator import \
+            create_content_request_manager
+
+        request_manager = create_content_request_manager(
+            "cookie_persist_test", conf, hass, session
+        )
+
+        # First cycle — auth + data
+        await request_manager.get_content()
+        first_cookie = data_route.calls.last.request.headers.get("cookie", "")
+        assert "session_id=sess999" in first_cookie
+        assert "auth=tok999" in first_cookie
+
+        # Second cycle — submit_once means no re-auth, but cookies persist
+        await request_manager.get_content()
+        second_cookie = data_route.calls.last.request.headers.get("cookie", "")
+        assert "session_id=sess999" in second_cookie
+        assert "auth=tok999" in second_cookie
+    finally:
+        await session.async_close()
+
+
+# ============================================================================
+# End-to-End Form Variables Tests
+# ============================================================================
+
+
+@pytest.mark.integration
+@pytest.mark.async_test
+@pytest.mark.timeout(10)
+@respx.mock
+async def test_e2e_form_variables_scraped_from_response(hass: HomeAssistant):
+    """End-to-end: form variables are scraped from the form response.
+
+    Configures variables with CSS selectors that extract values from the
+    form submission response. Verifies session.form_variables contains
+    the scraped data.
+    """
+    from homeassistant.helpers.template import Template
+
+    conf = {
+        "resource": "https://site.com/data",
+        "method": "get",
+        "verify_ssl": True,
+        "timeout": 10,
+        "parser": "html.parser",
+        "form_submit": {
+            "resource": "https://site.com/login",
+            "select": "#loginform",
+            "input": {"username": "admin", "password": "secret"},
+            "input_filter": [],
+            "submit_once": False,
+            "resubmit_on_error": False,
+            "variables": [
+                {
+                    "name": "api_token",
+                    "select": Template(".api-token", hass),
+                    "extract": "text",
+                },
+                {
+                    "name": "session_key",
+                    "select": Template(".session-key", hass),
+                    "extract": "text",
+                },
+            ],
+            "method": "get",
+            "verify_ssl": True,
+            "timeout": 10,
+            "parser": "html.parser",
+            "separator": ",",
+        },
+    }
+
+    session = create_http_session("var_test", conf, hass, None)
+
+    try:
+        respx.get("https://site.com/login").mock(
+            return_value=respx.MockResponse(200, text=LOGIN_PAGE_WITH_TOKEN_HTML)
+        )
+        # Form submission response contains the values to scrape
+        respx.post("https://site.com/auth/submit").mock(
+            return_value=respx.MockResponse(
+                200,
+                text=LOGIN_PAGE_WITH_TOKEN_HTML,
+            )
+        )
+        respx.get("https://site.com/data").mock(
+            return_value=respx.MockResponse(200, text=TARGET_PAGE_HTML)
+        )
+
+        from custom_components.multiscrape.coordinator import \
+            create_content_request_manager
+
+        request_manager = create_content_request_manager(
+            "var_test", conf, hass, session
+        )
+        await request_manager.get_content()
+
+        # Verify variables were scraped from form response
+        assert session.form_variables.get("api_token") == "scraped_token_123"
+        assert session.form_variables.get("session_key") == "session_key_abc"
+
+        # Verify form_variables is also accessible via request_manager
+        assert request_manager.form_variables.get("api_token") == "scraped_token_123"
+    finally:
+        await session.async_close()
+
+
+@pytest.mark.integration
+@pytest.mark.async_test
+@pytest.mark.timeout(10)
+@respx.mock
+async def test_e2e_form_variables_passed_to_page_request_headers(hass: HomeAssistant):
+    """End-to-end: scraped form variables are used in subsequent request headers.
+
+    Configures headers with a template that references form variables.
+    Verifies the data page request includes the rendered header value.
+    """
+    from homeassistant.helpers.template import Template
+
+    # We need a headers renderer that uses the variables
+    def headers_renderer(variables={}, parse_result=None):
+        token = variables.get("api_token", "")
+        return {"Authorization": f"Bearer {token}"}
+
+    conf = {
+        "resource": "https://site.com/data",
+        "method": "get",
+        "verify_ssl": True,
+        "timeout": 10,
+        "parser": "html.parser",
+        "form_submit": {
+            "resource": "https://site.com/login",
+            "select": "#loginform",
+            "input": {"username": "admin", "password": "secret"},
+            "input_filter": [],
+            "submit_once": False,
+            "resubmit_on_error": False,
+            "variables": [
+                {
+                    "name": "api_token",
+                    "select": Template(".api-token", hass),
+                    "extract": "text",
+                },
+            ],
+            "method": "get",
+            "verify_ssl": True,
+            "timeout": 10,
+            "parser": "html.parser",
+            "separator": ",",
+        },
+    }
+
+    session = create_http_session("var_header_test", conf, hass, None)
+    # Override the headers renderer to use variables
+    session._http_config.headers_renderer = headers_renderer
+
+    try:
+        respx.get("https://site.com/login").mock(
+            return_value=respx.MockResponse(200, text=LOGIN_PAGE_WITH_TOKEN_HTML)
+        )
+        respx.post("https://site.com/auth/submit").mock(
+            return_value=respx.MockResponse(200, text=LOGIN_PAGE_WITH_TOKEN_HTML)
+        )
+        data_route = respx.get("https://site.com/data").mock(
+            return_value=respx.MockResponse(200, text=TARGET_PAGE_HTML)
+        )
+
+        from custom_components.multiscrape.coordinator import \
+            create_content_request_manager
+
+        request_manager = create_content_request_manager(
+            "var_header_test", conf, hass, session
+        )
+        content = await request_manager.get_content()
+
+        # Verify the data page request included the rendered Authorization header
+        data_request = data_route.calls.last.request
+        assert data_request.headers.get("authorization") == "Bearer scraped_token_123"
+
+        # Also verify the content was returned correctly
+        assert "21.5" in content
+    finally:
+        await session.async_close()
+
+
+@pytest.mark.integration
+@pytest.mark.async_test
+@pytest.mark.timeout(10)
+@respx.mock
+async def test_e2e_form_variables_updated_on_resubmit(hass: HomeAssistant):
+    """End-to-end: form variables are refreshed when form is resubmitted.
+
+    After a scrape exception triggers resubmit, the form response may
+    contain new variable values (e.g., rotated token). Verify the new
+    values replace the old ones.
+    """
+    from homeassistant.helpers.template import Template
+
+    FORM_RESPONSE_V1 = """
+    <html><body>
+    <div class="api-token">token_v1</div>
+    </body></html>
+    """
+    FORM_RESPONSE_V2 = """
+    <html><body>
+    <div class="api-token">token_v2</div>
+    </body></html>
+    """
+
+    conf = {
+        "resource": "https://site.com/data",
+        "method": "get",
+        "verify_ssl": True,
+        "timeout": 10,
+        "parser": "html.parser",
+        "form_submit": {
+            "resource": "https://site.com/login",
+            "select": "#loginform",
+            "input": {"username": "admin", "password": "secret"},
+            "input_filter": [],
+            "submit_once": True,
+            "resubmit_on_error": True,
+            "variables": [
+                {
+                    "name": "api_token",
+                    "select": Template(".api-token", hass),
+                    "extract": "text",
+                },
+            ],
+            "method": "get",
+            "verify_ssl": True,
+            "timeout": 10,
+            "parser": "html.parser",
+            "separator": ",",
+        },
+    }
+
+    session = create_http_session("var_refresh_test", conf, hass, None)
+
+    try:
+        # First auth cycle returns token_v1
+        respx.get("https://site.com/login").mock(
+            return_value=respx.MockResponse(200, text=LOGIN_PAGE_HTML)
+        )
+        submit_route = respx.post("https://site.com/auth/submit").mock(
+            return_value=respx.MockResponse(200, text=FORM_RESPONSE_V1)
+        )
+        respx.get("https://site.com/data").mock(
+            return_value=respx.MockResponse(200, text=TARGET_PAGE_HTML)
+        )
+
+        from custom_components.multiscrape.coordinator import \
+            create_content_request_manager
+
+        request_manager = create_content_request_manager(
+            "var_refresh_test", conf, hass, session
+        )
+
+        # First cycle
+        await request_manager.get_content()
+        assert session.form_variables["api_token"] == "token_v1"
+
+        # Trigger resubmit
+        request_manager.notify_scrape_exception()
+
+        # Second auth returns token_v2
+        submit_route.mock(
+            return_value=respx.MockResponse(200, text=FORM_RESPONSE_V2)
+        )
+
+        await request_manager.get_content()
+        assert session.form_variables["api_token"] == "token_v2"
+    finally:
+        await session.async_close()
+
+
+@pytest.mark.integration
+@pytest.mark.async_test
+@pytest.mark.timeout(10)
+@respx.mock
+async def test_e2e_form_variables_empty_when_no_variables_configured(
+    hass: HomeAssistant,
+):
+    """End-to-end: form_variables remains empty when no variables configured."""
+    conf = {
+        "resource": "https://site.com/data",
+        "method": "get",
+        "verify_ssl": True,
+        "timeout": 10,
+        "parser": "html.parser",
+        "form_submit": {
+            "resource": "https://site.com/login",
+            "select": "#loginform",
+            "input": {"username": "admin", "password": "secret"},
+            "input_filter": [],
+            "submit_once": False,
+            "resubmit_on_error": False,
+            "variables": [],
+            "method": "get",
+            "verify_ssl": True,
+            "timeout": 10,
+        },
+    }
+
+    session = create_http_session("no_var_test", conf, hass, None)
+
+    try:
+        respx.get("https://site.com/login").mock(
+            return_value=respx.MockResponse(200, text=LOGIN_PAGE_HTML)
+        )
+        respx.post("https://site.com/auth/submit").mock(
+            return_value=respx.MockResponse(200, text="OK")
+        )
+        respx.get("https://site.com/data").mock(
+            return_value=respx.MockResponse(200, text=TARGET_PAGE_HTML)
+        )
+
+        from custom_components.multiscrape.coordinator import \
+            create_content_request_manager
+
+        request_manager = create_content_request_manager(
+            "no_var_test", conf, hass, session
+        )
+        await request_manager.get_content()
+
+        assert session.form_variables == {}
+        assert request_manager.form_variables == {}
+    finally:
+        await session.async_close()
