@@ -21,6 +21,7 @@ from .const import (CONF_FORM_INPUT, CONF_FORM_INPUT_FILTER,
                     CONF_FORM_VARIABLES, CONF_PARSER)
 from .file import LoggingFileManager
 from .http import merge_url_with_params
+from .scrape_context import ScrapeContext
 from .scraper import create_scraper
 from .selector import Selector
 from .util import create_dict_renderer, create_renderer
@@ -114,12 +115,13 @@ class HttpSession:
         resource: str,
         method: str | None = None,
         request_data: Any = None,
-        variables: dict = {},
+        scrape_context: ScrapeContext | None = None,
     ) -> httpx.Response:
         """Execute an HTTP request.
 
         Cookies are managed automatically by the dedicated httpx client.
         """
+        variables = scrape_context.to_template_variables() if scrape_context else {}
         data = request_data or self._http_config.data_renderer(variables)
         method = method or self._http_config.method or "GET"
         headers = self._http_config.headers_renderer(variables)

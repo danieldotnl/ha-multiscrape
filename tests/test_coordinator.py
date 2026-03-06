@@ -8,6 +8,7 @@ from homeassistant.core import HomeAssistant
 from custom_components.multiscrape.const import MAX_RETRIES
 from custom_components.multiscrape.coordinator import (
     ContentRequestManager, MultiscrapeDataUpdateCoordinator)
+from custom_components.multiscrape.scrape_context import ScrapeContext
 
 
 @pytest.mark.unit
@@ -343,9 +344,12 @@ async def test_coordinator_prepare_new_run_clears_state(
 @pytest.mark.unit
 @pytest.mark.async_test
 @pytest.mark.timeout(5)
-async def test_coordinator_form_variables_delegates_to_session(
+async def test_coordinator_scrape_context_wraps_form_variables(
     coordinator, mock_http_session
 ):
-    """Test that coordinator.form_variables returns session.form_variables."""
+    """Test that coordinator.scrape_context wraps session.form_variables in a ScrapeContext."""
     mock_http_session.form_variables = {"x-token": "abc123"}
-    assert coordinator.form_variables == {"x-token": "abc123"}
+    ctx = coordinator.scrape_context
+    assert isinstance(ctx, ScrapeContext)
+    assert ctx.form_variables == {"x-token": "abc123"}
+    assert ctx.current_value is None

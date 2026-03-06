@@ -4,6 +4,7 @@ import logging
 from bs4 import BeautifulSoup
 
 from .const import CONF_PARSER, CONF_SEPARATOR
+from .scrape_context import ScrapeContext
 
 DEFAULT_TIMEOUT = 10
 _LOGGER = logging.getLogger(__name__)
@@ -97,8 +98,11 @@ class Scraper:
                 )
                 raise
 
-    def scrape(self, selector, sensor, attribute=None, variables: dict = {}):
+    def scrape(self, selector, sensor, attribute=None, context: ScrapeContext | None = None):
         """Scrape based on given selector the data."""
+        if context is None:
+            context = ScrapeContext.empty()
+
         # This is required as this function is called separately for sensors and attributes
         log_prefix = f"{self._config_name} # {sensor}"
         if attribute:
@@ -107,7 +111,7 @@ class Scraper:
         if selector.just_value:
             _LOGGER.debug("%s # Applying value_template only.", log_prefix)
             result = selector.value_template.async_render_with_possible_json_value(
-                self._data, None, variables=variables
+                self._data, None, variables=context.to_template_variables()
             )
             return selector.value_template._parse_result(result)
 
@@ -152,8 +156,9 @@ class Scraper:
         if value is not None and selector.value_template is not None:
             _LOGGER.debug(
                 "%s # Applying value_template on selector result", log_prefix)
-            variables["value"] = value
-            value = selector.value_template.async_render(variables=variables, parse_result=True
+            render_ctx = context.with_current_value(value)
+            value = selector.value_template.async_render(
+                variables=render_ctx.to_template_variables(), parse_result=True
             )
 
         _LOGGER.debug(
