@@ -15,20 +15,43 @@ from custom_components.multiscrape.http_session import (FormAuthConfig,
 from custom_components.multiscrape.scrape_context import ScrapeContext
 
 # ============================================================================
+# Test helpers
+# ============================================================================
+
+_NOOP_HEADERS = lambda variables={}, parse_result=None: {}
+_NOOP_PARAMS = lambda variables={}, parse_result=None: {}
+_NOOP_DATA = lambda variables={}, parse_result=None: None
+
+
+def make_http_config(**overrides):
+    """Create an HttpConfig with sensible defaults for testing."""
+    defaults = {
+        "headers_renderer": _NOOP_HEADERS,
+        "params_renderer": _NOOP_PARAMS,
+        "data_renderer": _NOOP_DATA,
+    }
+    return HttpConfig(**{**defaults, **overrides})
+
+
+def make_form_config(**overrides):
+    """Create a FormAuthConfig with sensible defaults for testing."""
+    defaults = {
+        "parser": "html.parser",
+        "headers_renderer": _NOOP_HEADERS,
+        "params_renderer": _NOOP_PARAMS,
+        "data_renderer": _NOOP_DATA,
+    }
+    return FormAuthConfig(**{**defaults, **overrides})
+
+
+# ============================================================================
 # Fixtures
 # ============================================================================
 
 @pytest.fixture
 def http_config():
     """Create a basic HttpConfig."""
-    return HttpConfig(
-        verify_ssl=True,
-        timeout=10,
-        method="GET",
-        headers_renderer=lambda variables={}, parse_result=None: {},
-        params_renderer=lambda variables={}, parse_result=None: {},
-        data_renderer=lambda variables={}, parse_result=None: None,
-    )
+    return make_http_config(verify_ssl=True, timeout=10, method="GET")
 
 
 @pytest.fixture
@@ -164,12 +187,7 @@ async def test_method_override(session):
 @respx.mock
 async def test_default_method_from_config(hass: HomeAssistant):
     """Test that default method comes from config."""
-    config = HttpConfig(
-        method="POST",
-        headers_renderer=lambda variables={}, parse_result=None: {},
-        params_renderer=lambda variables={}, parse_result=None: {},
-        data_renderer=lambda variables={}, parse_result=None: None,
-    )
+    config = make_http_config(method="POST")
     sess = HttpSession(config_name="test", hass=hass, http_config=config)
 
     url = "https://example.com/api"
@@ -226,13 +244,7 @@ async def test_cookies_persist_across_requests(session):
 @respx.mock
 async def test_basic_auth(hass: HomeAssistant):
     """Test basic HTTP authentication."""
-    config = HttpConfig(
-        username="user",
-        password="pass",
-        headers_renderer=lambda variables={}, parse_result=None: {},
-        params_renderer=lambda variables={}, parse_result=None: {},
-        data_renderer=lambda variables={}, parse_result=None: None,
-    )
+    config = make_http_config(username="user", password="pass")
     sess = HttpSession(config_name="test", hass=hass, http_config=config)
 
     url = "https://example.com/protected"
@@ -252,13 +264,10 @@ async def test_digest_auth_setup(hass: HomeAssistant):
     """Test digest auth is configured correctly."""
     from homeassistant.const import HTTP_DIGEST_AUTHENTICATION
 
-    config = HttpConfig(
+    config = make_http_config(
         username="user",
         password="pass",
         auth_type=HTTP_DIGEST_AUTHENTICATION,
-        headers_renderer=lambda variables={}, parse_result=None: {},
-        params_renderer=lambda variables={}, parse_result=None: {},
-        data_renderer=lambda variables={}, parse_result=None: None,
     )
     sess = HttpSession(config_name="test", hass=hass, http_config=config)
 
@@ -277,13 +286,11 @@ async def test_digest_auth_setup(hass: HomeAssistant):
 @respx.mock
 async def test_headers_from_renderer(hass: HomeAssistant):
     """Test that headers are rendered from the config renderer."""
-    config = HttpConfig(
+    config = make_http_config(
         headers_renderer=lambda variables={}, parse_result=None: {
             "X-Custom": "test-value",
             "Authorization": "Bearer token123",
         },
-        params_renderer=lambda variables={}, parse_result=None: {},
-        data_renderer=lambda variables={}, parse_result=None: None,
     )
     sess = HttpSession(config_name="test", hass=hass, http_config=config)
 
@@ -304,10 +311,8 @@ async def test_headers_from_renderer(hass: HomeAssistant):
 @respx.mock
 async def test_params_merged_into_url(hass: HomeAssistant):
     """Test that params from renderer are merged into the URL."""
-    config = HttpConfig(
-        headers_renderer=lambda variables={}, parse_result=None: {},
+    config = make_http_config(
         params_renderer=lambda variables={}, parse_result=None: {"key": "value"},
-        data_renderer=lambda variables={}, parse_result=None: None,
     )
     sess = HttpSession(config_name="test", hass=hass, http_config=config)
 
@@ -333,11 +338,7 @@ async def test_variables_passed_to_renderers(hass: HomeAssistant):
         received_vars.update(variables)
         return {}
 
-    config = HttpConfig(
-        headers_renderer=capture_headers,
-        params_renderer=lambda variables={}, parse_result=None: {},
-        data_renderer=lambda variables={}, parse_result=None: None,
-    )
+    config = make_http_config(headers_renderer=capture_headers)
     sess = HttpSession(config_name="test", hass=hass, http_config=config)
 
     url = "https://example.com/api"
@@ -360,20 +361,12 @@ async def test_variables_passed_to_renderers(hass: HomeAssistant):
 @respx.mock
 async def test_form_auth_with_selector(hass: HomeAssistant):
     """Test form authentication with CSS selector."""
-    form_config = FormAuthConfig(
+    form_config = make_form_config(
         resource="https://example.com/login",
         select="#login",
         input_values={"username": "admin", "password": "secret"},
-        parser="html.parser",
-        headers_renderer=lambda variables={}, parse_result=None: {},
-        params_renderer=lambda variables={}, parse_result=None: {},
-        data_renderer=lambda variables={}, parse_result=None: None,
     )
-    config = HttpConfig(
-        headers_renderer=lambda variables={}, parse_result=None: {},
-        params_renderer=lambda variables={}, parse_result=None: {},
-        data_renderer=lambda variables={}, parse_result=None: None,
-    )
+    config = make_http_config()
     sess = HttpSession(
         config_name="test",
         hass=hass,
@@ -410,18 +403,10 @@ async def test_form_auth_with_selector(hass: HomeAssistant):
 @respx.mock
 async def test_form_auth_without_selector(hass: HomeAssistant):
     """Test form auth without selector (all input from config)."""
-    form_config = FormAuthConfig(
+    form_config = make_form_config(
         input_values={"user": "admin", "pass": "secret"},
-        parser="html.parser",
-        headers_renderer=lambda variables={}, parse_result=None: {},
-        params_renderer=lambda variables={}, parse_result=None: {},
-        data_renderer=lambda variables={}, parse_result=None: None,
     )
-    config = HttpConfig(
-        headers_renderer=lambda variables={}, parse_result=None: {},
-        params_renderer=lambda variables={}, parse_result=None: {},
-        data_renderer=lambda variables={}, parse_result=None: None,
-    )
+    config = make_http_config()
     sess = HttpSession(
         config_name="test",
         hass=hass,
@@ -448,20 +433,12 @@ async def test_form_auth_without_selector(hass: HomeAssistant):
 @respx.mock
 async def test_form_auth_uses_main_resource_returns_text(hass: HomeAssistant):
     """Test that when form has no own resource, response text is returned."""
-    form_config = FormAuthConfig(
+    form_config = make_form_config(
         resource=None,
         select="#login",
         input_values={"username": "admin"},
-        parser="html.parser",
-        headers_renderer=lambda variables={}, parse_result=None: {},
-        params_renderer=lambda variables={}, parse_result=None: {},
-        data_renderer=lambda variables={}, parse_result=None: None,
     )
-    config = HttpConfig(
-        headers_renderer=lambda variables={}, parse_result=None: {},
-        params_renderer=lambda variables={}, parse_result=None: {},
-        data_renderer=lambda variables={}, parse_result=None: None,
-    )
+    config = make_http_config()
     sess = HttpSession(
         config_name="test",
         hass=hass,
@@ -490,19 +467,11 @@ async def test_form_auth_uses_main_resource_returns_text(hass: HomeAssistant):
 @respx.mock
 async def test_form_auth_submit_once(hass: HomeAssistant):
     """Test submit_once prevents subsequent submissions."""
-    form_config = FormAuthConfig(
+    form_config = make_form_config(
         input_values={"user": "admin"},
         submit_once=True,
-        parser="html.parser",
-        headers_renderer=lambda variables={}, parse_result=None: {},
-        params_renderer=lambda variables={}, parse_result=None: {},
-        data_renderer=lambda variables={}, parse_result=None: None,
     )
-    config = HttpConfig(
-        headers_renderer=lambda variables={}, parse_result=None: {},
-        params_renderer=lambda variables={}, parse_result=None: {},
-        data_renderer=lambda variables={}, parse_result=None: None,
-    )
+    config = make_http_config()
     sess = HttpSession(
         config_name="test",
         hass=hass,
@@ -530,20 +499,12 @@ async def test_form_auth_submit_once(hass: HomeAssistant):
 @respx.mock
 async def test_form_auth_resubmit_on_error(hass: HomeAssistant):
     """Test resubmit_on_error resets should_submit after exception notification."""
-    form_config = FormAuthConfig(
+    form_config = make_form_config(
         input_values={"user": "admin"},
         submit_once=True,
         resubmit_on_error=True,
-        parser="html.parser",
-        headers_renderer=lambda variables={}, parse_result=None: {},
-        params_renderer=lambda variables={}, parse_result=None: {},
-        data_renderer=lambda variables={}, parse_result=None: None,
     )
-    config = HttpConfig(
-        headers_renderer=lambda variables={}, parse_result=None: {},
-        params_renderer=lambda variables={}, parse_result=None: {},
-        data_renderer=lambda variables={}, parse_result=None: None,
-    )
+    config = make_http_config()
     sess = HttpSession(
         config_name="test",
         hass=hass,
@@ -574,21 +535,13 @@ async def test_form_auth_resubmit_on_error(hass: HomeAssistant):
 @respx.mock
 async def test_form_auth_input_filter(hass: HomeAssistant):
     """Test input_filter removes specified fields from form."""
-    form_config = FormAuthConfig(
+    form_config = make_form_config(
         resource="https://example.com/login",
         select="#login",
         input_values={"username": "admin", "password": "secret"},
         input_filter=["csrf_token"],
-        parser="html.parser",
-        headers_renderer=lambda variables={}, parse_result=None: {},
-        params_renderer=lambda variables={}, parse_result=None: {},
-        data_renderer=lambda variables={}, parse_result=None: None,
     )
-    config = HttpConfig(
-        headers_renderer=lambda variables={}, parse_result=None: {},
-        params_renderer=lambda variables={}, parse_result=None: {},
-        data_renderer=lambda variables={}, parse_result=None: None,
-    )
+    config = make_http_config()
     sess = HttpSession(
         config_name="test",
         hass=hass,
@@ -617,20 +570,12 @@ async def test_form_auth_input_filter(hass: HomeAssistant):
 @respx.mock
 async def test_form_action_url_resolution(hass: HomeAssistant):
     """Test _determine_submit_resource with various URL combinations."""
-    form_config = FormAuthConfig(
+    form_config = make_form_config(
         resource="https://example.com/auth/login",
         select="#login",
         input_values={"user": "admin"},
-        parser="html.parser",
-        headers_renderer=lambda variables={}, parse_result=None: {},
-        params_renderer=lambda variables={}, parse_result=None: {},
-        data_renderer=lambda variables={}, parse_result=None: None,
     )
-    config = HttpConfig(
-        headers_renderer=lambda variables={}, parse_result=None: {},
-        params_renderer=lambda variables={}, parse_result=None: {},
-        data_renderer=lambda variables={}, parse_result=None: None,
-    )
+    config = make_http_config()
     sess = HttpSession(
         config_name="test",
         hass=hass,
@@ -646,18 +591,8 @@ async def test_form_action_url_resolution(hass: HomeAssistant):
 @pytest.mark.unit
 def test_determine_submit_resource_action_no_form_resource(hass: HomeAssistant):
     """Test URL resolution: action + no form_resource → urljoin(main, action)."""
-    form_config = FormAuthConfig(
-        resource=None,
-        parser="html.parser",
-        headers_renderer=lambda variables={}, parse_result=None: {},
-        params_renderer=lambda variables={}, parse_result=None: {},
-        data_renderer=lambda variables={}, parse_result=None: None,
-    )
-    config = HttpConfig(
-        headers_renderer=lambda variables={}, parse_result=None: {},
-        params_renderer=lambda variables={}, parse_result=None: {},
-        data_renderer=lambda variables={}, parse_result=None: None,
-    )
+    form_config = make_form_config(resource=None)
+    config = make_http_config()
     sess = HttpSession(
         config_name="test",
         hass=hass,
@@ -672,18 +607,8 @@ def test_determine_submit_resource_action_no_form_resource(hass: HomeAssistant):
 @pytest.mark.unit
 def test_determine_submit_resource_no_action_with_form_resource(hass: HomeAssistant):
     """Test URL resolution: no action + form_resource → form_resource."""
-    form_config = FormAuthConfig(
-        resource="https://example.com/auth/login",
-        parser="html.parser",
-        headers_renderer=lambda variables={}, parse_result=None: {},
-        params_renderer=lambda variables={}, parse_result=None: {},
-        data_renderer=lambda variables={}, parse_result=None: None,
-    )
-    config = HttpConfig(
-        headers_renderer=lambda variables={}, parse_result=None: {},
-        params_renderer=lambda variables={}, parse_result=None: {},
-        data_renderer=lambda variables={}, parse_result=None: None,
-    )
+    form_config = make_form_config(resource="https://example.com/auth/login")
+    config = make_http_config()
     sess = HttpSession(
         config_name="test",
         hass=hass,
@@ -698,18 +623,8 @@ def test_determine_submit_resource_no_action_with_form_resource(hass: HomeAssist
 @pytest.mark.unit
 def test_determine_submit_resource_no_action_no_form_resource(hass: HomeAssistant):
     """Test URL resolution: no action + no form_resource → main_resource."""
-    form_config = FormAuthConfig(
-        resource=None,
-        parser="html.parser",
-        headers_renderer=lambda variables={}, parse_result=None: {},
-        params_renderer=lambda variables={}, parse_result=None: {},
-        data_renderer=lambda variables={}, parse_result=None: None,
-    )
-    config = HttpConfig(
-        headers_renderer=lambda variables={}, parse_result=None: {},
-        params_renderer=lambda variables={}, parse_result=None: {},
-        data_renderer=lambda variables={}, parse_result=None: None,
-    )
+    form_config = make_form_config(resource=None)
+    config = make_http_config()
     sess = HttpSession(
         config_name="test",
         hass=hass,
@@ -735,19 +650,11 @@ async def test_form_method_from_html(hass: HomeAssistant):
     </form>
     </body></html>
     """
-    form_config = FormAuthConfig(
+    form_config = make_form_config(
         resource="https://example.com/login",
         select="#login",
-        parser="html.parser",
-        headers_renderer=lambda variables={}, parse_result=None: {},
-        params_renderer=lambda variables={}, parse_result=None: {},
-        data_renderer=lambda variables={}, parse_result=None: None,
     )
-    config = HttpConfig(
-        headers_renderer=lambda variables={}, parse_result=None: {},
-        params_renderer=lambda variables={}, parse_result=None: {},
-        data_renderer=lambda variables={}, parse_result=None: None,
-    )
+    config = make_http_config()
     sess = HttpSession(
         config_name="test",
         hass=hass,
@@ -895,18 +802,8 @@ def test_notify_scrape_exception_without_form(session):
 @pytest.mark.unit
 def test_notify_scrape_exception_resubmit_disabled(hass: HomeAssistant):
     """Test notify_scrape_exception does nothing when resubmit_on_error is False."""
-    form_config = FormAuthConfig(
-        resubmit_on_error=False,
-        parser="html.parser",
-        headers_renderer=lambda variables={}, parse_result=None: {},
-        params_renderer=lambda variables={}, parse_result=None: {},
-        data_renderer=lambda variables={}, parse_result=None: None,
-    )
-    config = HttpConfig(
-        headers_renderer=lambda variables={}, parse_result=None: {},
-        params_renderer=lambda variables={}, parse_result=None: {},
-        data_renderer=lambda variables={}, parse_result=None: None,
-    )
+    form_config = make_form_config(resubmit_on_error=False)
+    config = make_http_config()
     sess = HttpSession(
         config_name="test",
         hass=hass,

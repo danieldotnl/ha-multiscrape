@@ -127,6 +127,27 @@ class HttpSession:
         headers = self._http_config.headers_renderer(variables)
         params = self._http_config.params_renderer(variables)
 
+        return await self._execute_request(
+            context=context,
+            method=method,
+            resource=resource,
+            headers=headers,
+            params=params,
+            auth=self._auth,
+            data=data,
+        )
+
+    async def _execute_request(
+        self,
+        context: str,
+        method: str,
+        resource: str,
+        headers: dict,
+        params: dict,
+        auth: Any,
+        data: Any = None,
+    ) -> httpx.Response:
+        """Core HTTP request with logging and error handling."""
         merged_resource = merge_url_with_params(resource, params)
 
         _LOGGER.debug(
@@ -149,7 +170,7 @@ class HttpSession:
                 "method": method,
                 "url": merged_resource,
                 "headers": headers,
-                "auth": self._auth,
+                "auth": auth,
             }
 
             if data is not None:
@@ -289,8 +310,7 @@ class HttpSession:
 
         if not form_cfg.resource:
             return response.text
-        else:
-            return None
+        return None
 
     async def _form_request(
         self,
@@ -304,51 +324,15 @@ class HttpSession:
         headers = form_cfg.headers_renderer()
         params = form_cfg.params_renderer()
 
-        merged_resource = merge_url_with_params(resource, params)
-
-        _LOGGER.debug(
-            "%s # Executing %s-request with a %s to url: %s with headers: %s.",
-            self._config_name,
-            context,
-            method,
-            merged_resource,
-            headers,
+        return await self._execute_request(
+            context=context,
+            method=method,
+            resource=resource,
+            headers=headers,
+            params=params,
+            auth=form_cfg.auth,
+            data=request_data,
         )
-        if self._file_manager:
-            await asyncio.gather(
-                self._async_file_log("request_headers", context, headers),
-                self._async_file_log("request_body", context, request_data),
-            )
-
-        request_params = {
-            "method": method,
-            "url": merged_resource,
-            "headers": headers,
-            "auth": form_cfg.auth,
-        }
-
-        if request_data is not None:
-            if isinstance(request_data, dict):
-                request_params["data"] = request_data
-            else:
-                request_params["content"] = request_data
-
-        response = await self._client.request(**request_params)
-
-        _LOGGER.debug(
-            "%s # Response status code received: %s",
-            self._config_name,
-            response.status_code,
-        )
-        if self._file_manager:
-            await asyncio.gather(
-                self._async_file_log("response_headers", context, response.headers),
-                self._async_file_log("response_body", context, response.text),
-            )
-
-        if 400 <= response.status_code <= 599:
-            response.raise_for_status()
-        return response
 
     async def _fetch_form_page(self, resource: str) -> str:
         """Fetch the page containing the form."""
@@ -368,9 +352,8 @@ class HttpSession:
             self._form_auth_config.parser,
         )
         soup = BeautifulSoup(page, self._form_auth_config.parser)
-        soup.prettify()
         if self._file_manager:
-            await self._async_file_log("form_page_soup", "form", soup)
+            await self._async_file_log("form_page_soup", "form", soup.prettify())
 
         _LOGGER.debug(
             "%s # Try to find form with selector %s",
@@ -456,10 +439,16 @@ class HttpSession:
     async def _async_file_log(self, content_name, context, content):
         """Write content to a file if content is not None."""
         if content is not None:
+            filename = f"{context}_{content_name}.txt"
             try:
-                filename = f"{context}_{content_name}.txt"
                 await self._hass.async_add_executor_job(
                     self._file_manager.write, filename, content
+                )
+                _LOGGER.debug(
+                    "%s # %s written to file: %s",
+                    self._config_name,
+                    content_name,
+                    filename,
                 )
             except Exception as ex:
                 _LOGGER.error(
@@ -469,12 +458,6 @@ class HttpSession:
                     filename,
                     ex,
                 )
-            _LOGGER.debug(
-                "%s # %s written to file: %s",
-                self._config_name,
-                content_name,
-                filename,
-            )
 
 
 def create_http_session(config_name, conf, hass, file_manager):
