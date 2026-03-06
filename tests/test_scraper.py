@@ -11,6 +11,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.template import Template
 
 from custom_components.multiscrape.const import DEFAULT_SEPARATOR
+from custom_components.multiscrape.scrape_context import ScrapeContext
 from custom_components.multiscrape.scraper import Scraper
 from custom_components.multiscrape.selector import Selector
 
@@ -256,3 +257,79 @@ async def test_scraper_formatted_content_prettifies_html(
     assert "Test" in formatted
     # Verify it's actually formatted (has indentation)
     assert "  " in formatted  # Multiple spaces indicate indentation
+
+
+# ============================================================================
+# ScrapeContext integration tests
+# ============================================================================
+
+
+@pytest.mark.integration
+@pytest.mark.async_test
+@pytest.mark.timeout(5)
+async def test_scraper_context_form_variables_in_value_template(
+    hass: HomeAssistant, scraper_instance
+):
+    """Test that form variables from ScrapeContext are available in value templates."""
+    await scraper_instance.set_content(SAMPLE_HTML_FULL)
+
+    selector_config = {
+        "select": Template(".current-version h1", hass),
+        "extract": "text",
+        "value_template": Template("{{ value }} (token={{ token }})", hass),
+    }
+    selector = Selector(hass, selector_config)
+
+    ctx = ScrapeContext(form_variables={"token": "abc123"})
+    value = scraper_instance.scrape(selector, "test_sensor", context=ctx)
+
+    assert value == "Current Version: 2024.8.3 (token=abc123)"
+
+
+@pytest.mark.integration
+@pytest.mark.async_test
+@pytest.mark.timeout(5)
+async def test_scraper_context_form_variables_in_just_value_template(
+    hass: HomeAssistant, scraper_instance
+):
+    """Test that form variables are available in just_value (no selector) templates."""
+    await scraper_instance.set_content(SAMPLE_JSON_SIMPLE)
+
+    selector_config = {
+        "value_template": Template("token={{ token }}", hass),
+    }
+    selector = Selector(hass, selector_config)
+
+    ctx = ScrapeContext(form_variables={"token": "secret"})
+    value = scraper_instance.scrape(selector, "test_sensor", context=ctx)
+
+    assert value == "token=secret"
+
+
+@pytest.mark.integration
+@pytest.mark.async_test
+@pytest.mark.timeout(5)
+async def test_scraper_context_immutability_across_calls(
+    hass: HomeAssistant, scraper_instance
+):
+    """Test that ScrapeContext is not mutated between successive scrape calls."""
+    await scraper_instance.set_content(SAMPLE_HTML_FULL)
+
+    selector_config = {
+        "select": Template(".current-version h1", hass),
+        "extract": "text",
+        "value_template": Template("{{ value }}", hass),
+    }
+    selector = Selector(hass, selector_config)
+
+    ctx = ScrapeContext(form_variables={"token": "abc"})
+
+    # Call scrape twice with the same context
+    value1 = scraper_instance.scrape(selector, "sensor1", context=ctx)
+    value2 = scraper_instance.scrape(selector, "sensor2", context=ctx)
+
+    # Both should succeed and return the same result
+    assert value1 == value2
+    # Context should be unchanged (no "value" key leaked into form_variables)
+    assert "value" not in ctx.form_variables
+    assert ctx.current_value is None

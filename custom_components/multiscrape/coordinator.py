@@ -16,6 +16,7 @@ from homeassistant.util.dt import utcnow
 from .const import DOMAIN, MAX_RETRIES, RETRY_DELAY_SECONDS
 from .file import LoggingFileManager
 from .http_session import HttpSession
+from .scrape_context import ScrapeContext
 from .scraper import Scraper
 from .util import create_renderer
 
@@ -76,8 +77,9 @@ class ContentRequestManager:
                 ex,
             )
 
+        scrape_ctx = ScrapeContext(form_variables=self._session.form_variables)
         response = await self._session.async_request(
-            "page", resource, variables=self._session.form_variables
+            "page", resource, scrape_context=scrape_ctx
         )
         return response.text
 
@@ -222,6 +224,6 @@ class MultiscrapeDataUpdateCoordinator(TimestampDataUpdateCoordinator[None]):
         self._scraper.reset()
 
     @property
-    def form_variables(self) -> dict:
-        """Return the form variables."""
-        return self._request_manager.form_variables
+    def scrape_context(self) -> ScrapeContext:
+        """Return the current scrape context with form variables."""
+        return ScrapeContext(form_variables=self._request_manager.form_variables)

@@ -12,6 +12,7 @@ from custom_components.multiscrape.http_session import (FormAuthConfig,
                                                         HttpConfig,
                                                         HttpSession,
                                                         create_http_session)
+from custom_components.multiscrape.scrape_context import ScrapeContext
 
 # ============================================================================
 # Fixtures
@@ -342,7 +343,7 @@ async def test_variables_passed_to_renderers(hass: HomeAssistant):
     url = "https://example.com/api"
     respx.get(url).mock(return_value=respx.MockResponse(200, text="OK"))
 
-    await sess.async_request("test", url, variables={"token": "xyz"})
+    await sess.async_request("test", url, scrape_context=ScrapeContext(form_variables={"token": "xyz"}))
 
     assert received_vars == {"token": "xyz"}
 
