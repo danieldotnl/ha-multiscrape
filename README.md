@@ -116,6 +116,29 @@ Make a new file named /config/multiscrape.yaml
   scan_interval: 3600
   sensor:
     - unique_id: ha_latest_version
+      name: Latest version
+      select: ".release-date"
+      value_template: "{{ value | trim }}"
+    - unique_id: ha_release_date
+      icon: >-
+        {% if is_state('binary_sensor.ha_version_check', 'on') %}
+          mdi:alarm-light
+        {% else %}
+          mdi:bat
+        {% endif %}
+        name: Release date
+        select: ".release-date"
+        attribute: "title"
+        value_template: "{{ (value.split('released')[1]) }}"
+    binary_sensor:
+      - unique_id: ha_version_check
+        name: Latest version == 2021.7.0
+        select: ".release-date"
+        value_template: '{{ value | trim == "2021.7.0" }}'
+        attributes:
+          - name: Release notes link
+            select: ".release-date"
+            attribute: href
 ```
 
 ## Options
