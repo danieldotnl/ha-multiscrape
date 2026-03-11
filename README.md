@@ -109,6 +109,7 @@ multiscrape: !include multiscrape.yaml
 ```
 
 Make a new file named /config/multiscrape.yaml
+
 *Inside the multiscrape.yaml file. Syntax is the same but starting at the resource level*
 ```yaml
 - resource: https://www.home-assistant.io
