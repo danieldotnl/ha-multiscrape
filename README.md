@@ -101,7 +101,7 @@ multiscrape:
             attribute: href
 ```
 ### Advanced Example Configuration (YAML)
-[HA Documentation](https://www.home-assistant.io/docs/configuration/splitting_configuration/)
+For background on splitting the HA configuration, see the [HA Documentation](https://www.home-assistant.io/docs/configuration/splitting_configuration/).
 
 *Inside the configuration.yaml file*
 ```yaml
