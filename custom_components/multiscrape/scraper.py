@@ -4,6 +4,8 @@ import logging
 from bs4 import BeautifulSoup
 
 from .const import CONF_PARSER, CONF_SEPARATOR
+from .extractors import ValueExtractor
+from .parsers import JsonDetector, ParserFactory
 from .scrape_context import ScrapeContext
 
 DEFAULT_TIMEOUT = 10
@@ -26,7 +28,7 @@ def create_scraper(config_name, config, hass, file_manager):
 
 
 class Scraper:
-    """Class for handling the retrieval and scraping of data."""
+    """Orchestrates parsing and value extraction."""
 
     def __init__(
         self,
@@ -42,10 +44,11 @@ class Scraper:
         self._hass = hass
         self._file_manager = file_manager
         self._config_name = config_name
-        self._parser = parser
+        self._parser_factory = ParserFactory(parser)
+        self._extractor = ValueExtractor(separator)
         self._soup: BeautifulSoup = None
         self._data = None
-        self._separator = separator
+        self._is_json = False
         self.reset()
 
     @property
@@ -57,6 +60,7 @@ class Scraper:
         """Reset the scraper object."""
         self._data = None
         self._soup = None
+        self._is_json = False
 
     @property
     def formatted_content(self):
@@ -68,45 +72,41 @@ class Scraper:
     async def set_content(self, content):
         """Set the content to be scraped."""
         self._data = content
+        parser = self._parser_factory.get_parser(content)
 
-        # Try to detect JSON more robustly
-        content_stripped = content.lstrip() if content else ""
-        if content_stripped and content_stripped[0] in ["{", "["]:
+        if isinstance(parser, JsonDetector):
             _LOGGER.debug(
                 "%s # Response seems to be json. Skip parsing with BeautifulSoup.",
                 self._config_name,
             )
-        else:
-            try:
-                _LOGGER.debug(
-                    "%s # Loading the content in BeautifulSoup.",
-                    self._config_name,
-                )
-                self._soup = await self._hass.async_add_executor_job(
-                    BeautifulSoup, self._data, self._parser
-                )
+            self._is_json = True
+            return
 
-                if self._file_manager:
-                    await self._async_file_log("page_soup", self._soup.prettify())
+        try:
+            _LOGGER.debug(
+                "%s # Loading the content in BeautifulSoup.",
+                self._config_name,
+            )
+            self._soup = await parser.parse(content, self._hass)
 
-            except Exception as ex:
-                self.reset()
-                _LOGGER.error(
-                    "%s # Unable to parse response with BeautifulSoup: %s",
-                    self._config_name,
-                    ex,
-                )
-                raise
+            if self._file_manager:
+                await self._async_file_log("page_soup", self._soup.prettify())
+
+        except Exception as ex:
+            self.reset()
+            _LOGGER.error(
+                "%s # Unable to parse response with BeautifulSoup: %s",
+                self._config_name,
+                ex,
+            )
+            raise
 
     def scrape(self, selector, sensor, attribute=None, context: ScrapeContext | None = None):
         """Scrape based on given selector the data."""
         if context is None:
             context = ScrapeContext.empty()
 
-        # This is required as this function is called separately for sensors and attributes
-        log_prefix = f"{self._config_name} # {sensor}"
-        if attribute:
-            log_prefix = log_prefix + f"# {attribute}"
+        log_prefix = self._make_log_prefix(sensor, attribute)
 
         if selector.just_value:
             _LOGGER.debug("%s # Applying value_template only.", log_prefix)
@@ -115,43 +115,12 @@ class Scraper:
             )
             return selector.value_template._parse_result(result)
 
-        # Check if content is JSON
-        content_stripped = self._data.lstrip() if self._data else ""
-        if content_stripped and content_stripped[0] in ["{", "["]:
+        if self._is_json:
             raise ValueError(
                 "JSON cannot be scraped. Please provide a value template to parse JSON response."
             )
 
-        if selector.is_list:
-            tags = self._soup.select(selector.list)
-            _LOGGER.debug("%s # List selector selected tags: %s",
-                          log_prefix, tags)
-            if selector.attribute is not None:
-                _LOGGER.debug(
-                    "%s # Try to find attributes: %s",
-                    log_prefix,
-                    selector.attribute,
-                )
-                values = [tag[selector.attribute] for tag in tags]
-            else:
-                values = [self.extract_tag_value(tag, selector) for tag in tags]
-            value = self._separator.join(values)
-            _LOGGER.debug("%s # List selector csv: %s", log_prefix, value)
-
-        else:
-            tag = self._soup.select_one(selector.element)
-            _LOGGER.debug("%s # Tag selected: %s", log_prefix, tag)
-            if tag is None:
-                raise ValueError("Could not find a tag for given selector")
-
-            if selector.attribute is not None:
-                _LOGGER.debug(
-                    "%s # Try to find attribute: %s", log_prefix, selector.attribute
-                )
-                value = tag[selector.attribute]
-            else:
-                value = self.extract_tag_value(tag, selector)
-            _LOGGER.debug("%s # Selector result: %s", log_prefix, value)
+        value = self._extract_value(selector, log_prefix)
 
         if value is not None and selector.value_template is not None:
             _LOGGER.debug(
@@ -167,17 +136,26 @@ class Scraper:
         )
         return value
 
-    def extract_tag_value(self, tag, selector):
-        """Extract value from a tag."""
-        if tag.name in ("style", "script", "template"):
-            return tag.string
+    def _extract_value(self, selector, log_prefix):
+        """Delegate extraction to ValueExtractor."""
+        if selector.is_list:
+            tags = self._soup.select(selector.list)
+            _LOGGER.debug("%s # List selector selected tags: %s",
+                          log_prefix, tags)
+            return self._extractor.extract_list(tags, selector)
         else:
-            if selector.extract == "text":
-                return tag.text
-            elif selector.extract == "content":
-                return ''.join(map(str, tag.contents))
-            elif selector.extract == "tag":
-                return str(tag)
+            tag = self._soup.select_one(selector.element)
+            _LOGGER.debug("%s # Tag selected: %s", log_prefix, tag)
+            if tag is None:
+                raise ValueError("Could not find a tag for given selector")
+            return self._extractor.extract_single(tag, selector)
+
+    def _make_log_prefix(self, sensor, attribute):
+        """Create log prefix for messages."""
+        prefix = f"{self._config_name} # {sensor}"
+        if attribute:
+            prefix = prefix + f"# {attribute}"
+        return prefix
 
     async def _async_file_log(self, content_name, content):
         try:
