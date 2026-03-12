@@ -8,8 +8,9 @@ import respx
 from homeassistant.core import HomeAssistant
 from httpx import RequestError, TimeoutException
 
-from custom_components.multiscrape.http_session import (FormAuthConfig,
-                                                        HttpConfig,
+from custom_components.multiscrape.form_auth import (FormAuthConfig,
+                                                     FormAuthenticator)
+from custom_components.multiscrape.http_session import (HttpConfig,
                                                         HttpSession,
                                                         create_http_session)
 from custom_components.multiscrape.scrape_context import ScrapeContext
@@ -42,6 +43,25 @@ def make_form_config(**overrides):
         "data_renderer": _NOOP_DATA,
     }
     return FormAuthConfig(**{**defaults, **overrides})
+
+
+def make_form_session(hass, form_config, http_config=None, file_manager=None):
+    """Create an HttpSession with a FormAuthenticator wired up for testing."""
+    config = http_config or make_http_config()
+    session = HttpSession(
+        config_name="test",
+        hass=hass,
+        http_config=config,
+        file_manager=file_manager,
+    )
+    authenticator = FormAuthenticator(
+        config_name="test",
+        config=form_config,
+        execute_request=session._execute_request,
+        file_log=session._async_file_log if file_manager else None,
+    )
+    session._form_authenticator = authenticator
+    return session
 
 
 # ============================================================================
@@ -366,13 +386,7 @@ async def test_form_auth_with_selector(hass: HomeAssistant):
         select="#login",
         input_values={"username": "admin", "password": "secret"},
     )
-    config = make_http_config()
-    sess = HttpSession(
-        config_name="test",
-        hass=hass,
-        http_config=config,
-        form_auth_config=form_config,
-    )
+    sess = make_form_session(hass, form_config)
 
     # Mock form page fetch
     respx.get("https://example.com/login").mock(
@@ -406,13 +420,7 @@ async def test_form_auth_without_selector(hass: HomeAssistant):
     form_config = make_form_config(
         input_values={"user": "admin", "pass": "secret"},
     )
-    config = make_http_config()
-    sess = HttpSession(
-        config_name="test",
-        hass=hass,
-        http_config=config,
-        form_auth_config=form_config,
-    )
+    sess = make_form_session(hass, form_config)
 
     # No form page fetch should happen; POST directly to main resource
     submit_route = respx.post("https://example.com/main").mock(
@@ -438,13 +446,7 @@ async def test_form_auth_uses_main_resource_returns_text(hass: HomeAssistant):
         select="#login",
         input_values={"username": "admin"},
     )
-    config = make_http_config()
-    sess = HttpSession(
-        config_name="test",
-        hass=hass,
-        http_config=config,
-        form_auth_config=form_config,
-    )
+    sess = make_form_session(hass, form_config)
 
     # Form page is fetched from main resource
     respx.get("https://example.com/main").mock(
@@ -471,13 +473,7 @@ async def test_form_auth_submit_once(hass: HomeAssistant):
         input_values={"user": "admin"},
         submit_once=True,
     )
-    config = make_http_config()
-    sess = HttpSession(
-        config_name="test",
-        hass=hass,
-        http_config=config,
-        form_auth_config=form_config,
-    )
+    sess = make_form_session(hass, form_config)
 
     respx.post("https://example.com/main").mock(
         return_value=respx.MockResponse(200, text="OK")
@@ -485,7 +481,7 @@ async def test_form_auth_submit_once(hass: HomeAssistant):
 
     # First call submits
     await sess.ensure_authenticated("https://example.com/main")
-    assert not sess._should_submit
+    assert not sess._form_authenticator._should_submit
 
     # Second call skips
     result = await sess.ensure_authenticated("https://example.com/main")
@@ -504,13 +500,7 @@ async def test_form_auth_resubmit_on_error(hass: HomeAssistant):
         submit_once=True,
         resubmit_on_error=True,
     )
-    config = make_http_config()
-    sess = HttpSession(
-        config_name="test",
-        hass=hass,
-        http_config=config,
-        form_auth_config=form_config,
-    )
+    sess = make_form_session(hass, form_config)
 
     respx.post("https://example.com/main").mock(
         return_value=respx.MockResponse(200, text="OK")
@@ -518,11 +508,11 @@ async def test_form_auth_resubmit_on_error(hass: HomeAssistant):
 
     # Submit once
     await sess.ensure_authenticated("https://example.com/main")
-    assert not sess._should_submit
+    assert not sess._form_authenticator._should_submit
 
     # Notify scrape exception
     sess.notify_scrape_exception()
-    assert sess._should_submit
+    assert sess._form_authenticator._should_submit
 
     # Now it should submit again
     await sess.ensure_authenticated("https://example.com/main")
@@ -541,13 +531,7 @@ async def test_form_auth_input_filter(hass: HomeAssistant):
         input_values={"username": "admin", "password": "secret"},
         input_filter=["csrf_token"],
     )
-    config = make_http_config()
-    sess = HttpSession(
-        config_name="test",
-        hass=hass,
-        http_config=config,
-        form_auth_config=form_config,
-    )
+    sess = make_form_session(hass, form_config)
 
     respx.get("https://example.com/login").mock(
         return_value=respx.MockResponse(200, text=FORM_PAGE_HTML)
@@ -575,16 +559,14 @@ async def test_form_action_url_resolution(hass: HomeAssistant):
         select="#login",
         input_values={"user": "admin"},
     )
-    config = make_http_config()
-    sess = HttpSession(
+    auth = FormAuthenticator(
         config_name="test",
-        hass=hass,
-        http_config=config,
-        form_auth_config=form_config,
+        config=form_config,
+        execute_request=lambda **kwargs: None,
     )
 
     # action + form_resource → urljoin(form_resource, action)
-    result = sess._determine_submit_resource("/do_login", "https://main.com/page")
+    result = auth._determine_submit_resource("/do_login", "https://main.com/page")
     assert result == "https://example.com/do_login"
 
 
@@ -592,15 +574,13 @@ async def test_form_action_url_resolution(hass: HomeAssistant):
 def test_determine_submit_resource_action_no_form_resource(hass: HomeAssistant):
     """Test URL resolution: action + no form_resource → urljoin(main, action)."""
     form_config = make_form_config(resource=None)
-    config = make_http_config()
-    sess = HttpSession(
+    auth = FormAuthenticator(
         config_name="test",
-        hass=hass,
-        http_config=config,
-        form_auth_config=form_config,
+        config=form_config,
+        execute_request=lambda **kwargs: None,
     )
 
-    result = sess._determine_submit_resource("/login", "https://main.com/page")
+    result = auth._determine_submit_resource("/login", "https://main.com/page")
     assert result == "https://main.com/login"
 
 
@@ -608,15 +588,13 @@ def test_determine_submit_resource_action_no_form_resource(hass: HomeAssistant):
 def test_determine_submit_resource_no_action_with_form_resource(hass: HomeAssistant):
     """Test URL resolution: no action + form_resource → form_resource."""
     form_config = make_form_config(resource="https://example.com/auth/login")
-    config = make_http_config()
-    sess = HttpSession(
+    auth = FormAuthenticator(
         config_name="test",
-        hass=hass,
-        http_config=config,
-        form_auth_config=form_config,
+        config=form_config,
+        execute_request=lambda **kwargs: None,
     )
 
-    result = sess._determine_submit_resource(None, "https://main.com/page")
+    result = auth._determine_submit_resource(None, "https://main.com/page")
     assert result == "https://example.com/auth/login"
 
 
@@ -624,15 +602,13 @@ def test_determine_submit_resource_no_action_with_form_resource(hass: HomeAssist
 def test_determine_submit_resource_no_action_no_form_resource(hass: HomeAssistant):
     """Test URL resolution: no action + no form_resource → main_resource."""
     form_config = make_form_config(resource=None)
-    config = make_http_config()
-    sess = HttpSession(
+    auth = FormAuthenticator(
         config_name="test",
-        hass=hass,
-        http_config=config,
-        form_auth_config=form_config,
+        config=form_config,
+        execute_request=lambda **kwargs: None,
     )
 
-    result = sess._determine_submit_resource(None, "https://main.com/page")
+    result = auth._determine_submit_resource(None, "https://main.com/page")
     assert result == "https://main.com/page"
 
 
@@ -654,13 +630,7 @@ async def test_form_method_from_html(hass: HomeAssistant):
         resource="https://example.com/login",
         select="#login",
     )
-    config = make_http_config()
-    sess = HttpSession(
-        config_name="test",
-        hass=hass,
-        http_config=config,
-        form_auth_config=form_config,
-    )
+    sess = make_form_session(hass, form_config)
 
     respx.get("https://example.com/login").mock(
         return_value=respx.MockResponse(200, text=form_html)
@@ -803,16 +773,10 @@ def test_notify_scrape_exception_without_form(session):
 def test_notify_scrape_exception_resubmit_disabled(hass: HomeAssistant):
     """Test notify_scrape_exception does nothing when resubmit_on_error is False."""
     form_config = make_form_config(resubmit_on_error=False)
-    config = make_http_config()
-    sess = HttpSession(
-        config_name="test",
-        hass=hass,
-        http_config=config,
-        form_auth_config=form_config,
-    )
-    sess._should_submit = False
+    sess = make_form_session(hass, form_config)
+    sess._form_authenticator._should_submit = False
     sess.notify_scrape_exception()
-    assert not sess._should_submit
+    assert not sess._form_authenticator._should_submit
 
 
 # ============================================================================
@@ -849,7 +813,7 @@ async def test_create_http_session_basic(hass: HomeAssistant):
 
     assert session._http_config.verify_ssl is True
     assert session._http_config.timeout == 15
-    assert session._form_auth_config is None
+    assert session._form_authenticator is None
 
     await session.async_close()
 
@@ -880,11 +844,11 @@ async def test_create_http_session_with_form(hass: HomeAssistant):
     }
     session = create_http_session("test", conf, hass, None)
 
-    assert session._form_auth_config is not None
-    assert session._form_auth_config.resource == "https://example.com/login"
-    assert session._form_auth_config.select == "#login"
-    assert session._form_auth_config.submit_once is True
-    assert session._form_auth_config.resubmit_on_error is False
+    assert session._form_authenticator is not None
+    assert session._form_authenticator._config.resource == "https://example.com/login"
+    assert session._form_authenticator._config.select == "#login"
+    assert session._form_authenticator._config.submit_once is True
+    assert session._form_authenticator._config.resubmit_on_error is False
 
     await session.async_close()
 

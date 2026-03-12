@@ -1,13 +1,11 @@
-"""Unified HTTP session manager with authentication support."""
+"""HTTP session manager with form authentication support."""
 import asyncio
 import logging
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
-from urllib.parse import urljoin
 
 import httpx
-from bs4 import BeautifulSoup
 from homeassistant.const import (CONF_AUTHENTICATION, CONF_HEADERS,
                                  CONF_METHOD, CONF_NAME, CONF_PARAMS,
                                  CONF_PASSWORD, CONF_PAYLOAD, CONF_RESOURCE,
@@ -20,6 +18,7 @@ from .const import (CONF_FORM_INPUT, CONF_FORM_INPUT_FILTER,
                     CONF_FORM_SUBMIT, CONF_FORM_SUBMIT_ONCE,
                     CONF_FORM_VARIABLES, CONF_PARSER)
 from .file import LoggingFileManager
+from .form_auth import FormAuthConfig, FormAuthenticator
 from .http import merge_url_with_params
 from .scrape_context import ScrapeContext
 from .scraper import create_scraper
@@ -44,32 +43,14 @@ class HttpConfig:
     data_renderer: Callable = field(default_factory=lambda: lambda variables={}, parse_result=None: None)
 
 
-@dataclass
-class FormAuthConfig:
-    """Configuration for form-based authentication."""
-
-    resource: str | None = None
-    select: str | None = None
-    input_values: dict[str, str] | None = None
-    input_filter: list[str] = field(default_factory=list)
-    submit_once: bool = False
-    resubmit_on_error: bool = True
-    variables_selectors: dict[str, Any] = field(default_factory=dict)
-    scraper: Any = None
-    parser: str = "lxml"
-    headers_renderer: Callable = field(default_factory=lambda: lambda variables={}, parse_result=None: {})
-    params_renderer: Callable = field(default_factory=lambda: lambda variables={}, parse_result=None: {})
-    data_renderer: Callable = field(default_factory=lambda: lambda variables={}, parse_result=None: None)
-    method: str | None = None
-    auth: Any = None
-
-
 class HttpSession:
-    """Unified HTTP session manager with authentication support.
+    """HTTP session manager with authentication support.
 
     Uses a dedicated httpx.AsyncClient instead of the shared HA client.
     This allows httpx to manage cookies naturally via its built-in cookie jar,
     eliminating manual cookie extraction/passing.
+
+    Delegates form-based authentication to a FormAuthenticator collaborator.
     """
 
     def __init__(
@@ -78,14 +59,14 @@ class HttpSession:
         hass: HomeAssistant,
         http_config: HttpConfig,
         file_manager: LoggingFileManager | None = None,
-        form_auth_config: FormAuthConfig | None = None,
+        form_authenticator: FormAuthenticator | None = None,
     ):
         """Initialize HTTP session."""
         self._config_name = config_name
         self._hass = hass
         self._http_config = http_config
         self._file_manager = file_manager
-        self._form_auth_config = form_auth_config
+        self._form_authenticator = form_authenticator
 
         # Create dedicated httpx client with its own cookie jar
         self._client = httpx.AsyncClient(
@@ -102,10 +83,6 @@ class HttpSession:
             else:
                 self._auth = (http_config.username, http_config.password)
             _LOGGER.debug("%s # Authentication configuration processed", config_name)
-
-        # Form auth state
-        self._should_submit = True
-        self._form_variables: dict[str, Any] = {}
 
         _LOGGER.debug("%s # HttpSession initialized", config_name)
 
@@ -233,186 +210,21 @@ class HttpSession:
         or None when form has its own resource (main page still needs fetching).
         Returns None when no form auth is configured.
         """
-        if not self._form_auth_config:
+        if not self._form_authenticator:
             return None
-
-        if not self._should_submit:
-            _LOGGER.debug("%s # Skip submitting form", self._config_name)
-            return None
-
-        _LOGGER.debug("%s # Starting with form-submit", self._config_name)
-        form_cfg = self._form_auth_config
-        input_fields = {}
-        action, method = None, None
-
-        if form_cfg.select:
-            form_resource = form_cfg.resource or main_resource
-            page = await self._fetch_form_page(form_resource)
-            form = await self._extract_form(page)
-
-            input_fields = self._get_input_fields(form)
-            for field_name in form_cfg.input_filter:
-                input_fields.pop(field_name, None)
-
-            action = form.get("action")
-            method = form.get("method")
-
-            _LOGGER.debug(
-                "%s # Found form action %s and method %s",
-                self._config_name,
-                action,
-                method,
-            )
-        else:
-            _LOGGER.debug(
-                "%s # Skip scraping form, assuming all input is given in config.",
-                self._config_name,
-            )
-
-        if form_cfg.input_values is not None:
-            input_fields.update(form_cfg.input_values)
-            _LOGGER.debug(
-                "%s # Merged input fields with input data in config. Result: %s",
-                self._config_name,
-                input_fields,
-            )
-
-        payload = input_fields if input_fields else None
-
-        if not method:
-            method = "POST"
-
-        submit_resource = self._determine_submit_resource(action, main_resource)
-
-        _LOGGER.debug("%s # Submitting the form", self._config_name)
-        response = await self._form_request(
-            "form_submit",
-            submit_resource,
-            method=method,
-            request_data=payload,
-        )
-        _LOGGER.debug(
-            "%s # Form seems to be submitted successfully (to be sure, use log_response and check file). Now continuing to retrieve target page.",
-            self._config_name,
-        )
-
-        if form_cfg.submit_once:
-            self._should_submit = False
-
-        # Scrape variables from form response if configured
-        if form_cfg.scraper:
-            await form_cfg.scraper.set_content(response.text)
-            self._form_variables = {}
-            for variable_key in form_cfg.variables_selectors:
-                self._form_variables[variable_key] = form_cfg.scraper.scrape(
-                    form_cfg.variables_selectors[variable_key], variable_key
-                )
-
-        if not form_cfg.resource:
-            return response.text
-        return None
-
-    async def _form_request(
-        self,
-        context: str,
-        resource: str,
-        method: str = "GET",
-        request_data: Any = None,
-    ) -> httpx.Response:
-        """Execute an HTTP request using form auth config renderers."""
-        form_cfg = self._form_auth_config
-        headers = form_cfg.headers_renderer()
-        params = form_cfg.params_renderer()
-
-        return await self._execute_request(
-            context=context,
-            method=method,
-            resource=resource,
-            headers=headers,
-            params=params,
-            auth=form_cfg.auth,
-            data=request_data,
-        )
-
-    async def _fetch_form_page(self, resource: str) -> str:
-        """Fetch the page containing the form."""
-        _LOGGER.debug(
-            "%s # Requesting page with form from: %s",
-            self._config_name,
-            resource,
-        )
-        response = await self._form_request("form_page", resource, "GET")
-        return response.text
-
-    async def _extract_form(self, page: str):
-        """Parse page HTML and extract the form element."""
-        _LOGGER.debug(
-            "%s # Parse page with form with BeautifulSoup parser %s",
-            self._config_name,
-            self._form_auth_config.parser,
-        )
-        soup = BeautifulSoup(page, self._form_auth_config.parser)
-        if self._file_manager:
-            await self._async_file_log("form_page_soup", "form", soup.prettify())
-
-        _LOGGER.debug(
-            "%s # Try to find form with selector %s",
-            self._config_name,
-            self._form_auth_config.select,
-        )
-        form = soup.select_one(self._form_auth_config.select)
-
-        if not form:
-            raise ValueError("Could not find form")
-
-        _LOGGER.debug("%s # Form looks like this: \n%s", self._config_name, form)
-        return form
-
-    def _get_input_fields(self, form) -> dict:
-        """Extract input field names and values from a form element."""
-        _LOGGER.debug("%s # Finding all input fields in form", self._config_name)
-        elements = form.find_all("input")
-        input_fields = {
-            element.get("name"): element.get("value")
-            for element in elements
-            if element.get("name") is not None
-        }
-        _LOGGER.debug(
-            "%s # Found the following input fields: %s", self._config_name, input_fields
-        )
-        return input_fields
-
-    def _determine_submit_resource(self, action: str | None, main_resource: str) -> str:
-        """Determine the URL to submit the form to."""
-        form_resource = self._form_auth_config.resource
-        resource = main_resource
-        if action and form_resource:
-            resource = urljoin(form_resource, action)
-        elif action:
-            resource = urljoin(main_resource, action)
-        elif form_resource:
-            resource = form_resource
-
-        _LOGGER.debug(
-            "%s # Determined the url to submit the form to: %s",
-            self._config_name,
-            resource,
-        )
-        return resource
+        return await self._form_authenticator.ensure_authenticated(main_resource)
 
     def notify_scrape_exception(self):
         """Re-submit form after a scrape exception if configured."""
-        if self._form_auth_config and self._form_auth_config.resubmit_on_error:
-            _LOGGER.debug(
-                "%s # Exception occurred while scraping, will try to resubmit the form next interval.",
-                self._config_name,
-            )
-            self._should_submit = True
+        if self._form_authenticator:
+            self._form_authenticator.notify_scrape_exception()
 
     @property
     def form_variables(self) -> dict[str, Any]:
         """Return variables scraped during form authentication."""
-        return self._form_variables
+        if self._form_authenticator:
+            return self._form_authenticator.form_variables
+        return {}
 
     async def async_close(self):
         """Close the dedicated HTTP client."""
@@ -474,7 +286,6 @@ def create_http_session(config_name, conf, hass, file_manager):
         data_renderer=create_renderer(hass, conf.get(CONF_PAYLOAD), "request payload"),
     )
 
-    form_auth_config = None
     form_submit_config = conf.get(CONF_FORM_SUBMIT)
     if form_submit_config:
         # Build form auth renderers from form_submit config (has its own HTTP_SCHEMA fields)
@@ -514,10 +325,26 @@ def create_http_session(config_name, conf, hass, file_manager):
             auth=form_auth,
         )
 
+        # Create session first so FormAuthenticator can use its _execute_request
+        session = HttpSession(
+            config_name=config_name,
+            hass=hass,
+            http_config=http_config,
+            file_manager=file_manager,
+        )
+
+        form_authenticator = FormAuthenticator(
+            config_name=config_name,
+            config=form_auth_config,
+            execute_request=session._execute_request,
+            file_log=session._async_file_log if file_manager else None,
+        )
+        session._form_authenticator = form_authenticator
+        return session
+
     return HttpSession(
         config_name=config_name,
         hass=hass,
         http_config=http_config,
         file_manager=file_manager,
-        form_auth_config=form_auth_config,
     )
