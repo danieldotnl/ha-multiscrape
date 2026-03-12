@@ -67,6 +67,7 @@ It is based on both the existing [Rest sensor](https://www.home-assistant.io/int
 Install via HACS (default store) or install manually by copying the files in a new 'custom_components/multiscrape' directory.
 
 ## Example configuration (YAML)
+*This code example is to be placed into /config/configuration.yaml*
 
 ```yaml
 multiscrape:
@@ -85,6 +86,46 @@ multiscrape:
           {% else %}
             mdi:bat
           {% endif %}
+        name: Release date
+        select: ".release-date"
+        attribute: "title"
+        value_template: "{{ (value.split('released')[1]) }}"
+    binary_sensor:
+      - unique_id: ha_version_check
+        name: Latest version == 2021.7.0
+        select: ".release-date"
+        value_template: '{{ value | trim == "2021.7.0" }}'
+        attributes:
+          - name: Release notes link
+            select: ".release-date"
+            attribute: href
+```
+### Advanced Example Configuration (YAML)
+For background on splitting the HA configuration, see the [HA Documentation](https://www.home-assistant.io/docs/configuration/splitting_configuration/).
+
+*Inside the configuration.yaml file*
+```yaml
+multiscrape: !include multiscrape.yaml
+```
+
+Make a new file named /config/multiscrape.yaml
+
+*Inside the multiscrape.yaml file. Syntax is the same but starting at the resource level*
+```yaml
+- resource: https://www.home-assistant.io
+  scan_interval: 3600
+  sensor:
+    - unique_id: ha_latest_version
+      name: Latest version
+      select: ".release-date"
+      value_template: "{{ value | trim }}"
+    - unique_id: ha_release_date
+      icon: >-
+        {% if is_state('binary_sensor.ha_version_check', 'on') %}
+          mdi:alarm-light
+        {% else %}
+          mdi:bat
+        {% endif %}
         name: Release date
         select: ".release-date"
         attribute: "title"
