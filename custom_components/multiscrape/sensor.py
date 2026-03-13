@@ -153,7 +153,7 @@ class MultiscrapeSensor(MultiscrapeEntity, SensorEntity):
                     value, self.entity_id, self.device_class
                 )
         except Exception as exception:
-            self.coordinator.notify_scrape_exception()
+            self.coordinator.request_reauth()
 
             if self._sensor_selector.on_error.log not in [False, "false", "False"]:
                 level = LOG_LEVELS[self._sensor_selector.on_error.log]

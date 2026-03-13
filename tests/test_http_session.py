@@ -510,8 +510,8 @@ async def test_form_auth_resubmit_on_error(hass: HomeAssistant):
     await sess.ensure_authenticated("https://example.com/main")
     assert not sess._form_authenticator._should_submit
 
-    # Notify scrape exception
-    sess.notify_scrape_exception()
+    # Invalidate auth (simulating coordinator passing force_reauth)
+    sess.invalidate_auth()
     assert sess._form_authenticator._should_submit
 
     # Now it should submit again
@@ -763,19 +763,19 @@ def test_no_form_auth_returns_empty_variables(session):
 
 
 @pytest.mark.unit
-def test_notify_scrape_exception_without_form(session):
-    """Test notify_scrape_exception is a no-op without form auth."""
+def test_invalidate_auth_without_form(session):
+    """Test invalidate_auth is a no-op without form auth."""
     # Should not raise
-    session.notify_scrape_exception()
+    session.invalidate_auth()
 
 
 @pytest.mark.unit
-def test_notify_scrape_exception_resubmit_disabled(hass: HomeAssistant):
-    """Test notify_scrape_exception does nothing when resubmit_on_error is False."""
+def test_invalidate_auth_resubmit_disabled(hass: HomeAssistant):
+    """Test invalidate_auth does nothing when resubmit_on_error is False."""
     form_config = make_form_config(resubmit_on_error=False)
     sess = make_form_session(hass, form_config)
     sess._form_authenticator._should_submit = False
-    sess.notify_scrape_exception()
+    sess.invalidate_auth()
     assert not sess._form_authenticator._should_submit
 
 
@@ -1140,11 +1140,8 @@ async def test_e2e_form_resubmit_on_error(hass: HomeAssistant):
         await request_manager.get_content()
         assert login_route.call_count == 1
 
-        # Simulate scrape exception notification
-        request_manager.notify_scrape_exception()
-
-        # Third call — form re-submits after error
-        await request_manager.get_content()
+        # Simulate coordinator passing force_reauth after scrape exception
+        await request_manager.get_content(force_reauth=True)
         assert login_route.call_count == 2
     finally:
         await session.async_close()
@@ -1704,15 +1701,12 @@ async def test_e2e_form_variables_updated_on_resubmit(hass: HomeAssistant):
         await request_manager.get_content()
         assert session.form_variables["api_token"] == "token_v1"
 
-        # Trigger resubmit
-        request_manager.notify_scrape_exception()
-
         # Second auth returns token_v2
         submit_route.mock(
             return_value=respx.MockResponse(200, text=FORM_RESPONSE_V2)
         )
 
-        await request_manager.get_content()
+        await request_manager.get_content(force_reauth=True)
         assert session.form_variables["api_token"] == "token_v2"
     finally:
         await session.async_close()

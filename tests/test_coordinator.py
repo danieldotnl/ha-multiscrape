@@ -42,7 +42,7 @@ async def test_content_request_manager_with_form_submission(
         return_value="<html>Form Response</html>"
     )
     mock_session.form_variables = {"var": "value"}
-    mock_session.notify_scrape_exception = MagicMock()
+    mock_session.invalidate_auth = MagicMock()
     mock_session.async_request = AsyncMock()
 
     manager = ContentRequestManager(
@@ -72,7 +72,7 @@ async def test_content_request_manager_form_submission_no_result(
     mock_session = AsyncMock()
     mock_session.ensure_authenticated = AsyncMock(return_value=None)
     mock_session.form_variables = {"var": "value"}
-    mock_session.notify_scrape_exception = MagicMock()
+    mock_session.invalidate_auth = MagicMock()
     mock_session.async_request = AsyncMock(
         return_value=mock_http_response(text="<html>Page Content</html>")
     )
@@ -128,15 +128,35 @@ async def test_coordinator_update_failure(coordinator, mock_http_session):
 @pytest.mark.unit
 @pytest.mark.async_test
 @pytest.mark.timeout(5)
-async def test_coordinator_notify_scrape_exception(
+async def test_coordinator_request_reauth(
     coordinator, mock_http_session
 ):
-    """Test that scrape exceptions are properly notified."""
+    """Test that request_reauth sets the force_reauth flag."""
     # Act
-    coordinator.notify_scrape_exception()
+    coordinator.request_reauth()
 
     # Assert
-    mock_http_session.notify_scrape_exception.assert_called_once()
+    assert coordinator._force_reauth is True
+
+
+@pytest.mark.integration
+@pytest.mark.async_test
+@pytest.mark.timeout(10)
+async def test_coordinator_force_reauth_lifecycle(
+    coordinator, mock_http_session
+):
+    """Verify full flag lifecycle: request_reauth -> pass force_reauth -> invalidate_auth -> reset."""
+    # Simulate entity reporting a scrape exception
+    coordinator.request_reauth()
+    assert coordinator._force_reauth is True
+
+    # Next update should pass force_reauth=True, then reset the flag
+    await coordinator._async_update_data()
+
+    # invalidate_auth should have been called (via ContentRequestManager.get_content)
+    mock_http_session.invalidate_auth.assert_called_once()
+    # Flag should be reset after successful update
+    assert coordinator._force_reauth is False
 
 
 @pytest.mark.integration

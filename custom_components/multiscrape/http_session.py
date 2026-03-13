@@ -214,10 +214,10 @@ class HttpSession:
             return None
         return await self._form_authenticator.ensure_authenticated(main_resource)
 
-    def notify_scrape_exception(self):
-        """Re-submit form after a scrape exception if configured."""
+    def invalidate_auth(self):
+        """Invalidate the current authentication so the form will be re-submitted."""
         if self._form_authenticator:
-            self._form_authenticator.notify_scrape_exception()
+            self._form_authenticator.invalidate()
 
     @property
     def form_variables(self) -> dict[str, Any]:
