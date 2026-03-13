@@ -54,12 +54,11 @@ class ContentRequestManager:
         self._session = session
         self._resource_renderer = resource_renderer
 
-    def notify_scrape_exception(self):
-        """Notify the session of an exception so it will re-submit next trigger."""
-        self._session.notify_scrape_exception()
-
-    async def get_content(self) -> str:
+    async def get_content(self, force_reauth: bool = False) -> str:
         """Retrieve the content of a url and first submit a form if required."""
+        if force_reauth:
+            self._session.invalidate_auth()
+
         resource = self._resource_renderer()
 
         try:
@@ -128,6 +127,7 @@ class MultiscrapeDataUpdateCoordinator(TimestampDataUpdateCoordinator[None]):
         self.update_error = False
         self._resource = None
         self._retry_count: int = 0
+        self._force_reauth: bool = False
 
         if self._update_interval == timedelta(seconds=0):
             self._update_interval = None
@@ -155,15 +155,18 @@ class MultiscrapeDataUpdateCoordinator(TimestampDataUpdateCoordinator[None]):
 
         hass.bus.async_listen_once(EVENT_HOMEASSISTANT_STARTED, _on_hass_start)
 
-    def notify_scrape_exception(self) -> None:
-        """Notify the ContentRequestManager of a scrape exception so it can notify the FormSubmitter."""
-        self._request_manager.notify_scrape_exception()
+    def request_reauth(self) -> None:
+        """Flag that re-authentication is needed on the next update cycle."""
+        self._force_reauth = True
 
     async def _async_update_data(self) -> None:
         await self._prepare_new_run()
 
         try:
-            response = await self._request_manager.get_content()
+            response = await self._request_manager.get_content(
+                force_reauth=self._force_reauth
+            )
+            self._force_reauth = False
             await self._scraper.set_content(response)
             _LOGGER.debug(
                 "%s # Data successfully refreshed. Sensors will now start scraping to update.",
@@ -172,6 +175,7 @@ class MultiscrapeDataUpdateCoordinator(TimestampDataUpdateCoordinator[None]):
             self._retry_count = 0
 
         except Exception as ex:
+            self._force_reauth = True
             _LOGGER.error(
                 "%s # Updating failed with exception: %s",
                 self._config_name,

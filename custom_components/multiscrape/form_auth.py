@@ -140,11 +140,11 @@ class FormAuthenticator:
             return response.text
         return None
 
-    def notify_scrape_exception(self):
-        """Re-submit form after a scrape exception if configured."""
+    def invalidate(self):
+        """Mark session as invalid so the form will be re-submitted next interval."""
         if self._config.resubmit_on_error:
             _LOGGER.debug(
-                "%s # Exception occurred while scraping, will try to resubmit the form next interval.",
+                "%s # Session invalidated, will re-submit the form next interval.",
                 self._config_name,
             )
             self._should_submit = True

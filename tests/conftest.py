@@ -104,7 +104,7 @@ def mock_http_session(mock_http_response):
     ))
     mock.ensure_authenticated = AsyncMock(return_value=None)
     mock.form_variables = {}
-    mock.notify_scrape_exception = MagicMock()
+    mock.invalidate_auth = MagicMock()
     mock.async_close = AsyncMock()
     return mock
 
