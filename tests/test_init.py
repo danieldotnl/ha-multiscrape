@@ -12,9 +12,8 @@ from custom_components.multiscrape import (_async_process_config,
                                            _async_setup_shared_data,
                                            async_get_config_and_coordinator,
                                            async_setup)
-from custom_components.multiscrape.const import (COORDINATOR, DOMAIN,
-                                                 PLATFORM_IDX, SCRAPER,
-                                                 SCRAPER_DATA, SCRAPER_IDX)
+from custom_components.multiscrape.const import DOMAIN, ENTITY_KEY, SCRAPER_ID
+from custom_components.multiscrape.registry import ScraperRegistry
 
 
 @pytest.fixture
@@ -47,18 +46,13 @@ def empty_config():
 @pytest.mark.async_test
 @pytest.mark.timeout(10)
 async def test_async_setup_shared_data(hass: HomeAssistant):
-    """Test _async_setup_shared_data creates required data structures."""
+    """Test _async_setup_shared_data creates a ScraperRegistry."""
     # Act
     _async_setup_shared_data(hass)
 
     # Assert
     assert DOMAIN in hass.data
-    assert SCRAPER_DATA in hass.data[DOMAIN]
-    assert Platform.SENSOR in hass.data[DOMAIN]
-    assert Platform.BINARY_SENSOR in hass.data[DOMAIN]
-    assert Platform.BUTTON in hass.data[DOMAIN]
-    assert isinstance(hass.data[DOMAIN][SCRAPER_DATA], list)
-    assert isinstance(hass.data[DOMAIN][Platform.SENSOR], list)
+    assert isinstance(hass.data[DOMAIN], ScraperRegistry)
 
 
 @pytest.mark.integration
@@ -119,10 +113,11 @@ async def test_async_process_config_creates_scraper_data(
 
     # Assert
     assert result is True
-    assert len(hass.data[DOMAIN][SCRAPER_DATA]) == 1
-    scraper_data = hass.data[DOMAIN][SCRAPER_DATA][0]
-    assert SCRAPER in scraper_data
-    assert COORDINATOR in scraper_data
+    registry: ScraperRegistry = hass.data[DOMAIN]
+    assert len(registry.get_all()) == 1
+    instance = registry.get("test_scraper")
+    assert instance.scraper is not None
+    assert instance.coordinator is not None
 
 
 @pytest.mark.integration
@@ -154,8 +149,11 @@ async def test_async_process_config_generates_name_for_unnamed_scraper(
 
     # Assert
     assert result is True
-    # Should have generated a name like "Scraper_noname_0"
-    assert len(hass.data[DOMAIN][SCRAPER_DATA]) == 1
+    registry: ScraperRegistry = hass.data[DOMAIN]
+    assert len(registry.get_all()) == 1
+    # Should have generated an ID from the resource URL
+    instance = registry.get_all()[0]
+    assert "example" in instance.scraper_id
 
 
 @pytest.mark.integration
@@ -191,9 +189,11 @@ async def test_async_process_config_stores_platform_configs(
     await _async_process_config(hass, minimal_config)
 
     # Assert
-    assert len(hass.data[DOMAIN][Platform.SENSOR]) == 1
-    sensor_config = hass.data[DOMAIN][Platform.SENSOR][0]
-    assert sensor_config[CONF_NAME] == "test_sensor"
+    registry: ScraperRegistry = hass.data[DOMAIN]
+    instance = registry.get("test_scraper")
+    sensor_configs = instance.platform_configs[Platform.SENSOR]
+    assert len(sensor_configs) == 1
+    assert list(sensor_configs.values())[0][CONF_NAME] == "test_sensor"
 
 
 @pytest.mark.integration
@@ -234,9 +234,10 @@ async def test_async_process_config_with_multiple_platforms(hass: HomeAssistant)
     await _async_process_config(hass, config)
 
     # Assert
-    assert len(hass.data[DOMAIN][Platform.SENSOR]) == 1
-    assert len(hass.data[DOMAIN][Platform.BINARY_SENSOR]) == 1
-    assert len(hass.data[DOMAIN][Platform.BUTTON]) == 1
+    instance = hass.data[DOMAIN].get("multi_platform_scraper")
+    assert len(instance.platform_configs[Platform.SENSOR]) == 1
+    assert len(instance.platform_configs[Platform.BINARY_SENSOR]) == 1
+    assert len(instance.platform_configs[Platform.BUTTON]) == 1
 
 
 @pytest.mark.integration
@@ -267,8 +268,10 @@ async def test_async_process_config_with_multiple_sensors_per_scraper(
     await _async_process_config(hass, config)
 
     # Assert
-    assert len(hass.data[DOMAIN][Platform.SENSOR]) == 3
-    assert len(hass.data[DOMAIN][SCRAPER_DATA]) == 1  # Only one scraper
+    registry: ScraperRegistry = hass.data[DOMAIN]
+    instance = registry.get("multi_sensor_scraper")
+    assert len(instance.platform_configs[Platform.SENSOR]) == 3
+    assert len(registry.get_all()) == 1  # Only one scraper
 
 
 @pytest.mark.integration
@@ -298,8 +301,10 @@ async def test_async_process_config_with_multiple_scrapers(hass: HomeAssistant):
     await _async_process_config(hass, config)
 
     # Assert
-    assert len(hass.data[DOMAIN][SCRAPER_DATA]) == 2
-    assert len(hass.data[DOMAIN][Platform.SENSOR]) == 2
+    registry: ScraperRegistry = hass.data[DOMAIN]
+    assert len(registry.get_all()) == 2
+    assert registry.get("scraper1").platform_configs[Platform.SENSOR].get("sensor1") is not None
+    assert registry.get("scraper2").platform_configs[Platform.SENSOR].get("sensor2") is not None
     # Each scraper should have its own trigger service
     assert hass.services.has_service(DOMAIN, "trigger_scraper1")
     assert hass.services.has_service(DOMAIN, "trigger_scraper2")
@@ -315,7 +320,7 @@ async def test_async_get_config_and_coordinator(hass: HomeAssistant, minimal_con
     _async_setup_shared_data(hass)
     await _async_process_config(hass, minimal_config)
 
-    discovery_info = {SCRAPER_IDX: 0, PLATFORM_IDX: 0}
+    discovery_info = {SCRAPER_ID: "test_scraper", ENTITY_KEY: "test_sensor"}
 
     # Act
     conf, coordinator, scraper = await async_get_config_and_coordinator(
@@ -362,7 +367,8 @@ async def test_async_process_config_with_form_submit(hass: HomeAssistant):
 
     # Assert
     assert result is True
-    assert len(hass.data[DOMAIN][SCRAPER_DATA]) == 1
+    registry: ScraperRegistry = hass.data[DOMAIN]
+    assert len(registry.get_all()) == 1
 
 
 @pytest.mark.integration
@@ -395,7 +401,8 @@ async def test_async_process_config_with_resource_template(hass: HomeAssistant):
 
     # Assert
     assert result is True
-    assert len(hass.data[DOMAIN][SCRAPER_DATA]) == 1
+    registry: ScraperRegistry = hass.data[DOMAIN]
+    assert len(registry.get_all()) == 1
 
 
 @pytest.mark.integration
@@ -426,6 +433,7 @@ async def test_async_process_config_skips_platforms_not_in_config(hass: HomeAssi
     await _async_process_config(hass, config)
 
     # Assert
-    assert len(hass.data[DOMAIN][Platform.SENSOR]) == 1
-    assert len(hass.data[DOMAIN][Platform.BINARY_SENSOR]) == 0
-    assert len(hass.data[DOMAIN][Platform.BUTTON]) == 0
+    instance = hass.data[DOMAIN].get("sensor_only_scraper")
+    assert len(instance.platform_configs.get(Platform.SENSOR, {})) == 1
+    assert len(instance.platform_configs.get(Platform.BINARY_SENSOR, {})) == 0
+    assert len(instance.platform_configs.get(Platform.BUTTON, {})) == 0
