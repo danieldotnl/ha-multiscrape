@@ -3,19 +3,24 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
 
 from homeassistant.const import Platform
+
+if TYPE_CHECKING:
+    from .coordinator import MultiscrapeDataUpdateCoordinator
+    from .scraper import Scraper
 
 _LOGGER = logging.getLogger(__name__)
 
 
 @dataclass
 class ScraperInstance:
-    """Holds all data for a single scraper configuration."""
+    """Hold all data for a single scraper configuration."""
 
     scraper_id: str
-    scraper: object
-    coordinator: object
+    scraper: Scraper
+    coordinator: MultiscrapeDataUpdateCoordinator
     platform_configs: dict[Platform, dict[str, dict]] = field(default_factory=dict)
 
 
@@ -25,6 +30,10 @@ class ScraperRegistry:
     def __init__(self):
         """Initialize an empty registry."""
         self._scrapers: dict[str, ScraperInstance] = {}
+
+    def contains(self, scraper_id: str) -> bool:
+        """Check if a scraper ID is already registered."""
+        return scraper_id in self._scrapers
 
     def register(self, instance: ScraperInstance) -> None:
         """Register a scraper instance by its unique ID."""

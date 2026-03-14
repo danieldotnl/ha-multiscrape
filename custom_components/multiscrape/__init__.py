@@ -79,20 +79,22 @@ async def _async_process_config(hass: HomeAssistant, config) -> bool:
     load_tasks = []
     registry: ScraperRegistry = hass.data[DOMAIN]
 
-    for conf in config[DOMAIN]:
+    for scraper_idx, conf in enumerate(config[DOMAIN]):
         config_name = conf.get(CONF_NAME)
         if config_name is None:
             resource = conf.get(CONF_RESOURCE) or ""
-            config_name = f"scraper_{slugify(resource)}" if resource else "scraper_unnamed"
+            config_name = (
+                f"scraper_{slugify(resource)}" if resource else f"scraper_unnamed_{scraper_idx}"
+            )
             _LOGGER.debug(
-                "# Found no name for scraper, generated a unique name: %s", config_name
+                "# Found no name for scraper, generated name: %s", config_name
             )
 
         _LOGGER.debug(
             "%s # Setting up multiscrape with config:\n %s", config_name, conf
         )
 
-        scraper_id = config_name
+        scraper_id = _deduplicate_id(registry, config_name)
 
         file_manager = await create_file_manager(hass, config_name, conf.get(CONF_LOG_RESPONSE))
         session = create_http_session(config_name, conf, hass, file_manager)
@@ -130,7 +132,9 @@ async def _async_process_config(hass: HomeAssistant, config) -> bool:
                 entity_name = platform_conf.get(CONF_NAME, "")
                 entity_key = slugify(entity_name) if entity_name else f"entity_{id(platform_conf)}"
 
-                instance.platform_configs.setdefault(platform_domain, {})[entity_key] = platform_conf
+                platform_dict = instance.platform_configs.setdefault(platform_domain, {})
+                entity_key = _deduplicate_entity_key(platform_dict, entity_key)
+                platform_dict[entity_key] = platform_conf
 
                 load = discovery.async_load_platform(
                     hass,
@@ -149,6 +153,34 @@ async def _async_process_config(hass: HomeAssistant, config) -> bool:
 
 
     return True
+
+
+def _deduplicate_id(registry: ScraperRegistry, base_id: str) -> str:
+    """Return a unique scraper ID, appending a suffix if needed."""
+    if not registry.contains(base_id):
+        return base_id
+    suffix = 2
+    while registry.contains(f"{base_id}_{suffix}"):
+        suffix += 1
+    deduped = f"{base_id}_{suffix}"
+    _LOGGER.warning(
+        "Duplicate scraper name '%s', using '%s' instead", base_id, deduped
+    )
+    return deduped
+
+
+def _deduplicate_entity_key(platform_dict: dict, base_key: str) -> str:
+    """Return a unique entity key within a platform, appending a suffix if needed."""
+    if base_key not in platform_dict:
+        return base_key
+    suffix = 2
+    while f"{base_key}_{suffix}" in platform_dict:
+        suffix += 1
+    deduped = f"{base_key}_{suffix}"
+    _LOGGER.warning(
+        "Duplicate entity name '%s', using '%s' instead", base_key, deduped
+    )
+    return deduped
 
 
 async def async_get_config_and_coordinator(hass, platform_domain, discovery_info):

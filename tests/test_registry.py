@@ -87,3 +87,10 @@ def test_platform_configs_access(registry, make_instance):
 
     retrieved = registry.get("my_scraper")
     assert retrieved.platform_configs[Platform.SENSOR]["temp_sensor"] is sensor_config
+
+
+def test_contains(registry, make_instance):
+    """Test contains checks for registered IDs."""
+    assert registry.contains("my_scraper") is False
+    registry.register(make_instance("my_scraper"))
+    assert registry.contains("my_scraper") is True

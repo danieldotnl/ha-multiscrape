@@ -437,3 +437,70 @@ async def test_async_process_config_skips_platforms_not_in_config(hass: HomeAssi
     assert len(instance.platform_configs.get(Platform.SENSOR, {})) == 1
     assert len(instance.platform_configs.get(Platform.BINARY_SENSOR, {})) == 0
     assert len(instance.platform_configs.get(Platform.BUTTON, {})) == 0
+
+
+@pytest.mark.integration
+@pytest.mark.async_test
+@pytest.mark.timeout(10)
+@pytest.mark.respx
+async def test_duplicate_scraper_names_are_deduplicated(hass: HomeAssistant):
+    """Test that duplicate scraper names get a suffix instead of crashing."""
+    # Arrange
+    _async_setup_shared_data(hass)
+    config = {
+        DOMAIN: [
+            {
+                CONF_NAME: "my_scraper",
+                CONF_RESOURCE: "https://example.com/1",
+                Platform.SENSOR: [{CONF_NAME: "sensor1", "select": ".v1"}],
+            },
+            {
+                CONF_NAME: "my_scraper",
+                CONF_RESOURCE: "https://example.com/2",
+                Platform.SENSOR: [{CONF_NAME: "sensor2", "select": ".v2"}],
+            },
+        ]
+    }
+
+    # Act
+    result = await _async_process_config(hass, config)
+
+    # Assert - both scrapers should be registered with distinct IDs
+    assert result is True
+    registry: ScraperRegistry = hass.data[DOMAIN]
+    assert len(registry.get_all()) == 2
+    assert registry.get("my_scraper") is not None
+    assert registry.get("my_scraper_2") is not None
+
+
+@pytest.mark.integration
+@pytest.mark.async_test
+@pytest.mark.timeout(10)
+@pytest.mark.respx
+async def test_duplicate_entity_names_are_deduplicated(hass: HomeAssistant):
+    """Test that duplicate entity names within a scraper get a suffix."""
+    # Arrange
+    _async_setup_shared_data(hass)
+    config = {
+        DOMAIN: [
+            {
+                CONF_NAME: "my_scraper",
+                CONF_RESOURCE: "https://example.com",
+                Platform.SENSOR: [
+                    {CONF_NAME: "temperature", "select": ".temp1"},
+                    {CONF_NAME: "temperature", "select": ".temp2"},
+                ],
+            }
+        ]
+    }
+
+    # Act
+    await _async_process_config(hass, config)
+
+    # Assert - both sensors should be stored with distinct keys
+    registry: ScraperRegistry = hass.data[DOMAIN]
+    instance = registry.get("my_scraper")
+    sensor_configs = instance.platform_configs[Platform.SENSOR]
+    assert len(sensor_configs) == 2
+    assert "temperature" in sensor_configs
+    assert "temperature_2" in sensor_configs
