@@ -145,7 +145,8 @@ async def coordinator(
         scraper=scraper,
         update_interval=timedelta(seconds=60),
     )
-    return coordinator
+    yield coordinator
+    await coordinator.async_shutdown()
 
 
 @pytest.fixture
