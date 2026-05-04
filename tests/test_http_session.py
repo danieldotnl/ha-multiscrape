@@ -1,6 +1,5 @@
 """Tests for the unified HttpSession class."""
 
-from unittest.mock import MagicMock
 
 import httpx
 import pytest
@@ -83,15 +82,6 @@ def session(hass: HomeAssistant, http_config):
         http_config=http_config,
         file_manager=None,
     )
-
-
-@pytest.fixture
-def mock_file_manager():
-    """Create a mock file manager."""
-    mock = MagicMock()
-    mock.write = MagicMock()
-    mock.empty_folder = MagicMock()
-    return mock
 
 
 @pytest.fixture
@@ -1765,3 +1755,384 @@ async def test_e2e_form_variables_empty_when_no_variables_configured(
         assert request_manager.form_variables == {}
     finally:
         await session.async_close()
+
+
+# ============================================================================
+# End-to-End Full Variable Propagation Chain Tests
+# ============================================================================
+
+
+def _make_e2e_form_conf(hass):
+    """Create a config with form_submit + variables for e2e tests."""
+    from homeassistant.helpers.template import Template
+
+    return {
+        "resource": "https://site.com/data",
+        "method": "get",
+        "verify_ssl": True,
+        "timeout": 10,
+        "parser": "html.parser",
+        "form_submit": {
+            "resource": "https://site.com/login",
+            "select": "#loginform",
+            "input": {"username": "admin", "password": "secret"},
+            "input_filter": [],
+            "submit_once": False,
+            "resubmit_on_error": False,
+            "variables": [
+                {
+                    "name": "api_token",
+                    "select": Template(".api-token", hass),
+                    "extract": "text",
+                },
+            ],
+            "method": "get",
+            "verify_ssl": True,
+            "timeout": 10,
+            "parser": "html.parser",
+            "separator": ",",
+        },
+    }
+
+
+@pytest.mark.integration
+@pytest.mark.async_test
+@pytest.mark.timeout(10)
+@respx.mock
+async def test_e2e_full_variable_chain_form_to_scraper_output(hass: HomeAssistant):
+    """End-to-end: form variables flow through the full chain to scraper output.
+
+    Tests the complete flow:
+    FormAuthenticator.scrape_variables() → session.form_variables →
+    coordinator.scrape_context → Scraper.scrape(context=) → template rendering
+    """
+    from homeassistant.helpers.template import Template
+
+    from custom_components.multiscrape.coordinator import \
+        create_content_request_manager
+    from custom_components.multiscrape.scraper import Scraper
+    from custom_components.multiscrape.selector import Selector
+
+    conf = _make_e2e_form_conf(hass)
+
+    session = create_http_session("chain_test", conf, hass, None)
+
+    try:
+        respx.get("https://site.com/login").mock(
+            return_value=respx.MockResponse(200, text=LOGIN_PAGE_WITH_TOKEN_HTML)
+        )
+        respx.post("https://site.com/auth/submit").mock(
+            return_value=respx.MockResponse(200, text=LOGIN_PAGE_WITH_TOKEN_HTML)
+        )
+        data_html = """
+        <html><body>
+        <div class="temperature">21.5</div>
+        </body></html>
+        """
+        respx.get("https://site.com/data").mock(
+            return_value=respx.MockResponse(200, text=data_html)
+        )
+
+        request_manager = create_content_request_manager(
+            "chain_test", conf, hass, session
+        )
+
+        # Step 1: get_content triggers form auth + page fetch
+        content = await request_manager.get_content()
+
+        # Step 2: Variables were scraped from form response
+        assert session.form_variables["api_token"] == "scraped_token_123"
+
+        # Step 3: Build scrape context (as coordinator does)
+        scrape_context = ScrapeContext(form_variables=request_manager.form_variables)
+        assert scrape_context.form_variables["api_token"] == "scraped_token_123"
+
+        # Step 4: Scraper uses context in value template
+        scraper = Scraper("chain_test", hass, None, "html.parser", ",")
+        await scraper.set_content(content)
+        selector = Selector(hass, {
+            "select": Template(".temperature", hass),
+            "extract": "text",
+            "value_template": Template("{{ value }}°C (auth={{ api_token }})", hass),
+        })
+        result = scraper.scrape(selector, "temp_sensor", context=scrape_context)
+
+        # Final: form variable appears in rendered output
+        assert result == "21.5°C (auth=scraped_token_123)"
+    finally:
+        await session.async_close()
+
+
+@pytest.mark.integration
+@pytest.mark.async_test
+@pytest.mark.timeout(10)
+@respx.mock
+async def test_e2e_variables_passed_to_params_renderer(hass: HomeAssistant):
+    """End-to-end: form variables are passed to params renderer during page request."""
+    received_params_vars = {}
+
+    def params_renderer(variables={}, parse_result=None):
+        received_params_vars.update(variables)
+        return {"token": variables.get("api_token", "")}
+
+    conf = _make_e2e_form_conf(hass)
+
+    session = create_http_session("params_test", conf, hass, None)
+    session._http_config.params_renderer = params_renderer
+
+    try:
+        respx.get("https://site.com/login").mock(
+            return_value=respx.MockResponse(200, text=LOGIN_PAGE_WITH_TOKEN_HTML)
+        )
+        respx.post("https://site.com/auth/submit").mock(
+            return_value=respx.MockResponse(200, text=LOGIN_PAGE_WITH_TOKEN_HTML)
+        )
+        respx.get(url__startswith="https://site.com/data").mock(
+            return_value=respx.MockResponse(200, text=TARGET_PAGE_HTML)
+        )
+
+        from custom_components.multiscrape.coordinator import \
+            create_content_request_manager
+
+        request_manager = create_content_request_manager(
+            "params_test", conf, hass, session
+        )
+        await request_manager.get_content()
+
+        # Verify form variables were passed to the params renderer
+        assert received_params_vars.get("api_token") == "scraped_token_123"
+    finally:
+        await session.async_close()
+
+
+@pytest.mark.integration
+@pytest.mark.async_test
+@pytest.mark.timeout(10)
+@respx.mock
+async def test_e2e_variables_passed_to_data_renderer(hass: HomeAssistant):
+    """End-to-end: form variables are passed to data renderer during page request."""
+    received_data_vars = {}
+
+    def data_renderer(variables={}, parse_result=None):
+        received_data_vars.update(variables)
+        return None
+
+    conf = _make_e2e_form_conf(hass)
+
+    session = create_http_session("data_rend_test", conf, hass, None)
+    session._http_config.data_renderer = data_renderer
+
+    try:
+        respx.get("https://site.com/login").mock(
+            return_value=respx.MockResponse(200, text=LOGIN_PAGE_WITH_TOKEN_HTML)
+        )
+        respx.post("https://site.com/auth/submit").mock(
+            return_value=respx.MockResponse(200, text=LOGIN_PAGE_WITH_TOKEN_HTML)
+        )
+        respx.get("https://site.com/data").mock(
+            return_value=respx.MockResponse(200, text=TARGET_PAGE_HTML)
+        )
+
+        from custom_components.multiscrape.coordinator import \
+            create_content_request_manager
+
+        request_manager = create_content_request_manager(
+            "data_rend_test", conf, hass, session
+        )
+        await request_manager.get_content()
+
+        # Verify form variables were passed to the data renderer
+        assert received_data_vars.get("api_token") == "scraped_token_123"
+    finally:
+        await session.async_close()
+
+
+# ============================================================================
+# Error-Path File Logging Tests
+# ============================================================================
+
+
+@pytest.mark.integration
+@pytest.mark.async_test
+@pytest.mark.http
+@pytest.mark.timeout(10)
+@respx.mock
+async def test_handle_request_exception_with_none_response(
+    session_with_file_manager, mock_file_manager
+):
+    """Test _handle_request_exception is safe when response is None.
+
+    When a connection fails before any response is received (e.g., DNS failure),
+    _handle_request_exception is called with response=None. It must not crash.
+    """
+    url = "https://example.com/unreachable"
+    respx.get(url).mock(side_effect=RequestError("DNS resolution failed"))
+
+    with pytest.raises(RequestError):
+        await session_with_file_manager.async_request("test", url)
+
+    # File manager should have logged request headers/body before the error,
+    # but NOT error response (since response is None)
+    write_calls = mock_file_manager.write.call_args_list
+    filenames = [call[0][0] for call in write_calls]
+    assert any("request_headers" in f for f in filenames)
+    assert not any("response_headers_error" in f for f in filenames)
+    assert not any("response_body_error" in f for f in filenames)
+
+
+@pytest.mark.integration
+@pytest.mark.async_test
+@pytest.mark.http
+@pytest.mark.timeout(10)
+@respx.mock
+async def test_handle_request_exception_timeout_with_none_response(
+    session_with_file_manager, mock_file_manager
+):
+    """Test _handle_request_exception handles timeout with no response."""
+    url = "https://example.com/slow"
+    respx.get(url).mock(side_effect=TimeoutException("Timed out"))
+
+    with pytest.raises(TimeoutException):
+        await session_with_file_manager.async_request("test", url)
+
+    write_calls = mock_file_manager.write.call_args_list
+    filenames = [call[0][0] for call in write_calls]
+    # No error response files since response is None
+    assert not any("response_headers_error" in f for f in filenames)
+    assert not any("response_body_error" in f for f in filenames)
+
+
+@pytest.mark.integration
+@pytest.mark.async_test
+@pytest.mark.http
+@pytest.mark.timeout(10)
+@respx.mock
+async def test_file_logging_error_response_files_on_http_error(
+    session_with_file_manager, mock_file_manager
+):
+    """Test that HTTP errors (4xx/5xx) log error response headers and body."""
+    url = "https://example.com/server-error"
+    respx.get(url).mock(
+        return_value=respx.MockResponse(500, text="Internal Server Error")
+    )
+
+    with pytest.raises(httpx.HTTPStatusError):
+        await session_with_file_manager.async_request("test_ctx", url)
+
+    write_calls = mock_file_manager.write.call_args_list
+    filenames = [call[0][0] for call in write_calls]
+    # Should have request files and response files (logged before raise)
+    # plus error response files (logged in _handle_request_exception)
+    assert any("test_ctx_request_headers" in f for f in filenames)
+    assert any("test_ctx_response_headers" in f for f in filenames)
+    assert any("test_ctx_response_body" in f for f in filenames)
+    assert any("test_ctx_response_headers_error" in f for f in filenames)
+    assert any("test_ctx_response_body_error" in f for f in filenames)
+
+
+@pytest.mark.integration
+@pytest.mark.async_test
+@pytest.mark.http
+@pytest.mark.timeout(10)
+async def test_async_file_log_skips_none_content(
+    hass: HomeAssistant, mock_file_manager
+):
+    """Test _async_file_log does nothing when content is None."""
+    config = make_http_config()
+    sess = HttpSession(
+        config_name="test", hass=hass, http_config=config,
+        file_manager=mock_file_manager,
+    )
+
+    await sess._async_file_log("test_content", "ctx", None)
+
+    # write should not be called when content is None
+    mock_file_manager.write.assert_not_called()
+
+
+@pytest.mark.integration
+@pytest.mark.async_test
+@pytest.mark.http
+@pytest.mark.timeout(10)
+async def test_async_file_log_handles_write_exception(
+    hass: HomeAssistant, mock_file_manager, caplog
+):
+    """Test _async_file_log logs error when file write fails."""
+    mock_file_manager.write.side_effect = OSError("Disk full")
+
+    config = make_http_config()
+    sess = HttpSession(
+        config_name="test_session", hass=hass, http_config=config,
+        file_manager=mock_file_manager,
+    )
+
+    # Should not raise — exception is caught and logged
+    await sess._async_file_log("test_content", "ctx", "some data")
+
+    assert "Unable to write" in caplog.text
+
+
+@pytest.mark.integration
+@pytest.mark.async_test
+@pytest.mark.http
+@pytest.mark.timeout(10)
+async def test_async_file_log_correct_filename(
+    hass: HomeAssistant, mock_file_manager
+):
+    """Test _async_file_log generates correct filename from context and content_name."""
+    config = make_http_config()
+    sess = HttpSession(
+        config_name="test", hass=hass, http_config=config,
+        file_manager=mock_file_manager,
+    )
+
+    await sess._async_file_log("response_headers", "page", {"Content-Type": "text/html"})
+
+    mock_file_manager.write.assert_called_once()
+    call_args = mock_file_manager.write.call_args[0]
+    assert call_args[0] == "page_response_headers.txt"
+    assert call_args[1] == {"Content-Type": "text/html"}
+
+
+# ============================================================================
+# create_http_session with variables=None edge case
+# ============================================================================
+
+
+@pytest.mark.integration
+@pytest.mark.async_test
+@pytest.mark.timeout(10)
+async def test_create_http_session_form_variables_none(hass: HomeAssistant):
+    """Test create_http_session handles form config where variables key is absent.
+
+    When config.get(CONF_FORM_VARIABLES) returns None (key missing from config),
+    the `if variables:` check in create_http_session must not crash.
+    """
+    conf = {
+        "resource": "https://example.com",
+        "method": "get",
+        "verify_ssl": True,
+        "timeout": 10,
+        "parser": "html.parser",
+        "form_submit": {
+            "resource": "https://example.com/login",
+            "select": "#login",
+            "input": {"user": "admin"},
+            "input_filter": [],
+            "submit_once": False,
+            "resubmit_on_error": True,
+            # "variables" key deliberately omitted — config.get() returns None
+            "method": "post",
+            "verify_ssl": True,
+            "timeout": 10,
+        },
+    }
+    session = create_http_session("none_vars_test", conf, hass, None)
+
+    assert session._form_authenticator is not None
+    # No scraper should be created when variables is None/empty
+    assert session._form_authenticator._config.variables_selectors == {}
+    assert session._form_authenticator._config.scraper is None
+    assert session.form_variables == {}
+
+    await session.async_close()
