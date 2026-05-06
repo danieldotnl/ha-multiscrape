@@ -31,12 +31,14 @@ class HtmlParser(ContentParser):
     """Parse HTML/XML content using BeautifulSoup."""
 
     def __init__(self, parser_name: str = "lxml"):
-        """Initialize HTML parser."""
+        """Initialize markup parser."""
         self._parser_name = parser_name
 
     @property
     def name(self) -> str:
         """Return parser name."""
+        if self._parser_name == "lxml-xml":
+            return f"xml ({self._parser_name})"
         return f"html ({self._parser_name})"
 
     def can_parse(self, content: str) -> bool:

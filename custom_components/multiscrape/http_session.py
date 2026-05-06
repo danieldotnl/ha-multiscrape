@@ -215,9 +215,18 @@ class HttpSession:
         return await self._form_authenticator.ensure_authenticated(main_resource)
 
     def invalidate_auth(self):
-        """Invalidate the current authentication so the form will be re-submitted."""
+        """Invalidate the current authentication so the form will be re-submitted.
+
+        Clears the cookie jar to prevent stale session cookies from
+        interfering with fresh authentication.
+        """
         if self._form_authenticator:
             self._form_authenticator.invalidate()
+            self._client.cookies.clear()
+            _LOGGER.debug(
+                "%s # Cookies cleared for fresh authentication",
+                self._config_name,
+            )
 
     @property
     def form_variables(self) -> dict[str, Any]:

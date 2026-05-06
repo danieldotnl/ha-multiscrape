@@ -68,6 +68,20 @@ class FormAuthenticator:
             _LOGGER.debug("%s # Skip submitting form", self._config_name)
             return None
 
+        try:
+            return await self._submit_form(main_resource)
+        except Exception:
+            if self._form_variables:
+                _LOGGER.warning(
+                    "%s # Form authentication failed. Retaining stale form_variables "
+                    "from previous successful auth: %s",
+                    self._config_name,
+                    list(self._form_variables.keys()),
+                )
+            raise
+
+    async def _submit_form(self, main_resource: str) -> str | None:
+        """Execute the form submission flow."""
         _LOGGER.debug("%s # Starting with form-submit", self._config_name)
         form_cfg = self._config
         input_fields = {}

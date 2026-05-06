@@ -5,6 +5,7 @@ import logging
 from collections.abc import Callable
 from datetime import timedelta
 
+import httpx
 from homeassistant.const import (CONF_RESOURCE, CONF_RESOURCE_TEMPLATE,
                                  CONF_SCAN_INTERVAL,
                                  EVENT_HOMEASSISTANT_STARTED)
@@ -69,6 +70,23 @@ class ContentRequestManager:
                     self._config_name,
                 )
                 return result
+        except httpx.HTTPStatusError as ex:
+            if ex.response.status_code in (401, 403):
+                _LOGGER.error(
+                    "%s # Authentication rejected with HTTP %s. "
+                    "Not falling through to target page as data would be unreliable.\n%s",
+                    self._config_name,
+                    ex.response.status_code,
+                    ex,
+                )
+                raise
+            _LOGGER.error(
+                "%s # HTTP error during form-submit (status %s). "
+                "Will continue trying to scrape target page.\n%s",
+                self._config_name,
+                ex.response.status_code,
+                ex,
+            )
         except Exception as ex:
             _LOGGER.error(
                 "%s # Exception in form-submit feature. Will continue trying to scrape target page.\n%s",

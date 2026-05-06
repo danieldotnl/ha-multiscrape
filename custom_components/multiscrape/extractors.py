@@ -32,10 +32,16 @@ class ValueExtractor:
 
     @staticmethod
     def _extract_tag_value(tag: Tag, selector: Selector) -> str:
-        """Extract value from HTML tag based on extract mode."""
-        if tag.name in ("style", "script", "template"):
-            return tag.string or ""
+        """Extract value from tag based on extract mode.
+
+        For HTML raw-text elements (style, script, template) with default
+        text extraction, we use tag.string which returns the raw content
+        without parsing child tags. For explicit extract modes or XML
+        content, the extract parameter is always respected.
+        """
         if selector.extract == "text":
+            if tag.name in ("style", "script", "template") and tag.string is not None:
+                return tag.string
             return tag.text
         elif selector.extract == "content":
             return ''.join(map(str, tag.contents))
