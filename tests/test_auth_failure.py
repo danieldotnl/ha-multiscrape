@@ -443,7 +443,11 @@ class TestReauthFlow:
     @pytest.mark.timeout(10)
     @respx.mock
     async def test_invalidate_auth_no_op_when_resubmit_disabled(self, hass: HomeAssistant):
-        """Test that invalidate_auth does nothing when resubmit_on_error=False."""
+        """Test that invalidate_auth does nothing when resubmit_on_error=False.
+
+        Both _should_submit must stay False AND cookies must be preserved,
+        since there is no way to re-establish the session.
+        """
         form_config = make_form_config(
             input_values={"user": "admin"},
             submit_once=True,
@@ -453,15 +457,22 @@ class TestReauthFlow:
 
         try:
             respx.post("https://example.com/main").mock(
-                return_value=respx.MockResponse(200, text="OK")
+                return_value=respx.MockResponse(
+                    200, text="OK",
+                    headers={"Set-Cookie": "session=keep_me; Path=/"},
+                )
             )
 
             await session.ensure_authenticated("https://example.com/main")
             assert not session._form_authenticator._should_submit
+            assert len(session._client.cookies) > 0
 
             # invalidate_auth should NOT set _should_submit back
+            # AND should NOT clear cookies (no way to re-establish session)
             session.invalidate_auth()
             assert not session._form_authenticator._should_submit
+            assert len(session._client.cookies) > 0
+            assert session._client.cookies["session"] == "keep_me"
         finally:
             await session.async_close()
 

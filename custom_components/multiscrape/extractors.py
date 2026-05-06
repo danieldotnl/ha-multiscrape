@@ -39,12 +39,11 @@ class ValueExtractor:
         without parsing child tags. For explicit extract modes or XML
         content, the extract parameter is always respected.
         """
-        if selector.extract == "text":
-            if tag.name in ("style", "script", "template") and tag.string is not None:
-                return tag.string
-            return tag.text
-        elif selector.extract == "content":
+        if selector.extract == "content":
             return ''.join(map(str, tag.contents))
-        elif selector.extract == "tag":
+        if selector.extract == "tag":
             return str(tag)
+        # Default text extraction (extract is "text" or None)
+        if tag.name in ("style", "script", "template") and tag.string is not None:
+            return tag.string
         return tag.text
