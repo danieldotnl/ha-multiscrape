@@ -196,6 +196,8 @@ async def test_coordinator_with_zero_scan_interval(
     assert scraper._data == "<html>Manual Update</html>"
     assert coordinator.last_update_success
 
+    await coordinator.async_shutdown()
+
 
 # ============================================================================
 # Retry logic tests (scan_interval=0)
