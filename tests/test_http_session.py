@@ -1,6 +1,9 @@
 """Tests for the unified HttpSession class."""
 
 
+import ssl
+from unittest.mock import patch
+
 import httpx
 import pytest
 import respx
@@ -118,6 +121,32 @@ FORM_PAGE_NO_ACTION = """
 </body>
 </html>
 """
+
+
+# ============================================================================
+# Regression: issue #578 — blocking SSL cert load on event loop
+# ============================================================================
+
+
+@pytest.mark.parametrize("verify_ssl", [True, False])
+def test_init_does_not_load_verify_locations(hass: HomeAssistant, verify_ssl):
+    """HttpSession must not call ssl.SSLContext.load_verify_locations during init.
+
+    Regression guard for issue #578: constructing httpx.AsyncClient(verify=bool)
+    triggers a synchronous CA-bundle load on the event loop. We avoid this by
+    passing a pre-built (and pre-warmed) ssl.SSLContext from HA's util.ssl.
+    """
+    with patch.object(
+        ssl.SSLContext, "load_verify_locations"
+    ) as mock_load:
+        HttpSession(
+            config_name="test_ssl",
+            hass=hass,
+            http_config=make_http_config(verify_ssl=verify_ssl),
+            file_manager=None,
+        )
+
+    mock_load.assert_not_called()
 
 
 # ============================================================================
