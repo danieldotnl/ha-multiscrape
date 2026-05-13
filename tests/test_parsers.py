@@ -1,57 +1,80 @@
 """Unit tests for the parsers module."""
 
+import json
+
 import pytest
 from bs4 import BeautifulSoup
 from homeassistant.core import HomeAssistant
 
-from custom_components.multiscrape.parsers import (HtmlParser, JsonDetector,
+from custom_components.multiscrape.parsers import (HtmlParser, JsonParser,
                                                    ParserFactory)
 
+from .fixtures.json_samples import (SAMPLE_JSON_INVALID,
+                                    SAMPLE_JSON_SPECIAL_CHARS)
+
 # ============================================================================
-# JsonDetector tests
+# JsonParser tests
 # ============================================================================
 
 
-class TestJsonDetector:
-    """Tests for JsonDetector."""
+class TestJsonParser:
+    """Tests for JsonParser."""
 
     def setup_method(self):
         """Set up test fixtures."""
-        self.detector = JsonDetector()
+        self.parser = JsonParser()
 
     def test_name(self):
-        """Test that JsonDetector reports its name as 'json'."""
-        assert self.detector.name == "json"
+        """Test that JsonParser reports its name as 'json'."""
+        assert self.parser.name == "json"
 
     def test_can_parse_json_object(self):
         """Test that JSON objects are detected."""
-        assert self.detector.can_parse('{"key": "value"}') is True
+        assert self.parser.can_parse('{"key": "value"}') is True
 
     def test_can_parse_json_array(self):
         """Test that JSON arrays are detected."""
-        assert self.detector.can_parse('[1, 2, 3]') is True
+        assert self.parser.can_parse("[1, 2, 3]") is True
 
     def test_can_parse_json_with_leading_whitespace(self):
         """Test that JSON with leading whitespace is detected."""
-        assert self.detector.can_parse('  {"key": "value"}') is True
+        assert self.parser.can_parse('  {"key": "value"}') is True
 
     def test_cannot_parse_html(self):
         """Test that HTML content is not detected as JSON."""
-        assert self.detector.can_parse("<html><body>Hello</body></html>") is False
+        assert self.parser.can_parse("<html><body>Hello</body></html>") is False
 
     def test_cannot_parse_empty_string(self):
         """Test that empty string is not detected as JSON."""
-        assert self.detector.can_parse("") is False
+        assert self.parser.can_parse("") is False
 
     def test_cannot_parse_plain_text(self):
         """Test that plain text is not detected as JSON."""
-        assert self.detector.can_parse("Hello world") is False
+        assert self.parser.can_parse("Hello world") is False
 
     @pytest.mark.async_test
-    async def test_parse_returns_none(self, hass: HomeAssistant):
-        """Test that parse returns None since JSON is not parsed."""
-        result = await self.detector.parse('{"key": "value"}', hass)
-        assert result is None
+    async def test_parse_returns_dict_for_json_object(self, hass: HomeAssistant):
+        """Test that parse returns a dict for JSON objects."""
+        result = await self.parser.parse('{"key": "value"}', hass)
+        assert result == {"key": "value"}
+
+    @pytest.mark.async_test
+    async def test_parse_returns_list_for_json_array(self, hass: HomeAssistant):
+        """Test that parse returns a list for JSON arrays."""
+        result = await self.parser.parse("[1, 2, 3]", hass)
+        assert result == [1, 2, 3]
+
+    @pytest.mark.async_test
+    async def test_parse_raises_on_malformed_json(self, hass: HomeAssistant):
+        """Test that parse raises JSONDecodeError on malformed input."""
+        with pytest.raises(json.JSONDecodeError):
+            await self.parser.parse(SAMPLE_JSON_INVALID, hass)
+
+    @pytest.mark.async_test
+    async def test_parse_handles_special_chars(self, hass: HomeAssistant):
+        """Test that parse handles JSON with escaped special characters."""
+        result = await self.parser.parse(SAMPLE_JSON_SPECIAL_CHARS, hass)
+        assert result == {"text": 'Text with "quotes" and \n newlines'}
 
 
 # ============================================================================
@@ -88,7 +111,7 @@ class TestHtmlParser:
 
     def test_cannot_parse_json_array(self):
         """Test that JSON arrays are not accepted as HTML."""
-        assert self.parser.can_parse('[1, 2, 3]') is False
+        assert self.parser.can_parse("[1, 2, 3]") is False
 
     @pytest.mark.async_test
     async def test_parse_returns_beautifulsoup(self, hass: HomeAssistant):
@@ -117,15 +140,15 @@ class TestParserFactory:
         """Set up test fixtures."""
         self.factory = ParserFactory("lxml")
 
-    def test_selects_json_detector_for_json_object(self):
-        """Test that factory selects JsonDetector for JSON objects."""
+    def test_selects_json_parser_for_json_object(self):
+        """Test that factory selects JsonParser for JSON objects."""
         parser = self.factory.get_parser('{"key": "value"}')
-        assert isinstance(parser, JsonDetector)
+        assert isinstance(parser, JsonParser)
 
-    def test_selects_json_detector_for_json_array(self):
-        """Test that factory selects JsonDetector for JSON arrays."""
-        parser = self.factory.get_parser('[1, 2, 3]')
-        assert isinstance(parser, JsonDetector)
+    def test_selects_json_parser_for_json_array(self):
+        """Test that factory selects JsonParser for JSON arrays."""
+        parser = self.factory.get_parser("[1, 2, 3]")
+        assert isinstance(parser, JsonParser)
 
     def test_selects_html_parser_for_html(self):
         """Test that factory selects HtmlParser for HTML content."""

@@ -1,6 +1,8 @@
 """Content parsers for multiscrape using the Strategy pattern."""
+
 from __future__ import annotations
 
+import json
 import logging
 from abc import ABC, abstractmethod
 from typing import Any
@@ -55,8 +57,13 @@ class HtmlParser(ContentParser):
         )
 
 
-class JsonDetector(ContentParser):
-    """Detects JSON content. Does not parse it (JSON uses value_template only)."""
+class JsonParser(ContentParser):
+    """Parse JSON content into a Python structure.
+
+    Values are typically extracted via Jinja value_template (the canonical
+    Home Assistant pattern); the parsed structure is used for pretty-printing
+    and file logging.
+    """
 
     @property
     def name(self) -> str:
@@ -68,9 +75,9 @@ class JsonDetector(ContentParser):
         content_stripped = content.lstrip() if content else ""
         return bool(content_stripped) and content_stripped[0] in ("{", "[")
 
-    async def parse(self, content: str, hass: Any) -> None:
-        """JSON is not parsed into a queryable structure."""
-        return None
+    async def parse(self, content: str, hass: Any) -> dict | list:
+        """Parse JSON content. Raises json.JSONDecodeError on malformed input."""
+        return await hass.async_add_executor_job(json.loads, content)
 
 
 class ParserFactory:
@@ -79,7 +86,7 @@ class ParserFactory:
     def __init__(self, parser_name: str):
         """Initialize with the HTML parser name."""
         self._parsers: list[ContentParser] = [
-            JsonDetector(),
+            JsonParser(),
             HtmlParser(parser_name),
         ]
 

@@ -1,11 +1,13 @@
 """Support for multiscrape requests."""
+
+import json
 import logging
 
 from bs4 import BeautifulSoup
 
 from .const import CONF_PARSER, CONF_SEPARATOR
 from .extractors import ValueExtractor
-from .parsers import JsonDetector, ParserFactory
+from .parsers import JsonParser, ParserFactory
 from .scrape_context import ScrapeContext
 
 DEFAULT_TIMEOUT = 10
@@ -64,9 +66,17 @@ class Scraper:
 
     @property
     def formatted_content(self):
-        """Property for getting the content. HTML will be prettified."""
+        """Return the content for display: HTML prettified, JSON pretty-printed, or raw."""
         if self._soup:
             return self._soup.prettify()
+        if self._is_json and self._data:
+            try:
+                return json.dumps(
+                    json.loads(self._data), indent=2, ensure_ascii=False
+                )
+            except (json.JSONDecodeError, RecursionError):
+                # Detected as JSON-shaped but unparsable — fall back to raw.
+                return self._data
         return self._data
 
     async def set_content(self, content):
@@ -74,12 +84,14 @@ class Scraper:
         self._data = content
         parser = self._parser_factory.get_parser(content)
 
-        if isinstance(parser, JsonDetector):
+        if isinstance(parser, JsonParser):
             _LOGGER.debug(
-                "%s # Response seems to be json. Skip parsing with BeautifulSoup.",
+                "%s # Response detected as JSON; skipping BeautifulSoup parsing.",
                 self._config_name,
             )
             self._is_json = True
+            if self._file_manager:
+                await self._async_file_log("page_json", self.formatted_content)
             return
 
         try:
@@ -101,7 +113,9 @@ class Scraper:
             )
             raise
 
-    def scrape(self, selector, sensor, attribute=None, context: ScrapeContext | None = None):
+    def scrape(
+        self, selector, sensor, attribute=None, context: ScrapeContext | None = None
+    ):
         """Scrape based on given selector the data."""
         if context is None:
             context = ScrapeContext.empty()
@@ -123,16 +137,14 @@ class Scraper:
         value = self._extract_value(selector, log_prefix)
 
         if value is not None and selector.value_template is not None:
-            _LOGGER.debug(
-                "%s # Applying value_template on selector result", log_prefix)
+            _LOGGER.debug("%s # Applying value_template on selector result", log_prefix)
             render_ctx = context.with_current_value(value)
             value = selector.value_template.async_render(
                 variables=render_ctx.to_template_variables(), parse_result=True
             )
 
         _LOGGER.debug(
-            "%s # Final selector value: %s of type %s", log_prefix, value, type(
-                value)
+            "%s # Final selector value: %s of type %s", log_prefix, value, type(value)
         )
         return value
 
@@ -140,8 +152,7 @@ class Scraper:
         """Delegate extraction to ValueExtractor."""
         if selector.is_list:
             tags = self._soup.select(selector.list)
-            _LOGGER.debug("%s # List selector selected tags: %s",
-                          log_prefix, tags)
+            _LOGGER.debug("%s # List selector selected tags: %s", log_prefix, tags)
             return self._extractor.extract_list(tags, selector)
         else:
             tag = self._soup.select_one(selector.element)
