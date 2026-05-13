@@ -327,19 +327,24 @@ async def test_scraper_handles_malformed_json_softly(
 @pytest.mark.async_test
 @pytest.mark.timeout(5)
 async def test_scraper_handles_recursion_error_softly(
-    hass: HomeAssistant, scraper_instance
+    hass: HomeAssistant, scraper_instance, monkeypatch
 ):
-    """Pathologically nested JSON (RecursionError) also soft-fails in formatted_content."""
-    # 10000 levels of nesting reliably triggers RecursionError on CPython 3.13
-    # while remaining a syntactically valid JSON-shaped string.
-    deeply_nested = "[" * 10000 + "]" * 10000
-
-    await scraper_instance.set_content(deeply_nested)
-
+    """A JSON parse that raises RecursionError soft-fails in formatted_content."""
+    # Triggering a real RecursionError depends on sys.getrecursionlimit(), which
+    # varies across environments. Simulate the failure mode directly so the test
+    # is deterministic and doesn't produce huge debug output on CI.
+    await scraper_instance.set_content(SAMPLE_JSON_SIMPLE)
     assert scraper_instance._is_json is True
-    assert scraper_instance._data == deeply_nested
+
+    def boom(*_args, **_kwargs):
+        raise RecursionError("simulated deeply-nested JSON")
+
+    monkeypatch.setattr(
+        "custom_components.multiscrape.scraper.json.loads", boom
+    )
+
     # formatted_content falls back to raw on RecursionError
-    assert scraper_instance.formatted_content == deeply_nested
+    assert scraper_instance.formatted_content == SAMPLE_JSON_SIMPLE
 
 
 @pytest.mark.integration
