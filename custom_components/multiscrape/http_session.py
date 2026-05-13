@@ -12,6 +12,7 @@ from homeassistant.const import (CONF_AUTHENTICATION, CONF_HEADERS,
                                  CONF_TIMEOUT, CONF_USERNAME, CONF_VERIFY_SSL,
                                  HTTP_DIGEST_AUTHENTICATION)
 from homeassistant.core import HomeAssistant
+from homeassistant.util.ssl import client_context, create_no_verify_ssl_context
 
 from .const import (CONF_FORM_INPUT, CONF_FORM_INPUT_FILTER,
                     CONF_FORM_RESUBMIT_ERROR, CONF_FORM_SELECT,
@@ -68,9 +69,13 @@ class HttpSession:
         self._file_manager = file_manager
         self._form_authenticator = form_authenticator
 
-        # Create dedicated httpx client with its own cookie jar
+        # Create dedicated httpx client with its own cookie jar.
+        # Use HA's pre-warmed cached SSL context so CA certs are never loaded
+        # on the event loop (homeassistant.util.ssl pre-warms the cache at
+        # import time precisely to avoid blocking I/O here).
+        ssl_ctx = client_context() if http_config.verify_ssl else create_no_verify_ssl_context()
         self._client = httpx.AsyncClient(
-            verify=http_config.verify_ssl,
+            verify=ssl_ctx,
             timeout=http_config.timeout,
             follow_redirects=True,
         )
