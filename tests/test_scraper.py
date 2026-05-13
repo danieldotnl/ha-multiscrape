@@ -5,6 +5,7 @@ to extract data from HTML content using CSS selectors.
 """
 
 import re
+from unittest.mock import MagicMock
 
 import pytest
 from homeassistant.core import HomeAssistant
@@ -18,7 +19,8 @@ from custom_components.multiscrape.selector import Selector
 from .fixtures.html_samples import (SAMPLE_HTML_EMPTY, SAMPLE_HTML_FULL,
                                     SAMPLE_HTML_LIST, SAMPLE_HTML_MALFORMED,
                                     SAMPLE_HTML_SPECIAL_TAGS)
-from .fixtures.json_samples import SAMPLE_JSON_SIMPLE
+from .fixtures.json_samples import (SAMPLE_JSON_INVALID, SAMPLE_JSON_NESTED,
+                                    SAMPLE_JSON_SIMPLE)
 
 
 @pytest.fixture
@@ -147,13 +149,15 @@ async def test_scraper_selector_not_found_raises_error(
 @pytest.mark.async_test
 @pytest.mark.timeout(5)
 async def test_scraper_handles_json_content(hass: HomeAssistant, scraper_instance):
-    """Test that scraper detects and handles JSON content correctly."""
+    """Test that scraper detects JSON content and preserves it for value_template."""
     # Arrange
     await scraper_instance.set_content(SAMPLE_JSON_SIMPLE)
 
     # JSON content should not be parsed by BeautifulSoup
     assert scraper_instance._soup is None
+    # Raw data is preserved for value_template (the canonical HA JSON path)
     assert scraper_instance._data == SAMPLE_JSON_SIMPLE
+    assert scraper_instance._is_json is True
 
 
 @pytest.mark.integration
@@ -184,8 +188,8 @@ async def test_scraper_json_without_value_template_raises_error(
 @pytest.mark.async_test
 @pytest.mark.timeout(5)
 async def test_scraper_reset_clears_content(hass: HomeAssistant, scraper_instance):
-    """Test that reset() clears both data and soup."""
-    # Arrange
+    """Test that reset() clears HTML soup and JSON state."""
+    # Arrange — first an HTML cycle
     await scraper_instance.set_content(SAMPLE_HTML_FULL)
     assert scraper_instance._data is not None
     assert scraper_instance._soup is not None
@@ -196,6 +200,18 @@ async def test_scraper_reset_clears_content(hass: HomeAssistant, scraper_instanc
     # Assert
     assert scraper_instance._data is None
     assert scraper_instance._soup is None
+    assert scraper_instance._is_json is False
+
+    # Arrange — now a JSON cycle
+    await scraper_instance.set_content(SAMPLE_JSON_SIMPLE)
+    assert scraper_instance._is_json is True
+
+    # Act
+    scraper_instance.reset()
+
+    # Assert
+    assert scraper_instance._data is None
+    assert scraper_instance._is_json is False
 
 
 @pytest.mark.integration
@@ -257,6 +273,109 @@ async def test_scraper_formatted_content_prettifies_html(
     assert "Test" in formatted
     # Verify it's actually formatted (has indentation)
     assert "  " in formatted  # Multiple spaces indicate indentation
+
+
+# ============================================================================
+# JSON-specific scraper tests
+# ============================================================================
+
+
+@pytest.mark.integration
+@pytest.mark.async_test
+@pytest.mark.timeout(5)
+async def test_scraper_formatted_content_pretty_prints_json(
+    hass: HomeAssistant, scraper_instance
+):
+    """Test that formatted_content returns pretty-printed JSON for JSON responses."""
+    await scraper_instance.set_content(SAMPLE_JSON_NESTED)
+
+    formatted = scraper_instance.formatted_content
+
+    # Pretty-printed JSON has newlines, indentation, and quoted keys
+    assert "\n" in formatted
+    assert '"user"' in formatted
+    # 2-space indent (json.dumps indent=2)
+    assert "\n  " in formatted
+
+
+@pytest.mark.integration
+@pytest.mark.async_test
+@pytest.mark.timeout(5)
+async def test_scraper_handles_malformed_json_softly(
+    hass: HomeAssistant, scraper_instance
+):
+    """Test that malformed JSON soft-fails: detection succeeds, no exception, raw data preserved."""
+    # Act — should not raise
+    await scraper_instance.set_content(SAMPLE_JSON_INVALID)
+
+    # Assert state
+    assert scraper_instance._is_json is True
+    assert scraper_instance._data == SAMPLE_JSON_INVALID
+    # formatted_content falls back to raw when pretty-print fails
+    assert scraper_instance.formatted_content == SAMPLE_JSON_INVALID
+
+    # And select-style scraping still raises the JSON error
+    selector = Selector(hass, {"select": Template(".x", hass), "extract": "text"})
+    with pytest.raises(
+        ValueError,
+        match="JSON cannot be scraped",
+    ):
+        scraper_instance.scrape(selector, "test_sensor")
+
+
+@pytest.mark.integration
+@pytest.mark.async_test
+@pytest.mark.timeout(5)
+async def test_scraper_handles_recursion_error_softly(
+    hass: HomeAssistant, scraper_instance
+):
+    """Pathologically nested JSON (RecursionError) also soft-fails in formatted_content."""
+    # 10000 levels of nesting reliably triggers RecursionError on CPython 3.13
+    # while remaining a syntactically valid JSON-shaped string.
+    deeply_nested = "[" * 10000 + "]" * 10000
+
+    await scraper_instance.set_content(deeply_nested)
+
+    assert scraper_instance._is_json is True
+    assert scraper_instance._data == deeply_nested
+    # formatted_content falls back to raw on RecursionError
+    assert scraper_instance.formatted_content == deeply_nested
+
+
+@pytest.mark.integration
+@pytest.mark.async_test
+@pytest.mark.timeout(5)
+async def test_scraper_json_value_template_still_works(
+    hass: HomeAssistant, scraper_instance
+):
+    """Backwards-compat: value_template against JSON (canonical HA pattern) still works."""
+    await scraper_instance.set_content(SAMPLE_JSON_SIMPLE)
+
+    selector = Selector(
+        hass,
+        {"value_template": Template("{{ value_json.name }}", hass)},
+    )
+
+    value = scraper_instance.scrape(selector, "test_sensor")
+
+    assert value == "John"
+
+
+@pytest.mark.integration
+@pytest.mark.async_test
+@pytest.mark.timeout(5)
+async def test_scraper_json_file_logging_uses_page_json(hass: HomeAssistant):
+    """Test that JSON content is logged to page_json.txt (not page_soup.txt)."""
+    file_manager = MagicMock()
+    scraper = Scraper("test_scraper", hass, file_manager, "lxml", DEFAULT_SEPARATOR)
+
+    await scraper.set_content(SAMPLE_JSON_SIMPLE)
+
+    file_manager.write.assert_called_once()
+    filename, content = file_manager.write.call_args.args
+    assert filename == "page_json.txt"
+    # Content is the pretty-printed form
+    assert '"name": "John"' in content
 
 
 # ============================================================================

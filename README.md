@@ -1,7 +1,9 @@
 # Multiscrape
 
 ---
+
 > [!TIP]
+>
 > ## 👋 A quick note
 >
 > I run **[Smart Home Newsletter](https://smarthomenewsletter.com/?utm_source=github&utm_medium=readme&utm_campaign=multiscrape)** — a weekly curated digest for smart home enthusiasts.
@@ -11,9 +13,8 @@
 > Since you're here, you're clearly into home automation — so you might genuinely enjoy the newsletter.
 >
 > 👉 [Subscribe at smarthomenewsletter.com](https://smarthomenewsletter.com/?utm_source=github&utm_medium=readme&utm_campaign=multiscrape)
->
----
 
+---
 
 [![GitHub Release][releases-shield]][releases]
 [![License][license-shield]](LICENSE)
@@ -33,11 +34,12 @@
 ## Need help with Multiscrape?
 
 ### Personal (paid) support option
+
 I very often get asked for help, for example with finding the right CSS selectors or with a login. Actually more often than I can handle, so I'm running an experiment with a paid support option!
 
 **Sponsor me [here](https://github.com/sponsors/danieldotnl/sponsorships?tier_id=432422), and I'll try to assist you with your `multiscrape` configuration within 1-2 days.** The support funds will go towards family time, making up for the hours I spend on Home Assistant ☺️.
 
-**Note:** Scraping isn't always possible. I'd love to offer a "no cure, no pay" service, but GitHub Sponsoring doesn't support that. If you're concerned about sponsoring without guarentee, please reach out by email before sponsoring!
+**Note:** Scraping isn't always possible. I'd love to offer a "no cure, no pay" service, but GitHub Sponsoring doesn't support that. If you're concerned about sponsoring without guarantee, please reach out by email before sponsoring!
 
 ### Other options
 
@@ -67,7 +69,8 @@ It is based on both the existing [Rest sensor](https://www.home-assistant.io/int
 Install via HACS (default store) or install manually by copying the files in a new 'custom_components/multiscrape' directory.
 
 ## Example configuration (YAML)
-*This code example is to be placed into /config/configuration.yaml*
+
+_This code example is to be placed into /config/configuration.yaml_
 
 ```yaml
 multiscrape:
@@ -100,17 +103,21 @@ multiscrape:
             select: ".release-date"
             attribute: href
 ```
+
 ### Advanced Example Configuration (YAML)
+
 For background on splitting the HA configuration, see the [HA Documentation](https://www.home-assistant.io/docs/configuration/splitting_configuration/).
 
-*Inside the configuration.yaml file*
+_Inside the configuration.yaml file_
+
 ```yaml
 multiscrape: !include multiscrape.yaml
 ```
 
 Make a new file named /config/multiscrape.yaml
 
-*Inside the multiscrape.yaml file. Syntax is the same but starting at the resource level*
+_Inside the multiscrape.yaml file. Syntax is the same but starting at the resource level_
+
 ```yaml
 - resource: https://www.home-assistant.io
   scan_interval: 3600
@@ -145,28 +152,28 @@ Make a new file named /config/multiscrape.yaml
 
 Based on latest (pre) release.
 
-| name              | description                                                                                                               | required | default | type            |
-| ----------------- | ------------------------------------------------------------------------------------------------------------------------- | -------- | ------- | --------------- |
-| name              | The name for the integration.                                                                                             | False    |         | string          |
-| resource          | The url for retrieving the site or a template that will output an url. Not required when `resource_template` is provided. | True     |         | string          |
-| resource_template | A template that will output an url after being rendered. Only required when `resource` is not provided.                   | True     |         | template        |
-| authentication    | Configure HTTP authentication. `basic` or `digest`. Use this with username and password fields.                           | False    |         | string          |
-| username          | The username for accessing the url.                                                                                       | False    |         | string          |
-| password          | The password for accessing the url.                                                                                       | False    |         | string          |
-| headers           | The headers for the requests.                                                                                             | False    |         | template - list |
-| params            | The query params for the requests.                                                                                        | False    |         | template - list |
-| method            | The method for the request. Either `POST` or `GET`.                                                                       | False    | GET     | string          |
+| name              | description                                                                                                               | required | default | type              |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------- | -------- | ------- | ----------------- |
+| name              | The name for the integration.                                                                                             | False    |         | string            |
+| resource          | The url for retrieving the site or a template that will output an url. Not required when `resource_template` is provided. | True     |         | string            |
+| resource_template | A template that will output an url after being rendered. Only required when `resource` is not provided.                   | True     |         | template          |
+| authentication    | Configure HTTP authentication. `basic` or `digest`. Use this with username and password fields.                           | False    |         | string            |
+| username          | The username for accessing the url.                                                                                       | False    |         | string            |
+| password          | The password for accessing the url.                                                                                       | False    |         | string            |
+| headers           | The headers for the requests.                                                                                             | False    |         | template - list   |
+| params            | The query params for the requests.                                                                                        | False    |         | template - list   |
+| method            | The method for the request. Either `POST` or `GET`.                                                                       | False    | GET     | string            |
 | payload           | Optional payload to send with a POST request.                                                                             | False    |         | template - string |
-| verify_ssl        | Verify the SSL certificate of the endpoint.                                                                               | False    | True    | boolean         |
-| log_response      | Log the HTTP responses and HTML parsed by BeautifulSoup in files. (Will be written to/config/multiscrape/name_of_config)  | False    | False   | boolean         |
-| timeout           | Defines max time to wait data from the endpoint.                                                                          | False    | 10      | int             |
-| scan_interval     | Determines how often the url will be requested.                                                                           | False    | 60      | int             |
-| parser            | Determines the parser to be used with beautifulsoup. `lxml-xml` for xml recommended and `lxml` for everything else.       | False    | lxml    | string          |
-| list_separator    | Separator to be used in combination with `select_list` features.                                                          | False    | ,       | string          |
-| form_submit       | See [Form-submit](#form-submit)                                                                                           | False    |         |                 |
-| sensor            | See [Sensor](#sensorbinary-sensor)                                                                                        | False    |         | list            |
-| binary_sensor     | See [Binary sensor](#sensorbinary-sensor)                                                                                 | False    |         | list            |
-| button            | See [Refresh button](#refresh-button)                                                                                     | False    |         | list            |
+| verify_ssl        | Verify the SSL certificate of the endpoint.                                                                               | False    | True    | boolean           |
+| log_response      | Log the HTTP responses and HTML parsed by BeautifulSoup in files. (Will be written to/config/multiscrape/name_of_config)  | False    | False   | boolean           |
+| timeout           | Defines max time to wait data from the endpoint.                                                                          | False    | 10      | int               |
+| scan_interval     | Determines how often the url will be requested.                                                                           | False    | 60      | int               |
+| parser            | Determines the parser to be used with beautifulsoup. `lxml-xml` for xml recommended and `lxml` for everything else.       | False    | lxml    | string            |
+| list_separator    | Separator to be used in combination with `select_list` features.                                                          | False    | ,       | string            |
+| form_submit       | See [Form-submit](#form-submit)                                                                                           | False    |         |                   |
+| sensor            | See [Sensor](#sensorbinary-sensor)                                                                                        | False    |         | list              |
+| binary_sensor     | See [Binary sensor](#sensorbinary-sensor)                                                                                 | False    |         | list              |
+| button            | See [Refresh button](#refresh-button)                                                                                     | False    |         | list              |
 
 ### Sensor/Binary Sensor
 
@@ -273,7 +280,7 @@ Configure what should happen in case of a scraping error (the css selector does 
 For each multiscrape instance, a service will be created to trigger a scrape run through an automation. (For manual triggering, the button entity can now be configured.)
 The services are named `multiscrape.trigger_{name of integration}`.
 
-Multiscrape also offers a `get_content` and a `scrape` service. `get_content` retrieves the content of the website you want to scrape. It shows the same data for which you now need to enable `log_response` and open the page_soup.txt file.\
+Multiscrape also offers a `get_content` and a `scrape` service. `get_content` retrieves the content of the website you want to scrape. It shows the same data for which you now need to enable `log_response` and open the `page_soup.txt` file (or `page_json.txt` when the response is JSON).\
 `scrape` does what it says. It scrapes a website and provides the sensors and attributes.
 
 Both services accept the same configuration as what you would provide in your configuration yaml (what is described above), with a small but important caveat: if the service input contains templates, those are automatically parsed by home assistant when the service is being called. That is fine for templates like `resource` and `select`, but templates that need to be applied on the scraped data itself (like `value_template`), cannot be parsed when the service is called. Therefore you need to slightly alter the syntax and add a `!` in the middle. E.g. `{{` becomes `{!{` and `%}` becomes `%!}`. Multiscrape will then understand that this string needs to handled as a template after the service has been called.\
