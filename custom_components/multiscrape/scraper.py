@@ -124,10 +124,12 @@ class Scraper:
 
         if selector.just_value:
             _LOGGER.debug("%s # Applying value_template only.", log_prefix)
-            result = selector.value_template.async_render_with_possible_json_value(
-                self._data, None, variables=context.to_template_variables()
+            return selector.value_template.async_render_with_possible_json_value(
+                self._data,
+                None,
+                variables=context.to_template_variables(),
+                parse_result=True,
             )
-            return selector.value_template._parse_result(result)
 
         if self._is_json:
             raise ValueError(
