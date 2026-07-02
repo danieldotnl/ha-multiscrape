@@ -3,7 +3,7 @@
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from homeassistant.const import CONF_NAME
+from homeassistant.const import CONF_NAME, STATE_UNAVAILABLE, STATE_UNKNOWN
 from homeassistant.core import HomeAssistant, State
 from homeassistant.helpers.template import Template
 
@@ -552,6 +552,30 @@ async def test_async_added_to_hass_restores_state_and_attributes(
     # Assert
     assert sensor._attr_native_value == "42.0"
     assert sensor._attr_extra_state_attributes["test_attr"] == "saved_value"
+
+
+@pytest.mark.integration
+@pytest.mark.async_test
+@pytest.mark.timeout(10)
+@pytest.mark.parametrize("sentinel", [STATE_UNAVAILABLE, STATE_UNKNOWN])
+async def test_async_added_to_hass_does_not_restore_sentinel_states(
+    hass: HomeAssistant, coordinator, scraper, sentinel
+):
+    """Sentinel states must not be restored as a native value.
+
+    A numeric sensor (unit but no device/state class) would otherwise
+    crash on add_to_platform_finish trying to float('unavailable').
+    """
+    sensor = _create_sensor(hass, coordinator, scraper)
+    initial_value = sensor._attr_native_value
+
+    mock_state = State("sensor.test", sentinel)
+    with patch.object(sensor, "async_get_last_state", new=AsyncMock(return_value=mock_state)):
+        await sensor.async_added_to_hass()
+
+    # Assert - sentinel not restored, value left at its default
+    assert sensor._attr_native_value == initial_value
+    assert sensor._attr_native_value not in (STATE_UNAVAILABLE, STATE_UNKNOWN)
 
 
 @pytest.mark.integration
