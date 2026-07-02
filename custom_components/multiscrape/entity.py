@@ -4,6 +4,7 @@ from __future__ import annotations
 import logging
 from abc import abstractmethod
 
+from homeassistant.const import STATE_UNAVAILABLE, STATE_UNKNOWN
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import TemplateError
 from homeassistant.helpers.restore_state import RestoreEntity
@@ -97,7 +98,8 @@ class MultiscrapeEntity(CoordinatorEntity[MultiscrapeDataUpdateCoordinator], Res
         if not (state := await self.async_get_last_state()):
             return
         _LOGGER.debug("%s # %s # Restoring previous state: %s", self.scraper.name, self._name, state.state)
-        self._attr_native_value = state.state
+        if state.state not in (STATE_UNAVAILABLE, STATE_UNKNOWN):
+            self._attr_native_value = state.state
 
         for name in self._attribute_selectors:
             if state.attributes.get(name) is not None:
