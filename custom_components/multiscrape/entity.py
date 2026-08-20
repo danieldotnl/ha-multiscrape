@@ -4,7 +4,7 @@ from __future__ import annotations
 import logging
 from abc import abstractmethod
 
-from homeassistant.const import STATE_UNAVAILABLE, STATE_UNKNOWN
+from homeassistant.const import ATTR_ICON, STATE_UNAVAILABLE, STATE_UNKNOWN
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import TemplateError
 from homeassistant.helpers.restore_state import RestoreEntity
@@ -105,6 +105,13 @@ class MultiscrapeEntity(CoordinatorEntity[MultiscrapeDataUpdateCoordinator], Res
             if state.attributes.get(name) is not None:
                 _LOGGER.debug("%s # %s # Restoring attribute `%s` with value: %s", self.scraper.name, self._name, name, state.attributes[name])
                 self._attr_extra_state_attributes[name] = state.attributes[name]
+
+        if self._icon_template and (icon := state.attributes.get(ATTR_ICON)) is not None:
+            # Otherwise the entity is written with no icon on startup, and the
+            # first real coordinator update sets it seconds later -- a
+            # spurious attribute-only state change that a bare `platform:
+            # state` trigger (no to/from) fires on (#437).
+            self._attr_icon = icon
 
 
     @callback
