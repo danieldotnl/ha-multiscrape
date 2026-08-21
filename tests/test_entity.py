@@ -3,7 +3,8 @@
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from homeassistant.const import CONF_NAME, STATE_UNAVAILABLE, STATE_UNKNOWN
+from homeassistant.const import (ATTR_ICON, CONF_NAME, STATE_UNAVAILABLE,
+                                 STATE_UNKNOWN)
 from homeassistant.core import HomeAssistant, State
 from homeassistant.helpers.template import Template
 
@@ -552,6 +553,45 @@ async def test_async_added_to_hass_restores_state_and_attributes(
     # Assert
     assert sensor._attr_native_value == "42.0"
     assert sensor._attr_extra_state_attributes["test_attr"] == "saved_value"
+
+
+@pytest.mark.integration
+@pytest.mark.async_test
+@pytest.mark.timeout(10)
+async def test_async_added_to_hass_restores_icon(hass: HomeAssistant, coordinator, scraper):
+    """Restoring on startup must also restore a previously rendered icon (#437).
+
+    Without this, the entity is briefly written to HA with no icon on
+    startup, and the first real coordinator update -- seconds later --
+    sets it, producing a spurious attribute-only state change that a bare
+    `platform: state` trigger (no `to`/`from`) fires on.
+    """
+    icon_template = Template("mdi:check", hass)
+    sensor = _create_sensor(hass, coordinator, scraper, icon_template=icon_template)
+
+    mock_state = State("sensor.test", "42.0", {ATTR_ICON: "mdi:alert"})
+    with patch.object(sensor, "async_get_last_state", new=AsyncMock(return_value=mock_state)):
+        await sensor.async_added_to_hass()
+
+    # Assert
+    assert sensor.icon == "mdi:alert"
+
+
+@pytest.mark.integration
+@pytest.mark.async_test
+@pytest.mark.timeout(10)
+async def test_async_added_to_hass_without_icon_template_does_not_set_icon(
+    hass: HomeAssistant, coordinator, scraper
+):
+    """An entity with no icon_template configured should not gain one from restore."""
+    sensor = _create_sensor(hass, coordinator, scraper)
+
+    mock_state = State("sensor.test", "42.0", {ATTR_ICON: "mdi:alert"})
+    with patch.object(sensor, "async_get_last_state", new=AsyncMock(return_value=mock_state)):
+        await sensor.async_added_to_hass()
+
+    # Assert
+    assert sensor.icon is None
 
 
 @pytest.mark.integration
