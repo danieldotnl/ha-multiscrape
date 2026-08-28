@@ -205,10 +205,15 @@ class MultiscrapeDataUpdateCoordinator(TimestampDataUpdateCoordinator[None]):
                 self._async_unsub_refresh()
                 self._retry_count += 1
                 if self._retry_count <= MAX_RETRIES:
+
+                    async def _handle_retry(_now) -> None:
+                        """Retry callback: request a fresh refresh via the coordinator."""
+                        await self.async_request_refresh()
+
                     self._unsub_refresh = event.async_track_point_in_utc_time(
                         self.hass,
-                        self._job,
-                        utcnow().replace(microsecond=self._microsecond)
+                        _handle_retry,
+                        utcnow().replace(microsecond=0)
                         + timedelta(seconds=RETRY_DELAY_SECONDS),
                     )
                     _LOGGER.warning(
