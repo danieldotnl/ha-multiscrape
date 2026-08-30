@@ -223,8 +223,7 @@ class MultiscrapeDataUpdateCoordinator(TimestampDataUpdateCoordinator[None]):
                     self._unsub_refresh = event.async_track_point_in_utc_time(
                         self.hass,
                         _handle_retry,
-                        utcnow().replace(microsecond=0)
-                        + timedelta(seconds=RETRY_DELAY_SECONDS),
+                        utcnow() + timedelta(seconds=RETRY_DELAY_SECONDS),
                     )
                     _LOGGER.warning(
                         "%s # Since updating failed and scan_interval = 0, retry %s of %s will be scheduled in %s seconds",
@@ -244,21 +243,6 @@ class MultiscrapeDataUpdateCoordinator(TimestampDataUpdateCoordinator[None]):
         _LOGGER.debug(
             "%s # New run: start (re)loading data from resource", self._config_name
         )
-        if self.update_error and self._file_manager:
-            _LOGGER.debug(
-                "%s # Previous run failed, archiving logging files before clearing",
-                self._config_name,
-            )
-            try:
-                await self.hass.async_add_executor_job(
-                    self._file_manager.archive_failure
-                )
-            except Exception as ex:
-                _LOGGER.error(
-                    "%s # Error archiving files from failed run: %s",
-                    self._config_name,
-                    ex,
-                )
         self.update_error = False
         if self._file_manager:
             _LOGGER.debug(
