@@ -133,19 +133,19 @@ _Inside the multiscrape.yaml file. Syntax is the same but starting at the resour
         {% else %}
           mdi:bat
         {% endif %}
-        name: Release date
-        select: ".release-date"
-        attribute: "title"
-        value_template: "{{ (value.split('released')[1]) }}"
-    binary_sensor:
-      - unique_id: ha_version_check
-        name: Latest version == 2021.7.0
-        select: ".release-date"
-        value_template: '{{ value | trim == "2021.7.0" }}'
-        attributes:
-          - name: Release notes link
-            select: ".release-date"
-            attribute: href
+      name: Release date
+      select: ".release-date"
+      attribute: "title"
+      value_template: "{{ (value.split('released')[1]) }}"
+  binary_sensor:
+    - unique_id: ha_version_check
+      name: Latest version == 2021.7.0
+      select: ".release-date"
+      value_template: '{{ value | trim == "2021.7.0" }}'
+      attributes:
+        - name: Release notes link
+          select: ".release-date"
+          attribute: href
 ```
 
 ## Options
@@ -162,7 +162,7 @@ Based on latest (pre) release.
 | password          | The password for accessing the url.                                                                                       | False    |         | string            |
 | headers           | The headers for the requests.                                                                                             | False    |         | template - list   |
 | params            | The query params for the requests.                                                                                        | False    |         | template - list   |
-| method            | The method for the request. Either `POST` or `GET`.                                                                       | False    | GET     | string            |
+| method            | The method for the request. Either `POST`, `GET`, or `PUT`.                                                                | False    | GET     | string            |
 | payload           | Optional payload to send with a POST request.                                                                             | False    |         | template - string |
 | verify_ssl        | Verify the SSL certificate of the endpoint.                                                                               | False    | True    | boolean           |
 | log_response      | Log the HTTP responses and HTML parsed by BeautifulSoup in files. (Will be written to/config/multiscrape/name_of_config)  | False    | False   | boolean           |
