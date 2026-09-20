@@ -13,6 +13,7 @@ from homeassistant.const import (CONF_AUTHENTICATION, CONF_FORCE_UPDATE,
 from custom_components.multiscrape.const import (CONF_EXTRACT,
                                                  CONF_FORM_VARIABLES,
                                                  CONF_LOG_RESPONSE,
+                                                 CONF_MAX_RETRIES,
                                                  CONF_ON_ERROR_LOG,
                                                  CONF_ON_ERROR_VALUE,
                                                  CONF_ON_ERROR_VALUE_DEFAULT,
@@ -27,7 +28,7 @@ from custom_components.multiscrape.const import (CONF_EXTRACT,
                                                  DEFAULT_PARSER,
                                                  DEFAULT_SENSOR_NAME,
                                                  DEFAULT_SEPARATOR, DOMAIN,
-                                                 LOG_ERROR)
+                                                 LOG_ERROR, MAX_RETRIES)
 from custom_components.multiscrape.schema import (BINARY_SENSOR_SCHEMA,
                                                   BUTTON_SCHEMA,
                                                   COMBINED_SCHEMA,
@@ -337,6 +338,34 @@ def test_integration_schema_default_separator():
     result = _validate_combined({CONF_RESOURCE: "https://example.com"})
     assert result[CONF_SEPARATOR] == DEFAULT_SEPARATOR
     assert result[CONF_SEPARATOR] == ","
+
+
+@pytest.mark.unit
+def test_integration_schema_default_max_retries():
+    """Test that max_retries defaults to MAX_RETRIES (3)."""
+    result = _validate_combined({CONF_RESOURCE: "https://example.com"})
+    assert result[CONF_MAX_RETRIES] == MAX_RETRIES
+    assert result[CONF_MAX_RETRIES] == 3
+
+
+@pytest.mark.unit
+def test_integration_schema_accepts_zero_max_retries():
+    """Test that max_retries: 0 is valid and disables the automatic retries."""
+    result = _validate_combined({
+        CONF_RESOURCE: "https://example.com",
+        CONF_MAX_RETRIES: 0,
+    })
+    assert result[CONF_MAX_RETRIES] == 0
+
+
+@pytest.mark.unit
+def test_integration_schema_rejects_negative_max_retries():
+    """Test that a negative max_retries is rejected."""
+    with pytest.raises(vol.Invalid):
+        _validate_combined({
+            CONF_RESOURCE: "https://example.com",
+            CONF_MAX_RETRIES: -1,
+        })
 
 
 @pytest.mark.unit

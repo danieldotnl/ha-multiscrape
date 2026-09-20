@@ -3,13 +3,13 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Callable
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 import httpx
 from homeassistant.const import (CONF_RESOURCE, CONF_RESOURCE_TEMPLATE,
                                  CONF_SCAN_INTERVAL,
                                  EVENT_HOMEASSISTANT_STARTED)
-from homeassistant.core import Event, HomeAssistant
+from homeassistant.core import CALLBACK_TYPE, Event, HomeAssistant, callback
 from homeassistant.helpers.update_coordinator import (
     TimestampDataUpdateCoordinator, event)
 from homeassistant.util.dt import utcnow
@@ -149,10 +149,19 @@ class MultiscrapeDataUpdateCoordinator(TimestampDataUpdateCoordinator[None]):
         self.update_error = False
         self._resource = None
         self._retry_count: int = 0
+        self._retry_unsub: CALLBACK_TYPE | None = None
         self._force_reauth: bool = False
 
         if self._update_interval == timedelta(seconds=0):
             self._update_interval = None
+
+        # Best effort: the schema default means a config setting max_retries to
+        # the default value is indistinguishable from one not setting it at all.
+        if self._update_interval is not None and max_retries != MAX_RETRIES:
+            _LOGGER.warning(
+                "%s # max_retries is only used when scan_interval is 0 and will be ignored",
+                self._config_name,
+            )
 
         _LOGGER.debug(
             "%s # Scan interval is %s", self._config_name, self._update_interval
@@ -182,6 +191,8 @@ class MultiscrapeDataUpdateCoordinator(TimestampDataUpdateCoordinator[None]):
         self._force_reauth = True
 
     async def _async_update_data(self) -> None:
+        # Any run supersedes a pending retry, including a manually triggered one.
+        self._async_cancel_retry()
         await self._prepare_new_run()
 
         try:
@@ -207,22 +218,10 @@ class MultiscrapeDataUpdateCoordinator(TimestampDataUpdateCoordinator[None]):
             self.update_error = True
             if self._update_interval is None:
                 self._retry_count += 1
-                if self._max_retries == 0:
-                    _LOGGER.warning(
-                        "%s # Updating failed and scan_interval = 0. Automatic retry "
-                        "is disabled (max_retries: 0); relies on an external trigger "
-                        "(e.g. an orchestrator loop) to avoid uncoordinated requests "
-                        "to resources with limited concurrent-connection capacity.",
-                        self._config_name,
-                    )
-                elif self._retry_count <= self._max_retries:
-                    async def _handle_retry(_now) -> None:
-                        """Retry callback: request a fresh refresh via the coordinator."""
-                        await self.async_request_refresh()
-
-                    self._unsub_refresh = event.async_track_point_in_utc_time(
+                if self._retry_count <= self._max_retries:
+                    self._retry_unsub = event.async_track_point_in_utc_time(
                         self.hass,
-                        _handle_retry,
+                        self._handle_retry,
                         utcnow() + timedelta(seconds=RETRY_DELAY_SECONDS),
                     )
                     _LOGGER.warning(
@@ -232,12 +231,45 @@ class MultiscrapeDataUpdateCoordinator(TimestampDataUpdateCoordinator[None]):
                         self._max_retries,
                         RETRY_DELAY_SECONDS,
                     )
+                elif self._max_retries == 0:
+                    self._retry_count = 0
+                    _LOGGER.debug(
+                        "%s # Automatic retry is disabled (max_retries: 0)",
+                        self._config_name,
+                    )
                 else:
+                    # Re-arm the retries so a manual trigger gets a fresh set.
+                    self._retry_count = 0
                     _LOGGER.error(
                         "%s # Updating and %s retries failed and scan_interval = 0, please manually retry with trigger service.",
                         self._config_name,
                         self._max_retries,
                     )
+
+    async def _handle_retry(self, _now: datetime) -> None:
+        """Run a scheduled retry of a failed update."""
+        self._retry_unsub = None
+        if self.hass.is_stopping:
+            _LOGGER.debug(
+                "%s # Home Assistant is stopping, skipping scheduled retry",
+                self._config_name,
+            )
+            return
+        # async_refresh() takes the debouncer lock instead of going through the
+        # debouncer, so a retry can never be silently dropped.
+        await self.async_refresh()
+
+    @callback
+    def _async_cancel_retry(self) -> None:
+        """Cancel a pending retry, if any."""
+        if self._retry_unsub:
+            self._retry_unsub()
+            self._retry_unsub = None
+
+    async def async_shutdown(self) -> None:
+        """Cancel any scheduled retry and shut down the coordinator."""
+        self._async_cancel_retry()
+        await super().async_shutdown()
 
     async def _prepare_new_run(self) -> None:
         _LOGGER.debug(

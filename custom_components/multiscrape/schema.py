@@ -28,8 +28,7 @@ from .const import (CONF_ATTR, CONF_EXTRACT, CONF_FORM_INPUT,
                     CONF_FORM_INPUT_FILTER, CONF_FORM_RESUBMIT_ERROR,
                     CONF_FORM_SELECT, CONF_FORM_SUBMIT, CONF_FORM_SUBMIT_ONCE,
                     CONF_FORM_VARIABLES, CONF_LOG_RESPONSE, CONF_MAX_RETRIES,
-                    CONF_ON_ERROR,
-                    CONF_ON_ERROR_DEFAULT, CONF_ON_ERROR_LOG,
+                    CONF_ON_ERROR, CONF_ON_ERROR_DEFAULT, CONF_ON_ERROR_LOG,
                     CONF_ON_ERROR_VALUE, CONF_ON_ERROR_VALUE_DEFAULT,
                     CONF_ON_ERROR_VALUE_LAST, CONF_ON_ERROR_VALUE_NONE,
                     CONF_PARSER, CONF_PICTURE, CONF_SELECT, CONF_SELECT_LIST,
@@ -70,9 +69,7 @@ INTEGRATION_SCHEMA = {
     vol.Optional(CONF_SCAN_INTERVAL): cv.time_period,
     vol.Optional(CONF_LOG_RESPONSE, default=False): cv.boolean,
     vol.Optional(CONF_SEPARATOR, default=DEFAULT_SEPARATOR): cv.string,
-    vol.Optional(CONF_MAX_RETRIES, default=MAX_RETRIES): vol.All(
-        vol.Coerce(int), vol.Range(min=0)
-    ),
+    vol.Optional(CONF_MAX_RETRIES, default=MAX_RETRIES): cv.positive_int,
 }
 
 ON_ERROR_SCHEMA = {
