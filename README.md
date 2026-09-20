@@ -162,8 +162,8 @@ Based on latest (pre) release.
 | password          | The password for accessing the url.                                                                                       | False    |         | string            |
 | headers           | The headers for the requests.                                                                                             | False    |         | template - list   |
 | params            | The query params for the requests.                                                                                        | False    |         | template - list   |
-| method            | The method for the request. Either `POST`, `GET`, or `PUT`.                                                                | False    | GET     | string            |
-| payload           | Optional payload to send with a POST request.                                                                             | False    |         | template - string |
+| method            | The method for the request. Either `POST`, `GET`, or `PUT`.                                                               | False    | GET     | string            |
+| payload           | Optional payload to send with a `POST` or `PUT` request.                                                                  | False    |         | template - string |
 | verify_ssl        | Verify the SSL certificate of the endpoint.                                                                               | False    | True    | boolean           |
 | log_response      | Log the HTTP responses and HTML parsed by BeautifulSoup in files. (Will be written to/config/multiscrape/name_of_config)  | False    | False   | boolean           |
 | timeout           | Defines max time to wait data from the endpoint.                                                                          | False    | 10      | int               |
