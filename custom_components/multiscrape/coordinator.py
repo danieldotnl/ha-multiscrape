@@ -216,7 +216,14 @@ class MultiscrapeDataUpdateCoordinator(TimestampDataUpdateCoordinator[None]):
             )
             self._scraper.reset()
             self.update_error = True
-            if self._update_interval is None:
+            if self._shutdown_requested:
+                # A run still in flight when the coordinator was shut down (e.g. on
+                # reload, which also closes its session) must not arm a new retry.
+                _LOGGER.debug(
+                    "%s # Coordinator is shut down, not scheduling a retry",
+                    self._config_name,
+                )
+            elif self._update_interval is None:
                 self._retry_count += 1
                 if self._retry_count <= self._max_retries:
                     self._retry_unsub = event.async_track_point_in_utc_time(

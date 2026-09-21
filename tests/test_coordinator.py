@@ -441,6 +441,42 @@ async def test_coordinator_shutdown_cancels_pending_retry(
 @pytest.mark.integration
 @pytest.mark.async_test
 @pytest.mark.timeout(10)
+async def test_coordinator_no_retry_after_shutdown(
+    hass: HomeAssistant,
+    content_request_manager,
+    mock_file_manager,
+    scraper,
+    mock_http_session,
+):
+    """Test that a run failing after shutdown does not arm a new retry.
+
+    A reload shuts the coordinator down and closes its session, so a run that
+    was still in flight fails. That failure must not revive the coordinator.
+    """
+    coordinator = MultiscrapeDataUpdateCoordinator(
+        config_name="test_retry_after_shutdown",
+        hass=hass,
+        request_manager=content_request_manager,
+        file_manager=mock_file_manager,
+        scraper=scraper,
+        update_interval=timedelta(seconds=0),
+    )
+    mock_http_session.async_request.side_effect = Exception("Client closed")
+    await coordinator.async_shutdown()
+
+    with patch(
+        "custom_components.multiscrape.coordinator.event.async_track_point_in_utc_time",
+    ) as mock_track:
+        await coordinator._async_update_data()
+
+    mock_track.assert_not_called()
+    assert coordinator._retry_unsub is None
+    assert coordinator._retry_count == 0
+
+
+@pytest.mark.integration
+@pytest.mark.async_test
+@pytest.mark.timeout(10)
 async def test_coordinator_zero_interval_stops_after_max_retries(
     hass: HomeAssistant,
     content_request_manager,

@@ -1,6 +1,6 @@
 """Tests for the ScraperRegistry."""
 
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from homeassistant.const import Platform
@@ -94,3 +94,56 @@ def test_contains(registry, make_instance):
     assert registry.contains("my_scraper") is False
     registry.register(make_instance("my_scraper"))
     assert registry.contains("my_scraper") is True
+
+
+async def test_instance_shutdown_closes_everything():
+    """Test that shutting down an instance stops its coordinator and session."""
+    coordinator = MagicMock(async_shutdown=AsyncMock())
+    session = MagicMock(async_close=AsyncMock())
+    unsub_session_stop = MagicMock()
+    instance = ScraperInstance(
+        scraper_id="my_scraper",
+        scraper=MagicMock(),
+        coordinator=coordinator,
+        session=session,
+        unsub_session_stop=unsub_session_stop,
+    )
+
+    await instance.async_shutdown()
+
+    coordinator.async_shutdown.assert_awaited_once()
+    unsub_session_stop.assert_called_once()
+    session.async_close.assert_awaited_once()
+    assert instance.unsub_session_stop is None
+
+
+async def test_instance_shutdown_closes_session_when_coordinator_fails():
+    """Test that the session is still closed if the coordinator shutdown raises."""
+    coordinator = MagicMock(async_shutdown=AsyncMock(side_effect=Exception("Boom")))
+    session = MagicMock(async_close=AsyncMock())
+    unsub_session_stop = MagicMock()
+    instance = ScraperInstance(
+        scraper_id="my_scraper",
+        scraper=MagicMock(),
+        coordinator=coordinator,
+        session=session,
+        unsub_session_stop=unsub_session_stop,
+    )
+
+    with pytest.raises(Exception, match="Boom"):
+        await instance.async_shutdown()
+
+    unsub_session_stop.assert_called_once()
+    session.async_close.assert_awaited_once()
+
+
+async def test_instance_shutdown_without_session():
+    """Test that an instance without a session only shuts down its coordinator."""
+    coordinator = MagicMock(async_shutdown=AsyncMock())
+    instance = ScraperInstance(
+        scraper_id="my_scraper", scraper=MagicMock(), coordinator=coordinator
+    )
+
+    await instance.async_shutdown()
+
+    coordinator.async_shutdown.assert_awaited_once()
