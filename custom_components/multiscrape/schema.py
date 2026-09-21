@@ -27,8 +27,8 @@ from homeassistant.const import (CONF_AUTHENTICATION, CONF_DEVICE_CLASS,
 from .const import (CONF_ATTR, CONF_EXTRACT, CONF_FORM_INPUT,
                     CONF_FORM_INPUT_FILTER, CONF_FORM_RESUBMIT_ERROR,
                     CONF_FORM_SELECT, CONF_FORM_SUBMIT, CONF_FORM_SUBMIT_ONCE,
-                    CONF_FORM_VARIABLES, CONF_LOG_RESPONSE, CONF_ON_ERROR,
-                    CONF_ON_ERROR_DEFAULT, CONF_ON_ERROR_LOG,
+                    CONF_FORM_VARIABLES, CONF_LOG_RESPONSE, CONF_MAX_RETRIES,
+                    CONF_ON_ERROR, CONF_ON_ERROR_DEFAULT, CONF_ON_ERROR_LOG,
                     CONF_ON_ERROR_VALUE, CONF_ON_ERROR_VALUE_DEFAULT,
                     CONF_ON_ERROR_VALUE_LAST, CONF_ON_ERROR_VALUE_NONE,
                     CONF_PARSER, CONF_PICTURE, CONF_SELECT, CONF_SELECT_LIST,
@@ -37,7 +37,7 @@ from .const import (CONF_ATTR, CONF_EXTRACT, CONF_FORM_INPUT,
                     DEFAULT_EXTRACT, DEFAULT_FORCE_UPDATE, DEFAULT_METHOD,
                     DEFAULT_PARSER, DEFAULT_SENSOR_NAME, DEFAULT_SEPARATOR,
                     DEFAULT_VERIFY_SSL, DOMAIN, EXTRACT_OPTIONS, LOG_ERROR,
-                    LOG_LEVELS, METHODS)
+                    LOG_LEVELS, MAX_RETRIES, METHODS)
 from .scraper import DEFAULT_TIMEOUT
 
 _LOGGER = logging.getLogger(__name__)
@@ -69,6 +69,7 @@ INTEGRATION_SCHEMA = {
     vol.Optional(CONF_SCAN_INTERVAL): cv.time_period,
     vol.Optional(CONF_LOG_RESPONSE, default=False): cv.boolean,
     vol.Optional(CONF_SEPARATOR, default=DEFAULT_SEPARATOR): cv.string,
+    vol.Optional(CONF_MAX_RETRIES, default=MAX_RETRIES): cv.positive_int,
 }
 
 ON_ERROR_SCHEMA = {

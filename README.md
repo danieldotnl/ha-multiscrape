@@ -168,6 +168,7 @@ Based on latest (pre) release.
 | log_response      | Log the HTTP responses and HTML parsed by BeautifulSoup in files. (Will be written to/config/multiscrape/name_of_config)  | False    | False   | boolean           |
 | timeout           | Defines max time to wait data from the endpoint.                                                                          | False    | 10      | int               |
 | scan_interval     | Determines how often the url will be requested.                                                                           | False    | 60      | int               |
+| max_retries       | Number of automatic retries after a failed run. Only applies when `scan_interval` is 0. See [Retries](#retries).          | False    | 3       | int               |
 | parser            | Determines the parser to be used with beautifulsoup. `lxml-xml` for xml recommended and `lxml` for everything else.       | False    | lxml    | string            |
 | list_separator    | Separator to be used in combination with `select_list` features.                                                          | False    | ,       | string            |
 | form_submit       | See [Form-submit](#form-submit)                                                                                           | False    |         |                   |
@@ -274,6 +275,14 @@ Configure what should happen in case of a scraping error (the css selector does 
 | log     | Determines if and how something should be logged in case of a scraping error. Value can be either 'false', 'info', 'warning' or 'error'.                                                                                                                                | False    | error   | string |
 | value   | Determines what value the sensor/attribute should get in case of a scraping error. The value can be 'last' meaning that the value does not change, 'none' which results in HA showing 'Unkown' on the sensor, or 'default' which will show the specified default value. | False    | none    | string |
 | default | The default value to be used when the on-error value is set to 'default'.                                                                                                                                                                                               | False    |         | string |
+
+### Retries
+
+When `scan_interval` is 0, Multiscrape does not poll by itself: a run only happens when you trigger it (through the service or the refresh button). To keep a single failure from leaving the sensors stale until the next trigger, a failed run is retried automatically, up to `max_retries` times, 30 seconds apart. Once those are exhausted, Multiscrape logs an error and stops; a trigger after that starts over with a fresh set of retries. A trigger that arrives while a retry is still pending replaces it rather than starting a new set.
+
+Set `max_retries: 0` to switch the automatic retries off entirely. This is useful when the runs are already coordinated by something outside Multiscrape - for example an automation that polls a device which only accepts one connection at a time. In that setup an automatic retry would fire while the external loop is mid-request and the two would collide, so it is better to let the external mechanism decide when to try again.
+
+`max_retries` is ignored when `scan_interval` is not 0: a failed run is simply followed by the next scheduled one.
 
 ## Services
 

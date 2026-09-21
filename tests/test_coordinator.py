@@ -3,9 +3,13 @@ from datetime import timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from homeassistant.core import HomeAssistant
+from homeassistant.core import CoreState, HomeAssistant
+from homeassistant.util.dt import utcnow
+from pytest_homeassistant_custom_component.common import \
+    async_fire_time_changed
 
-from custom_components.multiscrape.const import MAX_RETRIES
+from custom_components.multiscrape.const import (MAX_RETRIES,
+                                                 RETRY_DELAY_SECONDS)
 from custom_components.multiscrape.coordinator import (
     ContentRequestManager, MultiscrapeDataUpdateCoordinator)
 from custom_components.multiscrape.scrape_context import ScrapeContext
@@ -229,6 +233,7 @@ async def test_coordinator_zero_interval_retries_on_failure(
     )
     assert coordinator._update_interval is None
     assert coordinator._retry_count == 0
+    assert coordinator._retry_unsub is None
 
     # Simulate failed content retrieval
     mock_http_session.async_request.side_effect = Exception("Network error")
@@ -236,16 +241,201 @@ async def test_coordinator_zero_interval_retries_on_failure(
     with patch(
         "custom_components.multiscrape.coordinator.event.async_track_point_in_utc_time"
     ) as mock_track:
-        # Patch internals that are set up during full coordinator lifecycle
-        coordinator._async_unsub_refresh = MagicMock()
-        coordinator._job = MagicMock()
-        coordinator._microsecond = 0
         await coordinator._async_update_data()
 
     # Assert
     assert coordinator._retry_count == 1
     assert coordinator.update_error is True
     mock_track.assert_called_once()
+    assert coordinator._retry_unsub is mock_track.return_value
+    # HA's own scheduling must be left alone
+    assert coordinator._unsub_refresh is None
+
+    _hass, scheduled_callback, when = mock_track.call_args[0]
+    assert scheduled_callback == coordinator._handle_retry
+
+    # Running the scheduled callback must actually refresh, not enqueue a
+    # debounced request that can be dropped while the debouncer lock is held.
+    with patch.object(coordinator, "async_refresh", AsyncMock()) as mock_refresh:
+        await scheduled_callback(when)
+
+    mock_refresh.assert_awaited_once()
+    assert coordinator._retry_unsub is None
+
+    await coordinator.async_shutdown()
+
+
+@pytest.mark.integration
+@pytest.mark.async_test
+@pytest.mark.timeout(10)
+async def test_coordinator_retry_is_actually_executed_by_hass(
+    hass: HomeAssistant,
+    content_request_manager,
+    mock_file_manager,
+    scraper,
+    mock_http_session,
+    freezer,
+):
+    """Test that the scheduled retry really runs, without mocking the scheduler.
+
+    The rest of the retry tests mock async_track_point_in_utc_time. This one
+    drives the real HA scheduler, so a callback HA cannot run (the original
+    bug) fails here instead of passing on a stub.
+    """
+    coordinator = MultiscrapeDataUpdateCoordinator(
+        config_name="test_retry_executed",
+        hass=hass,
+        request_manager=content_request_manager,
+        file_manager=mock_file_manager,
+        scraper=scraper,
+        update_interval=timedelta(seconds=0),
+    )
+    mock_http_session.async_request.side_effect = Exception("Network error")
+
+    await coordinator.async_refresh()
+    await hass.async_block_till_done()
+    assert mock_http_session.async_request.call_count == 1
+    assert coordinator._retry_count == 1
+
+    # The retry succeeds, which must also clear the scheduled retry
+    mock_http_session.async_request.side_effect = None
+    mock_http_session.async_request.return_value.text = "<html>Recovered</html>"
+
+    freezer.tick(timedelta(seconds=RETRY_DELAY_SECONDS + 1))
+    async_fire_time_changed(hass)
+    await hass.async_block_till_done()
+
+    assert mock_http_session.async_request.call_count == 2
+    assert coordinator._retry_count == 0
+    assert coordinator._retry_unsub is None
+    assert scraper._data == "<html>Recovered</html>"
+
+    # Nothing is left armed to fire again
+    freezer.tick(timedelta(seconds=RETRY_DELAY_SECONDS + 1))
+    async_fire_time_changed(hass)
+    await hass.async_block_till_done()
+    assert mock_http_session.async_request.call_count == 2
+
+    await coordinator.async_shutdown()
+
+
+@pytest.mark.integration
+@pytest.mark.async_test
+@pytest.mark.timeout(10)
+async def test_coordinator_success_cancels_pending_retry(
+    hass: HomeAssistant,
+    content_request_manager,
+    mock_file_manager,
+    scraper,
+    mock_http_session,
+):
+    """Test that a successful run cancels a retry scheduled by an earlier one.
+
+    Otherwise a trigger landing between a failure and its retry leaves the
+    retry armed, and it scrapes again on a config that asked for no polling.
+    """
+    coordinator = MultiscrapeDataUpdateCoordinator(
+        config_name="test_retry_cancelled",
+        hass=hass,
+        request_manager=content_request_manager,
+        file_manager=mock_file_manager,
+        scraper=scraper,
+        update_interval=timedelta(seconds=0),
+    )
+    mock_http_session.async_request.side_effect = Exception("Network error")
+
+    unsub = MagicMock()
+    with patch(
+        "custom_components.multiscrape.coordinator.event.async_track_point_in_utc_time",
+        return_value=unsub,
+    ) as mock_track:
+        await coordinator._async_update_data()
+        assert coordinator._retry_unsub is unsub
+
+        # A manual trigger arrives before the retry fires, and succeeds
+        mock_http_session.async_request.side_effect = None
+        mock_http_session.async_request.return_value.text = "<html>Success</html>"
+        await coordinator._async_update_data()
+
+    unsub.assert_called_once()
+    assert coordinator._retry_unsub is None
+    assert coordinator._retry_count == 0
+    assert mock_track.call_count == 1
+
+    await coordinator.async_shutdown()
+
+
+@pytest.mark.integration
+@pytest.mark.async_test
+@pytest.mark.timeout(10)
+async def test_coordinator_retry_skipped_while_stopping(
+    hass: HomeAssistant,
+    content_request_manager,
+    mock_file_manager,
+    scraper,
+):
+    """Test that a retry firing during HA shutdown does not scrape.
+
+    The scheduled retry replaces the coordinator's own scheduled refresh, which
+    HA suppresses while stopping. The retry must do the same.
+    """
+    coordinator = MultiscrapeDataUpdateCoordinator(
+        config_name="test_retry_stopping",
+        hass=hass,
+        request_manager=content_request_manager,
+        file_manager=mock_file_manager,
+        scraper=scraper,
+        update_interval=timedelta(seconds=0),
+    )
+
+    original_state = hass.state
+    hass.set_state(CoreState.stopping)
+    try:
+        with patch.object(coordinator, "async_refresh", AsyncMock()) as mock_refresh:
+            await coordinator._handle_retry(utcnow())
+    finally:
+        hass.set_state(original_state)
+
+    mock_refresh.assert_not_awaited()
+    assert coordinator._retry_unsub is None
+
+    await coordinator.async_shutdown()
+
+
+@pytest.mark.integration
+@pytest.mark.async_test
+@pytest.mark.timeout(10)
+async def test_coordinator_shutdown_cancels_pending_retry(
+    hass: HomeAssistant,
+    content_request_manager,
+    mock_file_manager,
+    scraper,
+    mock_http_session,
+):
+    """Test that shutting down the coordinator cancels a pending retry."""
+    coordinator = MultiscrapeDataUpdateCoordinator(
+        config_name="test_retry_shutdown",
+        hass=hass,
+        request_manager=content_request_manager,
+        file_manager=mock_file_manager,
+        scraper=scraper,
+        update_interval=timedelta(seconds=0),
+    )
+    mock_http_session.async_request.side_effect = Exception("Network error")
+
+    unsub = MagicMock()
+    with patch(
+        "custom_components.multiscrape.coordinator.event.async_track_point_in_utc_time",
+        return_value=unsub,
+    ):
+        await coordinator._async_update_data()
+
+    assert coordinator._retry_unsub is unsub
+
+    await coordinator.async_shutdown()
+
+    unsub.assert_called_once()
+    assert coordinator._retry_unsub is None
 
 
 @pytest.mark.integration
@@ -275,13 +465,121 @@ async def test_coordinator_zero_interval_stops_after_max_retries(
     with patch(
         "custom_components.multiscrape.coordinator.event.async_track_point_in_utc_time"
     ) as mock_track:
-        coordinator._async_unsub_refresh = MagicMock()
         await coordinator._async_update_data()
 
     # Assert - no more retries scheduled
-    assert coordinator._retry_count == MAX_RETRIES + 1
     mock_track.assert_not_called()
     assert "please manually retry with trigger service" in caplog.text
+    # Counter is re-armed so a manual trigger gets a fresh set of retries
+    assert coordinator._retry_count == 0
+
+    await coordinator.async_shutdown()
+
+
+@pytest.mark.integration
+@pytest.mark.async_test
+@pytest.mark.timeout(10)
+async def test_coordinator_zero_interval_honours_custom_max_retries(
+    hass: HomeAssistant,
+    content_request_manager,
+    mock_file_manager,
+    scraper,
+    mock_http_session,
+    caplog,
+):
+    """Test that a non-default max_retries bounds the number of retries."""
+    coordinator = MultiscrapeDataUpdateCoordinator(
+        config_name="test_custom_max_retry",
+        hass=hass,
+        request_manager=content_request_manager,
+        file_manager=mock_file_manager,
+        scraper=scraper,
+        update_interval=timedelta(seconds=0),
+        max_retries=1,
+    )
+    mock_http_session.async_request.side_effect = Exception("Network error")
+
+    with patch(
+        "custom_components.multiscrape.coordinator.event.async_track_point_in_utc_time"
+    ) as mock_track:
+        # First failure schedules the one allowed retry
+        await coordinator._async_update_data()
+        assert coordinator._retry_count == 1
+        assert mock_track.call_count == 1
+        assert "retry 1 of 1 will be scheduled" in caplog.text
+
+        # The retry fails too: no further retry, counter re-armed
+        await coordinator._async_update_data()
+
+    assert mock_track.call_count == 1
+    assert coordinator._retry_count == 0
+    assert "Updating and 1 retries failed" in caplog.text
+
+    await coordinator.async_shutdown()
+
+
+@pytest.mark.integration
+@pytest.mark.async_test
+@pytest.mark.timeout(10)
+async def test_coordinator_zero_max_retries_never_schedules(
+    hass: HomeAssistant,
+    content_request_manager,
+    mock_file_manager,
+    scraper,
+    mock_http_session,
+    caplog,
+):
+    """Test that max_retries: 0 disables the automatic retry entirely."""
+    coordinator = MultiscrapeDataUpdateCoordinator(
+        config_name="test_no_retry",
+        hass=hass,
+        request_manager=content_request_manager,
+        file_manager=mock_file_manager,
+        scraper=scraper,
+        update_interval=timedelta(seconds=0),
+        max_retries=0,
+    )
+    mock_http_session.async_request.side_effect = Exception("Network error")
+
+    with patch(
+        "custom_components.multiscrape.coordinator.event.async_track_point_in_utc_time"
+    ) as mock_track:
+        await coordinator._async_update_data()
+
+    mock_track.assert_not_called()
+    assert coordinator._retry_unsub is None
+    assert coordinator.update_error is True
+    # No error telling the user to trigger manually: an external mechanism owns
+    # the schedule, which is the whole point of max_retries: 0.
+    assert "please manually retry with trigger service" not in caplog.text
+
+    await coordinator.async_shutdown()
+
+
+@pytest.mark.integration
+@pytest.mark.async_test
+@pytest.mark.timeout(10)
+async def test_coordinator_max_retries_warns_with_real_scan_interval(
+    hass: HomeAssistant,
+    content_request_manager,
+    mock_file_manager,
+    scraper,
+    caplog,
+):
+    """Test that max_retries with a non-zero scan_interval warns at startup."""
+    coordinator = MultiscrapeDataUpdateCoordinator(
+        config_name="test_ignored_max_retries",
+        hass=hass,
+        request_manager=content_request_manager,
+        file_manager=mock_file_manager,
+        scraper=scraper,
+        update_interval=timedelta(seconds=60),
+        max_retries=0,
+    )
+
+    assert "max_retries is only used when scan_interval is 0" in caplog.text
+
+    await coordinator.async_shutdown()
 
 
 @pytest.mark.integration
