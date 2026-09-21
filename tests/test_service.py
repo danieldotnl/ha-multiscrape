@@ -1,5 +1,7 @@
 """Integration tests for multiscrape service functionality."""
 
+import asyncio
+
 import pytest
 import respx
 from homeassistant.const import CONF_RESOURCE, Platform
@@ -41,17 +43,55 @@ async def test_setup_config_services(hass: HomeAssistant, coordinator):
 @pytest.mark.integration
 @pytest.mark.async_test
 @pytest.mark.timeout(10)
-async def test_trigger_service_calls_coordinator_refresh(hass: HomeAssistant, coordinator):
-    """Test that trigger service calls coordinator refresh."""
+async def test_trigger_service_calls_coordinator_refresh(
+    hass: HomeAssistant, coordinator, mock_http_session
+):
+    """Test that trigger service runs a coordinator refresh."""
     # Arrange
     await setup_config_services(hass, coordinator, "test_trigger")
 
     # Act
     await hass.services.async_call(DOMAIN, "trigger_test_trigger", blocking=True)
 
-    # Assert - coordinator should have been refreshed
-    # We can't directly verify the call without mocking, but we can verify the service exists
-    assert hass.services.has_service(DOMAIN, "trigger_test_trigger")
+    # Assert - the refresh has completed by the time the service call returns
+    assert mock_http_session.async_request.await_count == 1
+    assert coordinator.last_update_success
+
+
+@pytest.mark.integration
+@pytest.mark.async_test
+@pytest.mark.timeout(10)
+async def test_trigger_service_during_refresh_is_not_dropped(
+    hass: HomeAssistant, coordinator, mock_http_session, mock_http_response
+):
+    """Test that a trigger arriving while a refresh is running still scrapes."""
+    # Arrange - the first request blocks until released
+    await setup_config_services(hass, coordinator, "test_trigger")
+    release = asyncio.Event()
+    started = asyncio.Event()
+    response = mock_http_response(text='<div class="test">Test Content</div>')
+
+    async def slow_then_fast(*args, **kwargs):
+        if not started.is_set():
+            started.set()
+            await release.wait()
+        return response
+
+    mock_http_session.async_request.side_effect = slow_then_fast
+    running = hass.async_create_task(coordinator.async_refresh())
+    await started.wait()
+
+    # Act - trigger while the first refresh holds the lock
+    trigger = hass.async_create_task(
+        hass.services.async_call(DOMAIN, "trigger_test_trigger", blocking=True)
+    )
+    await asyncio.sleep(0)
+    release.set()
+    await running
+    await trigger
+
+    # Assert - the trigger ran its own scrape rather than being coalesced away
+    assert mock_http_session.async_request.await_count == 2
 
 
 @pytest.mark.integration

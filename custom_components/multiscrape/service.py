@@ -46,7 +46,9 @@ async def setup_config_services(
 async def _setup_trigger_service(hass: HomeAssistant, target_name, coordinator):
     async def _async_trigger_service(service: ServiceCall):
         _LOGGER.info("Multiscrape triggered by service: %s", service.__repr__())
-        await coordinator.async_request_refresh()
+        # async_refresh() waits for a refresh already in progress instead of going
+        # through the debouncer, which would silently drop this request.
+        await coordinator.async_refresh()
 
     hass.services.async_register(
         DOMAIN,
