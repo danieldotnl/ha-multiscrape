@@ -1,5 +1,7 @@
 """Integration tests for button platform."""
 
+import asyncio
+
 import pytest
 from homeassistant.const import CONF_NAME, CONF_UNIQUE_ID
 from homeassistant.core import HomeAssistant
@@ -107,7 +109,7 @@ async def test_button_press_triggers_coordinator_refresh(
         nonlocal refresh_called
         refresh_called = True
 
-    coordinator.async_request_refresh = mock_refresh
+    coordinator.async_refresh = mock_refresh
 
     # Act
     await button.async_press()
@@ -115,6 +117,45 @@ async def test_button_press_triggers_coordinator_refresh(
     # Assert
     assert refresh_called is True
     assert "Multiscrape triggered by button" in caplog.text
+
+
+@pytest.mark.integration
+@pytest.mark.async_test
+@pytest.mark.timeout(10)
+async def test_button_press_during_refresh_is_not_dropped(
+    hass: HomeAssistant, coordinator, mock_http_session, mock_http_response
+):
+    """Test that a press arriving while a refresh is running still scrapes."""
+    # Arrange - the first request blocks until released
+    button = MultiscrapeRefreshButton(
+        hass=hass,
+        coordinator=coordinator,
+        unique_id="test_button",
+        name="Test Button",
+    )
+    release = asyncio.Event()
+    started = asyncio.Event()
+    response = mock_http_response(text='<div class="test">Test Content</div>')
+
+    async def slow_then_fast(*args, **kwargs):
+        if not started.is_set():
+            started.set()
+            await release.wait()
+        return response
+
+    mock_http_session.async_request.side_effect = slow_then_fast
+    running = hass.async_create_task(coordinator.async_refresh())
+    await started.wait()
+
+    # Act - press while the first refresh holds the lock
+    press = hass.async_create_task(button.async_press())
+    await asyncio.sleep(0)
+    release.set()
+    await running
+    await press
+
+    # Assert - the press ran its own scrape rather than being coalesced away
+    assert mock_http_session.async_request.await_count == 2
 
 
 @pytest.mark.integration
@@ -232,7 +273,7 @@ async def test_button_press_multiple_times(hass: HomeAssistant, coordinator):
         nonlocal press_count
         press_count += 1
 
-    coordinator.async_request_refresh = mock_refresh
+    coordinator.async_refresh = mock_refresh
 
     # Act - press button 3 times
     await button.async_press()

@@ -4,15 +4,12 @@ from __future__ import annotations
 import logging
 
 from homeassistant.components.button import ButtonEntity
-from homeassistant.const import CONF_NAME
-from homeassistant.const import CONF_UNIQUE_ID
-from homeassistant.const import Platform
+from homeassistant.const import CONF_NAME, CONF_UNIQUE_ID, Platform
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.entity import async_generate_entity_id
-from homeassistant.helpers.entity import EntityCategory
+from homeassistant.helpers.entity import (EntityCategory,
+                                          async_generate_entity_id)
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.typing import ConfigType
-from homeassistant.helpers.typing import DiscoveryInfoType
+from homeassistant.helpers.typing import ConfigType, DiscoveryInfoType
 
 from . import async_get_config_and_coordinator
 
@@ -65,4 +62,6 @@ class MultiscrapeRefreshButton(ButtonEntity):
     async def async_press(self) -> None:
         """Press the button."""
         _LOGGER.info("Multiscrape triggered by button")
-        await self._coordinator.async_request_refresh()
+        # async_refresh() waits for a refresh already in progress instead of going
+        # through the debouncer, which would silently drop this press.
+        await self._coordinator.async_refresh()
