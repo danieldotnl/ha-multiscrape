@@ -8,7 +8,10 @@ from typing import TYPE_CHECKING
 from homeassistant.const import Platform
 
 if TYPE_CHECKING:
+    from homeassistant.core import CALLBACK_TYPE
+
     from .coordinator import MultiscrapeDataUpdateCoordinator
+    from .http_session import HttpSession
     from .scraper import Scraper
 
 _LOGGER = logging.getLogger(__name__)
@@ -22,6 +25,24 @@ class ScraperInstance:
     scraper: Scraper
     coordinator: MultiscrapeDataUpdateCoordinator
     platform_configs: dict[Platform, dict[str, dict]] = field(default_factory=dict)
+    session: HttpSession | None = None
+    unsub_session_stop: CALLBACK_TYPE | None = None
+
+    async def async_shutdown(self) -> None:
+        """Shut down the coordinator and close the HTTP session.
+
+        Used when the instance is discarded before Home Assistant stops, e.g. on
+        reload. It also removes the stop listener that would otherwise keep the
+        session alive until then.
+        """
+        try:
+            await self.coordinator.async_shutdown()
+        finally:
+            if self.unsub_session_stop:
+                self.unsub_session_stop()
+                self.unsub_session_stop = None
+            if self.session:
+                await self.session.async_close()
 
 
 class ScraperRegistry:

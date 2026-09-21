@@ -43,6 +43,7 @@ async def async_setup(hass: HomeAssistant, entry: ConfigEntry):
         if conf is None:
             return
         await async_reload_integration_platforms(hass, DOMAIN, PLATFORMS)
+        await _async_shutdown_scrapers(hass)
         _async_setup_shared_data(hass)
         await _async_process_config(hass, conf)
 
@@ -68,6 +69,32 @@ async def async_setup(hass: HomeAssistant, entry: ConfigEntry):
 def _async_setup_shared_data(hass: HomeAssistant):
     """Create a fresh ScraperRegistry for platform config and scraper coordinators."""
     hass.data[DOMAIN] = ScraperRegistry()
+
+
+async def _async_shutdown_scrapers(hass: HomeAssistant) -> None:
+    """Shut down the scrapers of the current registry before it is replaced.
+
+    A discarded coordinator or session is not garbage collected, because its
+    EVENT_HOMEASSISTANT_STOP listener still references it. Without an explicit
+    shutdown a coordinator keeps any pending work alive (a scheduled retry, most
+    visibly) and would run it against a stale session and a stale config, with
+    nothing left listening to the result. The session would keep its HTTP
+    client open until Home Assistant stops.
+    """
+    registry: ScraperRegistry | None = hass.data.get(DOMAIN)
+    if registry is None:
+        return
+
+    for instance in registry.get_all():
+        try:
+            await instance.async_shutdown()
+        except Exception:  # pylint: disable=broad-except
+            _LOGGER.exception(
+                "%s # Error while shutting down scraper on reload",
+                instance.scraper_id,
+            )
+
+    registry.clear()
 
 
 async def _async_process_config(hass: HomeAssistant, config) -> bool:
@@ -113,12 +140,16 @@ async def _async_process_config(hass: HomeAssistant, config) -> bool:
         async def _shutdown_session(_event, _session=session):
             await _session.async_close()
 
-        hass.bus.async_listen_once(EVENT_HOMEASSISTANT_STOP, _shutdown_session)
+        unsub_session_stop = hass.bus.async_listen_once(
+            EVENT_HOMEASSISTANT_STOP, _shutdown_session
+        )
 
         instance = ScraperInstance(
             scraper_id=scraper_id,
             scraper=scraper,
             coordinator=coordinator,
+            session=session,
+            unsub_session_stop=unsub_session_stop,
         )
         registry.register(instance)
 
