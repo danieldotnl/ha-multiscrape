@@ -217,6 +217,8 @@ Configure the form-submit functionality which enables you to submit a (login) fo
 
 #### Form input templates
 
+> **Breaking change:** `form_submit: input:` values are now rendered as templates. If an existing value contains a literal `{{`, `{%` or `{#` (for example in a password), Home Assistant will refuse to load the whole multiscrape entry with a template syntax error. Escape the marker: `"{{ '{{' }}literal"`, `"{{ '{%' }}literal"` or `"{{ '{#' }}literal"`. Values are also stripped of leading and trailing whitespace, so `" secret "` is submitted as `secret`.
+
 The values in `input` are rendered as [Home Assistant templates](https://www.home-assistant.io/docs/configuration/templating/) at the moment the form is submitted. The input fields scraped from the form are available as the `form` variable, so a value can be computed from another field on the same form.
 
 This is what you need for login forms that hash the password in JavaScript using a nonce from a hidden field. For example, AT&T BGW320 gateways post `md5(access_code + nonce)`:
@@ -244,9 +246,11 @@ Notes:
 - Use `form['field-name']` instead of `form.field-name` for field names that are not valid identifiers.
 - Fields listed in `input_filter` are still available in `form`, so you can use a field to compute a value without submitting the field itself.
 - `form` only contains `<input>` elements with a `name` attribute. `<select>`, `<textarea>` and values computed by JavaScript are not included.
+- An `<input>` without a `value` attribute gives `None`, so `form.password` is `None` in the example above. Use `| default('')` if you need an empty string.
 - When `select` is omitted no form is scraped, so `form` is empty.
-- `form` is the only variable available here. [Form variables](#form-variables) are scraped from the form _response_, which does not exist yet when `input` is rendered, so they cannot be used in `input`.
-- Because values are now templates, a value containing a literal `{{`, `{%` or `{#` is interpreted as a template. Escape it, for example `"{{ '{{' }}literal"`. Values are also stripped of surrounding whitespace.
+- These templates are rendered **strictly**: referencing a field that is not on the form raises an error instead of rendering an empty string, so a renamed or mistyped field can never silently submit the hash of your access code alone. Use `{{ form.field | default('') }}` for a genuinely optional field.
+- `form` is the only extra variable multiscrape provides here; the standard Home Assistant template functions are available as usual. [Form variables](#form-variables) are scraped from the form _response_, which does not exist yet when `input` is rendered, so they cannot be used in `input`.
+- Because the values hold credentials, multiscrape does not log the template or the scraped fields when rendering fails; the error only names the `input` key. (Home Assistant core may still log the template itself.)
 
 ### Form Variables
 

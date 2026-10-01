@@ -156,12 +156,15 @@ def _restore_templates(config):
     for platform in [Platform.SENSOR, Platform.BINARY_SENSOR]:
         selectors.extend(config.get(platform) or [])
     if config.get(CONF_FORM_SUBMIT):
-        selectors.extend(config[CONF_FORM_SUBMIT].get(CONF_FORM_VARIABLES) or [])
-        form_input = config[CONF_FORM_SUBMIT].get(CONF_FORM_INPUT)
+        # Copy before writing: config is only a shallow copy of the service call data.
+        form_submit = dict(config[CONF_FORM_SUBMIT])
+        selectors.extend(form_submit.get(CONF_FORM_VARIABLES) or [])
+        form_input = form_submit.get(CONF_FORM_INPUT)
         if form_input:
-            config[CONF_FORM_SUBMIT][CONF_FORM_INPUT] = {
+            form_submit[CONF_FORM_INPUT] = {
                 key: _restore_template(value) for key, value in form_input.items()
             }
+        config[CONF_FORM_SUBMIT] = form_submit
 
     for selector in selectors:
         for attr_conf in selector.get(CONF_SENSOR_ATTRS) or []:

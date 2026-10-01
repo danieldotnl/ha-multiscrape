@@ -2,6 +2,7 @@
 
 
 import hashlib
+import logging
 import ssl
 from unittest.mock import patch
 
@@ -17,6 +18,7 @@ from custom_components.multiscrape.form_auth import (FormAuthConfig,
 from custom_components.multiscrape.http_session import (HttpConfig,
                                                         HttpSession,
                                                         create_http_session)
+from custom_components.multiscrape.schema import COMBINED_SCHEMA
 from custom_components.multiscrape.scrape_context import ScrapeContext
 from custom_components.multiscrape.util import create_dict_renderer
 
@@ -32,6 +34,17 @@ _NOOP_DATA = lambda variables={}, parse_result=None: None
 def static_input_renderer(values):
     """Build an input renderer returning fixed values (no templates involved)."""
     return lambda variables={}, parse_result=None: dict(values)
+
+
+def form_input_renderer(hass, values):
+    """Build an input renderer with the same settings create_http_session uses.
+
+    Strict, so an undefined form field raises rather than silently rendering
+    empty; content is kept out of error logs because these values are credentials.
+    """
+    return create_dict_renderer(
+        hass, values, "form input", strict=True, log_content=False
+    )
 
 
 def make_http_config(**overrides):
@@ -602,13 +615,12 @@ async def test_form_auth_renders_input_templates_with_form_variable(hass: HomeAs
     form_config = make_form_config(
         resource="https://example.com/login",
         select="#login",
-        input_renderer=create_dict_renderer(
+        input_renderer=form_input_renderer(
             hass,
             {
                 "password": "**********",
                 "hashpassword": "{{ md5('code' ~ form.nonce) }}",
             },
-            "form input",
         ),
     )
     sess = make_form_session(hass, form_config)
@@ -640,8 +652,8 @@ async def test_form_auth_input_template_can_reference_filtered_field(hass: HomeA
         resource="https://example.com/login",
         select="#login",
         input_filter=["nonce"],
-        input_renderer=create_dict_renderer(
-            hass, {"hashpassword": "{{ md5('code' ~ form.nonce) }}"}, "form input"
+        input_renderer=form_input_renderer(
+            hass, {"hashpassword": "{{ md5('code' ~ form.nonce) }}"}
         ),
     )
     sess = make_form_session(hass, form_config)
@@ -671,9 +683,7 @@ async def test_form_auth_plain_input_values_are_submitted_verbatim(hass: HomeAss
     form_config = make_form_config(
         resource="https://example.com/login",
         select="#login",
-        input_renderer=create_dict_renderer(
-            hass, {"username": "admin", "pin": "0123"}, "form input"
-        ),
+        input_renderer=form_input_renderer(hass, {"username": "admin", "pin": "0123"}),
     )
     sess = make_form_session(hass, form_config)
 
@@ -700,8 +710,8 @@ async def test_form_auth_plain_input_values_are_submitted_verbatim(hass: HomeAss
 async def test_form_auth_input_template_without_select_sees_empty_form(hass: HomeAssistant):
     """Test `form` is defined but empty when no form is scraped."""
     form_config = make_form_config(
-        input_renderer=create_dict_renderer(
-            hass, {"user": "admin", "fields": "{{ form | count }}"}, "form input"
+        input_renderer=form_input_renderer(
+            hass, {"user": "admin", "fields": "{{ form | count }}"}
         ),
     )
     sess = make_form_session(hass, form_config)
@@ -723,12 +733,17 @@ async def test_form_auth_input_template_without_select_sees_empty_form(hass: Hom
 @pytest.mark.timeout(10)
 @respx.mock
 async def test_form_auth_input_template_error_propagates(hass: HomeAssistant):
-    """Test a failing input template raises instead of submitting a bad payload."""
+    """Test an unknown form field raises instead of submitting a wrong credential.
+
+    Uses the documented `md5('code' ~ form.field)` shape: without strict rendering
+    an unknown field renders as an empty string, so the hash of the access code
+    alone would be submitted silently.
+    """
     form_config = make_form_config(
         resource="https://example.com/login",
         select="#login",
-        input_renderer=create_dict_renderer(
-            hass, {"hashpassword": "{{ md5(form.missing) }}"}, "form input"
+        input_renderer=form_input_renderer(
+            hass, {"hashpassword": "{{ md5('code' ~ form.noncce) }}"}
         ),
     )
     sess = make_form_session(hass, form_config)
@@ -744,6 +759,92 @@ async def test_form_auth_input_template_error_propagates(hass: HomeAssistant):
         await sess.ensure_authenticated("https://example.com/main")
 
     assert not submit_route.called
+
+
+@pytest.mark.integration
+@pytest.mark.async_test
+@pytest.mark.http
+@pytest.mark.timeout(10)
+@respx.mock
+async def test_form_auth_input_template_rerendered_on_each_submit(hass: HomeAssistant):
+    """Test each submit re-renders the input against freshly scraped fields.
+
+    The whole point of the feature is that the nonce changes on every page load,
+    so a rendered payload must never be reused across submits.
+    """
+    nonces = iter(["aaa", "bbb"])
+    form_config = make_form_config(
+        resource="https://example.com/login",
+        select="#login",
+        input_renderer=form_input_renderer(
+            hass, {"hashpassword": "{{ md5('code' ~ form.nonce) }}"}
+        ),
+    )
+    sess = make_form_session(hass, form_config)
+
+    respx.get("https://example.com/login").mock(
+        side_effect=lambda request: httpx.Response(
+            200,
+            text=FORM_PAGE_WITH_NONCE.replace("deadbeef", next(nonces)),
+        )
+    )
+    submit_route = respx.post("https://example.com/submit").mock(
+        return_value=respx.MockResponse(200, text="Welcome!")
+    )
+
+    await sess.ensure_authenticated("https://example.com/main")
+    await sess.ensure_authenticated("https://example.com/main")
+
+    assert submit_route.call_count == 2
+    first = submit_route.calls[0].request.content.decode()
+    second = submit_route.calls[1].request.content.decode()
+    assert hashlib.md5(b"codeaaa").hexdigest() in first
+    assert hashlib.md5(b"codebbb").hexdigest() in second
+
+
+@pytest.mark.integration
+@pytest.mark.async_test
+@pytest.mark.http
+@pytest.mark.timeout(10)
+@respx.mock
+async def test_form_auth_input_template_error_keeps_secrets_out_of_log(
+    hass: HomeAssistant, caplog
+):
+    """Test a failing input template does not log the template or the form fields.
+
+    Input templates hold credentials (a hardcoded access code) and the scraped
+    fields can hold session tokens, so neither belongs in the error log.
+    """
+    form_config = make_form_config(
+        resource="https://example.com/login",
+        select="#login",
+        input_renderer=form_input_renderer(
+            hass, {"hashpassword": "{{ md5('SECRETCODE' ~ form.noncce) }}"}
+        ),
+    )
+    sess = make_form_session(hass, form_config)
+
+    respx.get("https://example.com/login").mock(
+        return_value=respx.MockResponse(200, text=FORM_PAGE_WITH_NONCE)
+    )
+    respx.post("https://example.com/submit").mock(
+        return_value=respx.MockResponse(200, text="Welcome!")
+    )
+
+    with (
+        caplog.at_level(logging.ERROR, logger="custom_components.multiscrape.util"),
+        pytest.raises(TemplateError),
+    ):
+        await sess.ensure_authenticated("https://example.com/main")
+
+    multiscrape_log = "\n".join(
+        record.getMessage()
+        for record in caplog.records
+        if record.name == "custom_components.multiscrape.util"
+    )
+    assert "form input 'hashpassword'" in multiscrape_log
+    assert "SECRETCODE" not in multiscrape_log
+    assert "deadbeef" not in multiscrape_log
 
 
 @pytest.mark.integration
@@ -1057,20 +1158,24 @@ async def test_create_http_session_with_form(hass: HomeAssistant):
 @pytest.mark.timeout(10)
 async def test_create_http_session_builds_input_renderer(hass: HomeAssistant):
     """Test the factory turns form_submit input into a renderer fed with `form`."""
-    conf = {
-        "resource": "https://example.com",
-        "method": "get",
-        "parser": "html.parser",
-        "form_submit": {
-            "resource": "https://example.com/login",
-            "select": "#login",
-            "input": {
-                "user": "admin",
-                "hashpassword": "{{ md5('code' ~ form.nonce) }}",
+    # Validate through the real schema so the renderer gets Template objects,
+    # exactly as it does at runtime.
+    conf = COMBINED_SCHEMA(
+        {
+            "resource": "https://example.com",
+            "method": "get",
+            "parser": "html.parser",
+            "form_submit": {
+                "resource": "https://example.com/login",
+                "select": "#login",
+                "input": {
+                    "user": "admin",
+                    "hashpassword": "{{ md5('code' ~ form.nonce) }}",
+                },
+                "method": "post",
             },
-            "method": "post",
-        },
-    }
+        }
+    )
     session = create_http_session("test", conf, hass, None)
 
     renderer = session._form_authenticator._config.input_renderer
@@ -1078,6 +1183,10 @@ async def test_create_http_session_builds_input_renderer(hass: HomeAssistant):
         "user": "admin",
         "hashpassword": hashlib.md5(b"codedeadbeef").hexdigest(),
     }
+    # The factory must wire the renderer up strictly: an unknown form field is an
+    # error, not an empty string that would hash into a wrong credential.
+    with pytest.raises(TemplateError):
+        renderer({"form": {}})
 
     await session.async_close()
 
