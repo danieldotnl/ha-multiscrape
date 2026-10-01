@@ -74,9 +74,6 @@ def make_form_conf(**overrides):
             "submit_once": False,
             "resubmit_on_error": True,
             "variables": [],
-            "method": "get",
-            "verify_ssl": True,
-            "timeout": 10,
         },
     }
     if overrides:

@@ -625,3 +625,116 @@ def test_combined_schema_accepts_no_entities():
         CONF_RESOURCE: "https://example.com",
     })
     assert CONF_RESOURCE in result
+
+
+# ============================================================================
+# FORM_SUBMIT_SCHEMA inherited HTTP option tests (#630)
+# ============================================================================
+
+
+@pytest.mark.unit
+def test_form_schema_method_has_no_default():
+    """Test form_submit does not inherit HTTP_SCHEMA's GET default for method.
+
+    Inheriting it would force a GET on every form submit. Voluptuous markers
+    compare equal to their key string, so reassigning the key after the splat
+    would keep the inherited marker and its default: this guards that.
+    """
+    assert CONF_METHOD not in _validate_form({})
+
+    markers = [key for key in FORM_SUBMIT_SCHEMA if key == CONF_METHOD]
+    assert len(markers) == 1
+    assert markers[0].default is vol.schema_builder.UNDEFINED
+
+
+@pytest.mark.unit
+def test_form_schema_method_is_lowercased():
+    """Test a configured form_submit method is normalised like the top-level one."""
+    assert _validate_form({CONF_METHOD: "PUT"})[CONF_METHOD] == "put"
+
+
+@pytest.mark.unit
+def test_form_schema_rejects_unknown_method():
+    """Test an unsupported form_submit method fails validation."""
+    with pytest.raises(vol.Invalid):
+        _validate_form({CONF_METHOD: "connect"})
+
+
+@pytest.mark.unit
+def test_form_schema_timeout_has_no_default():
+    """Test form_submit does not inherit the timeout default.
+
+    Inheriting it would cap a form submit at 10s even when the top-level
+    timeout is higher. Unset means: inherit the client timeout.
+    """
+    assert CONF_TIMEOUT not in _validate_form({})
+    assert _validate_form({CONF_TIMEOUT: 30})[CONF_TIMEOUT] == 30
+
+
+@pytest.mark.unit
+def test_form_schema_rejects_verify_ssl():
+    """Test form_submit rejects verify_ssl instead of silently ignoring it (#630).
+
+    The httpx client is deliberately shared with the data request so the login
+    cookies carry over, so its SSL context cannot differ per form.
+    """
+    with pytest.raises(vol.Invalid, match=CONF_VERIFY_SSL):
+        _validate_form({CONF_VERIFY_SSL: False})
+
+
+@pytest.mark.unit
+def test_combined_schema_rejects_form_verify_ssl():
+    """Test the rejection reaches the user through the full config schema."""
+    with pytest.raises(vol.Invalid, match=CONF_VERIFY_SSL):
+        _validate_combined({
+            CONF_RESOURCE: "https://example.com",
+            "form_submit": {CONF_RESOURCE: "https://example.com/login",
+                            CONF_VERIFY_SSL: False},
+        })
+
+
+@pytest.mark.integration
+@pytest.mark.async_test
+@pytest.mark.timeout(10)
+async def test_form_schema_accepts_payload_template(hass):
+    """Test form_submit payload is validated as a template."""
+    result = _validate_form({"payload": "{{ form.nonce }}"})
+
+    assert result["payload"].template == "{{ form.nonce }}"
+    assert result["payload"].is_static is False
+
+
+@pytest.mark.integration
+@pytest.mark.async_test
+@pytest.mark.timeout(10)
+async def test_form_schema_accepts_resource_template(hass):
+    """Test form_submit accepts resource_template."""
+    result = _validate_form({CONF_RESOURCE_TEMPLATE: "http://{{ 'gw' }}/login"})
+
+    assert result[CONF_RESOURCE_TEMPLATE].template == "http://{{ 'gw' }}/login"
+
+
+@pytest.mark.integration
+@pytest.mark.async_test
+@pytest.mark.timeout(10)
+async def test_form_schema_rejects_resource_with_resource_template(hass):
+    """Test form_submit resource and resource_template stay mutually exclusive."""
+    with pytest.raises(vol.Invalid):
+        _validate_form({
+            CONF_RESOURCE: "https://example.com/login",
+            CONF_RESOURCE_TEMPLATE: "http://{{ 'gw' }}/login",
+        })
+
+
+@pytest.mark.unit
+def test_http_schema_method_keeps_its_default():
+    """Test the top-level method default survives the shared-validator refactor."""
+    assert _validate_combined({CONF_RESOURCE: "https://example.com"})[CONF_METHOD] == "get"
+
+
+@pytest.mark.unit
+def test_http_schema_keeps_verify_ssl_and_timeout():
+    """Test dropping these from form_submit left the top-level options alone."""
+    result = _validate_combined({CONF_RESOURCE: "https://example.com"})
+    assert result[CONF_VERIFY_SSL] is True
+    assert result[CONF_TIMEOUT] == DEFAULT_TIMEOUT

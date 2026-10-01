@@ -15,7 +15,11 @@ _LOGGER = logging.getLogger(__name__)
 class FormAuthConfig:
     """Configuration for form-based authentication."""
 
-    resource: str | None = None
+    # Renders the url of the page with the form (and the default submit target).
+    # Built from form_submit's `resource` or `resource_template`; renders to None when
+    # neither is configured, which means "use the main resource and reuse the form
+    # response as the scrape content".
+    resource_renderer: Callable = field(default_factory=lambda: lambda variables={}, parse_result=None: None)
     select: str | None = None
     input_renderer: Callable = field(default_factory=lambda: lambda variables={}, parse_result=None: {})
     input_filter: list[str] = field(default_factory=list)
@@ -28,6 +32,9 @@ class FormAuthConfig:
     params_renderer: Callable = field(default_factory=lambda: lambda variables={}, parse_result=None: {})
     data_renderer: Callable = field(default_factory=lambda: lambda variables={}, parse_result=None: None)
     method: str | None = None
+    # Applied to both form requests. None means: inherit the client timeout, which is
+    # built from the top-level timeout option.
+    timeout: int | None = None
     auth: Any = None
 
 
@@ -89,11 +96,14 @@ class FormAuthenticator:
         # input templates as `form`, so a field can be excluded from the payload and
         # still be used to compute another one (e.g. hashing a nonce).
         scraped_fields: dict[str, Any] = {}
-        action, method = None, None
+        action, form_method = None, None
+
+        # Rendered once per submit so the form page fetch, the submit target and the
+        # "reuse the response as content" decision can never disagree.
+        form_resource = form_cfg.resource_renderer()
 
         if form_cfg.select:
-            form_resource = form_cfg.resource or main_resource
-            page = await self._fetch_form_page(form_resource)
+            page = await self._fetch_form_page(form_resource or main_resource)
             form = await self._extract_form(page)
 
             scraped_fields = self._get_input_fields(form)
@@ -102,13 +112,13 @@ class FormAuthenticator:
                 input_fields.pop(field_name, None)
 
             action = form.get("action")
-            method = form.get("method")
+            form_method = form.get("method")
 
             _LOGGER.debug(
                 "%s # Found form action %s and method %s",
                 self._config_name,
                 action,
-                method,
+                form_method,
             )
         else:
             _LOGGER.debug(
@@ -125,12 +135,41 @@ class FormAuthenticator:
                 input_fields,
             )
 
-        payload = input_fields if input_fields else None
+        # An explicit payload is submitted as the raw request body instead of the
+        # url-encoded input fields. It wins because it is explicit config, while the
+        # input fields are mostly scraped: letting the input fields win would make
+        # `payload` silently inert whenever `select` is set.
+        rendered_payload = form_cfg.data_renderer({"form": scraped_fields})
+        if rendered_payload:
+            if input_fields:
+                # The values are credentials, so only the keys are logged.
+                _LOGGER.debug(
+                    "%s # A payload is configured, so it is submitted as the request "
+                    "body instead of the %s url-encoded input field(s): %s",
+                    self._config_name,
+                    len(input_fields),
+                    list(input_fields),
+                )
+            payload = rendered_payload
+        else:
+            payload = input_fields if input_fields else None
 
-        if not method:
-            method = "POST"
+        method = form_cfg.method or form_method or "POST"
+        if (
+            form_cfg.method
+            and form_method
+            and form_cfg.method.lower() != form_method.lower()
+        ):
+            _LOGGER.debug(
+                "%s # Using the configured method %s instead of the form's method %s.",
+                self._config_name,
+                form_cfg.method,
+                form_method,
+            )
 
-        submit_resource = self._determine_submit_resource(action, main_resource)
+        submit_resource = self._determine_submit_resource(
+            action, main_resource, form_resource
+        )
 
         _LOGGER.debug("%s # Submitting the form", self._config_name)
         response = await self._form_request(
@@ -156,7 +195,7 @@ class FormAuthenticator:
                     form_cfg.variables_selectors[variable_key], variable_key
                 )
 
-        if not form_cfg.resource:
+        if not form_resource:
             return response.text
         return None
 
@@ -189,6 +228,7 @@ class FormAuthenticator:
             params=params,
             auth=form_cfg.auth,
             data=request_data,
+            timeout=form_cfg.timeout,
         )
 
     async def _fetch_form_page(self, resource: str) -> str:
@@ -239,9 +279,10 @@ class FormAuthenticator:
         )
         return input_fields
 
-    def _determine_submit_resource(self, action: str | None, main_resource: str) -> str:
+    def _determine_submit_resource(
+        self, action: str | None, main_resource: str, form_resource: str | None
+    ) -> str:
         """Determine the URL to submit the form to."""
-        form_resource = self._config.resource
         resource = main_resource
         if action and form_resource:
             resource = urljoin(form_resource, action)

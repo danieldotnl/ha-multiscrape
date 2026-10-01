@@ -5,7 +5,7 @@ import logging
 import homeassistant.helpers.config_validation as cv
 import voluptuous as vol
 from homeassistant.const import (CONF_DESCRIPTION, CONF_HEADERS, CONF_ICON,
-                                 CONF_NAME, CONF_UNIQUE_ID,
+                                 CONF_NAME, CONF_PAYLOAD, CONF_UNIQUE_ID,
                                  CONF_VALUE_TEMPLATE, Platform)
 from homeassistant.core import HomeAssistant, ServiceCall, SupportsResponse
 from homeassistant.helpers.service import async_set_service_schema
@@ -164,6 +164,12 @@ def _restore_templates(config):
             form_submit[CONF_FORM_INPUT] = {
                 key: _restore_template(value) for key, value in form_input.items()
             }
+        form_payload = form_submit.get(CONF_PAYLOAD)
+        if form_payload:
+            # Rendered with the scraped `form` fields at submit time, so it has to
+            # survive home assistant rendering the service call data, just like
+            # form_submit: input does.
+            form_submit[CONF_PAYLOAD] = _restore_template(form_payload)
         config[CONF_FORM_SUBMIT] = form_submit
 
     for selector in selectors:
