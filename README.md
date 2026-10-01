@@ -205,15 +205,52 @@ Configure the attributes on the sensor that can be set with additional scraping 
 
 Configure the form-submit functionality which enables you to submit a (login) form before scraping a site. More details on how this works [can be found on the wiki](https://github.com/danieldotnl/ha-multiscrape/wiki/Form-submit-functionality).
 
-| name              | description                                                                                               | required | default | type                |
-| ----------------- | --------------------------------------------------------------------------------------------------------- | -------- | ------- | ------------------- |
-| resource          | The url for the site with the form                                                                        | False    |         | string              |
-| select            | CSS selector used for selecting the form in the html. When omitted, the input fields are directly posted. | False    |         | string              |
-| input             | A dictionary with name/values which will be merged with the input fields on the form                      | False    |         | string - dictionary |
-| input_filter      | A list of input fields that should not be submitted with the form                                         | False    |         | string - list       |
-| submit_once       | Submit the form only once on startup instead of each scan interval                                        | False    | False   | boolean             |
-| resubmit_on_error | Resubmit the form after a scraping error is encountered                                                   | False    | True    | boolean             |
-| variables         | See [Form Variables](#Form-Variables)                                                                     | False    |         | list                |
+| name              | description                                                                                                                                                                                           | required | default | type                  |
+| ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- | ------- | --------------------- |
+| resource          | The url for the site with the form                                                                                                                                                                    | False    |         | string                |
+| select            | CSS selector used for selecting the form in the html. When omitted, the input fields are directly posted.                                                                                             | False    |         | string                |
+| input             | A dictionary with name/values which will be merged with the input fields on the form. Values are rendered as templates when the form is submitted. See [Form input templates](#form-input-templates). | False    |         | template - dictionary |
+| input_filter      | A list of input fields that should not be submitted with the form                                                                                                                                     | False    |         | string - list         |
+| submit_once       | Submit the form only once on startup instead of each scan interval                                                                                                                                    | False    | False   | boolean               |
+| resubmit_on_error | Resubmit the form after a scraping error is encountered                                                                                                                                               | False    | True    | boolean               |
+| variables         | See [Form Variables](#Form-Variables)                                                                                                                                                                 | False    |         | list                  |
+
+#### Form input templates
+
+> **Breaking change:** `form_submit: input:` values are now rendered as templates. If an existing value contains a literal `{{`, `{%` or `{#` (for example in a password), Home Assistant will refuse to load the whole multiscrape entry with a template syntax error. Escape the marker: `"{{ '{{' }}literal"`, `"{{ '{%' }}literal"` or `"{{ '{#' }}literal"`. Values are also stripped of leading and trailing whitespace, so `" secret "` is submitted as `secret`.
+
+The values in `input` are rendered as [Home Assistant templates](https://www.home-assistant.io/docs/configuration/templating/) at the moment the form is submitted. The input fields scraped from the form are available as the `form` variable, so a value can be computed from another field on the same form.
+
+This is what you need for login forms that hash the password in JavaScript using a nonce from a hidden field. For example, AT&T BGW320 gateways post `md5(access_code + nonce)`:
+
+```yaml
+multiscrape:
+  - resource: http://192.168.1.254/cgi-bin/nattable.ha
+    form_submit:
+      resource: http://192.168.1.254/cgi-bin/login.ha
+      select: "form"
+      input:
+        password: "**********"
+        hashpassword: "{{ md5('<access code>' ~ form.nonce) }}"
+      resubmit_on_error: true
+    sensor:
+      - unique_id: att_nat_sessions_in_use
+        name: NAT sessions in use
+        select: 'table[summary*="summary of session information"] tr:nth-child(2) td'
+```
+
+`md5`, `sha1`, `sha256` and `sha512` are built-in Home Assistant template functions (and filters), so no extra configuration is needed.
+
+Notes:
+
+- Use `form['field-name']` instead of `form.field-name` for field names that are not valid identifiers.
+- Fields listed in `input_filter` are still available in `form`, so you can use a field to compute a value without submitting the field itself.
+- `form` only contains `<input>` elements with a `name` attribute. `<select>`, `<textarea>` and values computed by JavaScript are not included.
+- An `<input>` without a `value` attribute gives `None`, so `form.password` is `None` in the example above. Use `| default('')` if you need an empty string.
+- When `select` is omitted no form is scraped, so `form` is empty.
+- These templates are rendered **strictly**: referencing a field that is not on the form raises an error instead of rendering an empty string, so a renamed or mistyped field can never silently submit the hash of your access code alone. Use `{{ form.field | default('') }}` for a genuinely optional field.
+- `form` is the only extra variable multiscrape provides here; the standard Home Assistant template functions are available as usual. [Form variables](#form-variables) are scraped from the form _response_, which does not exist yet when `input` is rendered, so they cannot be used in `input`.
+- Because the values hold credentials, multiscrape does not log the template or the scraped fields when rendering fails; the error only names the `input` key. (Home Assistant core may still log the template itself.)
 
 ### Form Variables
 
@@ -284,6 +321,8 @@ Multiscrape also offers a `get_content` and a `scrape` service. `get_content` re
 
 Both services accept the same configuration as what you would provide in your configuration yaml (what is described above), with a small but important caveat: if the service input contains templates, those are automatically parsed by home assistant when the service is being called. That is fine for templates like `resource` and `select`, but templates that need to be applied on the scraped data itself (like `value_template`), cannot be parsed when the service is called. Therefore you need to slightly alter the syntax and add a `!` in the middle. E.g. `{{` becomes `{!{` and `%}` becomes `%!}`. Multiscrape will then understand that this string needs to handled as a template after the service has been called.\
 _If someone has a better solution, please let me know!_
+
+The same applies to [form input templates](#form-input-templates): in a service call, write `hashpassword: "{!{ md5('<access code>' ~ form.nonce) }!}"`.
 
 To call one of those services, go to 'Developer tools' in Home Assistant and then to 'services'. Find the `multiscrape.get_content` or `multiscrape.scrape` services and go to yaml mode. There you enter your configuration.
 Example:

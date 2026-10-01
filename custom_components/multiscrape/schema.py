@@ -98,7 +98,7 @@ FORM_HEADERS_MAPPING_SCHEMA = {vol.Required(CONF_NAME): cv.string, **SELECTOR_SC
 FORM_SUBMIT_SCHEMA = {
     **HTTP_SCHEMA,
     vol.Optional(CONF_FORM_SELECT): cv.string,
-    vol.Optional(CONF_FORM_INPUT): vol.Schema({cv.string: cv.string}),
+    vol.Optional(CONF_FORM_INPUT): vol.Schema({cv.string: cv.template}),
     vol.Optional(CONF_FORM_INPUT_FILTER, default=[]): cv.ensure_list,
     vol.Optional(CONF_FORM_SUBMIT_ONCE, default=False): cv.boolean,
     vol.Optional(CONF_FORM_RESUBMIT_ERROR, default=True): cv.boolean,
