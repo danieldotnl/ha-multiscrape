@@ -33,6 +33,12 @@ _NOOP_HEADERS = lambda variables={}, parse_result=None: {}
 _NOOP_PARAMS = lambda variables={}, parse_result=None: {}
 _NOOP_DATA = lambda variables={}, parse_result=None: None
 
+
+def static_input_renderer(values):
+    """Build an input renderer returning fixed values (no templates involved)."""
+    return lambda variables={}, parse_result=None: dict(values)
+
+
 LOGIN_PAGE_HTML = """
 <html><body>
 <form id="loginform" action="/auth/submit" method="post">
@@ -70,13 +76,19 @@ def make_http_config(**overrides):
 
 
 def make_form_config(**overrides):
-    """Create a FormAuthConfig with sensible defaults."""
+    """Create a FormAuthConfig with sensible defaults.
+
+    `input_values={...}` is a convenience that is translated into a static
+    `input_renderer`. Pass `input_renderer=` directly to exercise templates.
+    """
     defaults = {
         "parser": "html.parser",
         "headers_renderer": _NOOP_HEADERS,
         "params_renderer": _NOOP_PARAMS,
         "data_renderer": _NOOP_DATA,
     }
+    if "input_values" in overrides:
+        overrides["input_renderer"] = static_input_renderer(overrides.pop("input_values"))
     return FormAuthConfig(**{**defaults, **overrides})
 
 

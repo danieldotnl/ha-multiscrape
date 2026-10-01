@@ -17,7 +17,7 @@ class FormAuthConfig:
 
     resource: str | None = None
     select: str | None = None
-    input_values: dict[str, str] | None = None
+    input_renderer: Callable = field(default_factory=lambda: lambda variables={}, parse_result=None: {})
     input_filter: list[str] = field(default_factory=list)
     submit_once: bool = False
     resubmit_on_error: bool = True
@@ -85,6 +85,10 @@ class FormAuthenticator:
         _LOGGER.debug("%s # Starting with form-submit", self._config_name)
         form_cfg = self._config
         input_fields = {}
+        # Fields scraped from the form, before input_filter is applied. Exposed to the
+        # input templates as `form`, so a field can be excluded from the payload and
+        # still be used to compute another one (e.g. hashing a nonce).
+        scraped_fields: dict[str, Any] = {}
         action, method = None, None
 
         if form_cfg.select:
@@ -92,7 +96,8 @@ class FormAuthenticator:
             page = await self._fetch_form_page(form_resource)
             form = await self._extract_form(page)
 
-            input_fields = self._get_input_fields(form)
+            scraped_fields = self._get_input_fields(form)
+            input_fields = dict(scraped_fields)
             for field_name in form_cfg.input_filter:
                 input_fields.pop(field_name, None)
 
@@ -111,10 +116,11 @@ class FormAuthenticator:
                 self._config_name,
             )
 
-        if form_cfg.input_values is not None:
-            input_fields.update(form_cfg.input_values)
+        rendered_input = form_cfg.input_renderer({"form": scraped_fields})
+        if rendered_input:
+            input_fields.update(rendered_input)
             _LOGGER.debug(
-                "%s # Merged input fields with input data in config. Result: %s",
+                "%s # Merged input fields with the rendered input from config. Result: %s",
                 self._config_name,
                 input_fields,
             )

@@ -39,15 +39,22 @@ def create_renderer(hass, value_template, context=""):
     return _render
 
 
-def create_dict_renderer(hass, templates_dict):
-    """Create template renderers for a dictionary with value_templates."""
+def create_dict_renderer(hass, templates_dict, context=""):
+    """Create template renderers for a dictionary with value_templates.
+
+    Args:
+        hass: Home Assistant instance
+        templates_dict: Dictionary with template strings or Template objects as values
+        context: Optional context description for better error messages (e.g. "form input")
+
+    """
     if templates_dict is None:
         return lambda variables={}, parse_result=None: {}
 
     # Create a copy of the templates_dict to avoid modification of the original
     templates_dict = templates_dict.copy()
     for item in templates_dict:
-        templates_dict[item] = create_renderer(hass, templates_dict[item])
+        templates_dict[item] = create_renderer(hass, templates_dict[item], context)
 
     def _render(variables: dict = {}, parse_result=False):
         return {

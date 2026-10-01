@@ -10,7 +10,7 @@ from homeassistant.const import (CONF_AUTHENTICATION, CONF_FORCE_UPDATE,
                                  CONF_VERIFY_SSL, HTTP_BASIC_AUTHENTICATION,
                                  HTTP_DIGEST_AUTHENTICATION)
 
-from custom_components.multiscrape.const import (CONF_EXTRACT,
+from custom_components.multiscrape.const import (CONF_EXTRACT, CONF_FORM_INPUT,
                                                  CONF_FORM_VARIABLES,
                                                  CONF_LOG_RESPONSE,
                                                  CONF_MAX_RETRIES,
@@ -310,6 +310,39 @@ def test_form_schema_rejects_variables_without_name():
                 {CONF_SELECT: "input[name='csrf']"},
             ],
         })
+
+
+@pytest.mark.integration
+@pytest.mark.async_test
+@pytest.mark.timeout(10)
+async def test_form_schema_input_accepts_template(hass):
+    """Test that input values are validated as templates."""
+    result = _validate_form({CONF_FORM_INPUT: {"hashpassword": "{{ md5('a') }}"}})
+
+    template = result[CONF_FORM_INPUT]["hashpassword"]
+    assert template.template == "{{ md5('a') }}"
+    assert template.is_static is False
+
+
+@pytest.mark.integration
+@pytest.mark.async_test
+@pytest.mark.timeout(10)
+async def test_form_schema_input_plain_value_is_static_template(hass):
+    """Test that a value without template markers stays verbatim."""
+    result = _validate_form({CONF_FORM_INPUT: {"username": "admin"}})
+
+    template = result[CONF_FORM_INPUT]["username"]
+    assert template.template == "admin"
+    assert template.is_static is True
+
+
+@pytest.mark.integration
+@pytest.mark.async_test
+@pytest.mark.timeout(10)
+async def test_form_schema_input_rejects_invalid_template(hass):
+    """Test that an unparsable input template fails config validation."""
+    with pytest.raises(vol.Invalid):
+        _validate_form({CONF_FORM_INPUT: {"username": "{{ unclosed"}})
 
 
 # ============================================================================

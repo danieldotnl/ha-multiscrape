@@ -328,7 +328,7 @@ def create_http_session(config_name, conf, hass, file_manager):
         form_auth_config = FormAuthConfig(
             resource=form_submit_config.get(CONF_RESOURCE),
             select=form_submit_config.get(CONF_FORM_SELECT),
-            input_values=form_submit_config.get(CONF_FORM_INPUT),
+            input_renderer=create_dict_renderer(hass, form_submit_config.get(CONF_FORM_INPUT), "form input"),
             input_filter=form_submit_config.get(CONF_FORM_INPUT_FILTER, []),
             submit_once=form_submit_config.get(CONF_FORM_SUBMIT_ONCE, False),
             resubmit_on_error=form_submit_config.get(CONF_FORM_RESUBMIT_ERROR, True),

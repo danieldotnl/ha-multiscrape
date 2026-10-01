@@ -12,8 +12,9 @@ from homeassistant.helpers.service import async_set_service_schema
 from homeassistant.helpers.template import Template
 from homeassistant.util import slugify
 
-from .const import (CONF_FIELDS, CONF_FORM_SUBMIT, CONF_FORM_VARIABLES,
-                    CONF_LOG_RESPONSE, CONF_SENSOR_ATTRS, DOMAIN)
+from .const import (CONF_FIELDS, CONF_FORM_INPUT, CONF_FORM_SUBMIT,
+                    CONF_FORM_VARIABLES, CONF_LOG_RESPONSE, CONF_SENSOR_ATTRS,
+                    DOMAIN)
 from .coordinator import (MultiscrapeDataUpdateCoordinator,
                           create_content_request_manager)
 from .file import create_file_manager
@@ -156,6 +157,11 @@ def _restore_templates(config):
         selectors.extend(config.get(platform) or [])
     if config.get(CONF_FORM_SUBMIT):
         selectors.extend(config[CONF_FORM_SUBMIT].get(CONF_FORM_VARIABLES) or [])
+        form_input = config[CONF_FORM_SUBMIT].get(CONF_FORM_INPUT)
+        if form_input:
+            config[CONF_FORM_SUBMIT][CONF_FORM_INPUT] = {
+                key: _restore_template(value) for key, value in form_input.items()
+            }
 
     for selector in selectors:
         for attr_conf in selector.get(CONF_SENSOR_ATTRS) or []:
