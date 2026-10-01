@@ -1,5 +1,7 @@
 """Integration tests for sensor platform."""
 
+from datetime import UTC, date, datetime
+
 import pytest
 from homeassistant.components.sensor import SensorDeviceClass
 from homeassistant.const import (CONF_DEVICE_CLASS, CONF_FORCE_UPDATE,
@@ -504,3 +506,164 @@ async def test_async_setup_platform_raises_platform_not_ready(
 
     # Cleanup
     sensor_module.async_get_config_and_coordinator = original_func
+
+
+@pytest.mark.integration
+@pytest.mark.async_test
+@pytest.mark.timeout(10)
+@pytest.mark.parametrize(
+    ("device_class", "restored", "expected"),
+    [
+        (
+            SensorDeviceClass.TIMESTAMP,
+            "2026-09-21T10:29:00+00:00",
+            datetime(2026, 9, 21, 10, 29, tzinfo=UTC),
+        ),
+        (SensorDeviceClass.DATE, "2026-09-21", date(2026, 9, 21)),
+    ],
+)
+async def test_sensor_restores_date_device_class_as_native_type(
+    hass: HomeAssistant, coordinator, scraper, device_class, restored, expected
+):
+    """A restored state string must be parsed before it becomes the native value.
+
+    Restored states are always strings, so handing one straight to a
+    date/timestamp sensor made HA reject the entity on startup with
+    "has timestamp device class but provides state ... 'str' object has
+    no attribute 'tzinfo'" (#623).
+    """
+    from unittest.mock import AsyncMock, patch
+
+    from homeassistant.core import State
+
+    from custom_components.multiscrape.const import CONF_EXTRACT
+    from custom_components.multiscrape.selector import Selector
+
+    # Arrange
+    config = {
+        CONF_NAME: "test_date_sensor",
+        CONF_SELECT: Template(".iso-date", hass),
+        CONF_EXTRACT: "text",
+        CONF_DEVICE_CLASS: device_class,
+    }
+    sensor = MultiscrapeSensor(
+        hass=hass,
+        coordinator=coordinator,
+        scraper=scraper,
+        unique_id="test_date_sensor",
+        name="test_date_sensor",
+        unit_of_measurement=None,
+        device_class=device_class,
+        state_class=None,
+        force_update=False,
+        icon_template=None,
+        picture=None,
+        sensor_selector=Selector(hass, config),
+        attribute_selectors={},
+    )
+
+    # Act
+    mock_state = State(sensor.entity_id, restored)
+    with patch.object(
+        sensor, "async_get_last_state", new=AsyncMock(return_value=mock_state)
+    ):
+        await sensor.async_added_to_hass()
+
+    # Assert - the native value is a date/datetime, and HA can write the state
+    assert sensor._attr_native_value == expected
+    assert sensor.state == restored
+
+
+@pytest.mark.integration
+@pytest.mark.async_test
+@pytest.mark.timeout(10)
+async def test_sensor_timestamp_device_class_parses_scraped_value(
+    hass: HomeAssistant, coordinator, scraper
+):
+    """Test sensor with TIMESTAMP device class parses scraped timestamps."""
+    from custom_components.multiscrape.const import CONF_EXTRACT
+    from custom_components.multiscrape.selector import Selector
+
+    # Arrange
+    config = {
+        CONF_NAME: "test_timestamp_sensor",
+        CONF_SELECT: Template(".iso-timestamp", hass),
+        CONF_EXTRACT: "text",
+        CONF_DEVICE_CLASS: SensorDeviceClass.TIMESTAMP,
+    }
+    sensor = MultiscrapeSensor(
+        hass=hass,
+        coordinator=coordinator,
+        scraper=scraper,
+        unique_id="test_timestamp_sensor",
+        name="test_timestamp_sensor",
+        unit_of_measurement=None,
+        device_class=SensorDeviceClass.TIMESTAMP,
+        state_class=None,
+        force_update=False,
+        icon_template=None,
+        picture=None,
+        sensor_selector=Selector(hass, config),
+        attribute_selectors={},
+    )
+
+    await scraper.set_content(
+        '<div class="iso-timestamp">2026-09-21T10:29:00+00:00</div>'
+    )
+
+    # Act
+    sensor._update_sensor()
+
+    # Assert
+    assert sensor._attr_native_value == datetime(
+        2026, 9, 21, 10, 29, tzinfo=UTC
+    )
+
+
+@pytest.mark.integration
+@pytest.mark.async_test
+@pytest.mark.timeout(10)
+async def test_sensor_timestamp_device_class_on_error_default_is_parsed(
+    hass: HomeAssistant, coordinator, scraper
+):
+    """An on_error default must be parsed too, or it crashes the state write."""
+    from custom_components.multiscrape.const import CONF_EXTRACT
+    from custom_components.multiscrape.selector import Selector
+
+    # Arrange - a selector that finds nothing, falling back to the default
+    config = {
+        CONF_NAME: "test_timestamp_sensor",
+        CONF_SELECT: Template(".does-not-exist", hass),
+        CONF_EXTRACT: "text",
+        CONF_DEVICE_CLASS: SensorDeviceClass.TIMESTAMP,
+        CONF_ON_ERROR: {
+            CONF_ON_ERROR_VALUE: CONF_ON_ERROR_VALUE_DEFAULT,
+            CONF_ON_ERROR_DEFAULT: Template("2026-01-01T00:00:00+00:00", hass),
+        },
+    }
+    sensor = MultiscrapeSensor(
+        hass=hass,
+        coordinator=coordinator,
+        scraper=scraper,
+        unique_id="test_timestamp_sensor",
+        name="test_timestamp_sensor",
+        unit_of_measurement=None,
+        device_class=SensorDeviceClass.TIMESTAMP,
+        state_class=None,
+        force_update=False,
+        icon_template=None,
+        picture=None,
+        sensor_selector=Selector(hass, config),
+        attribute_selectors={},
+    )
+
+    await scraper.set_content(SAMPLE_HTML_FULL)
+
+    # Act
+    sensor._update_sensor()
+
+    # Assert
+    assert sensor._attr_native_value == datetime(
+        2026, 1, 1, 0, 0, tzinfo=UTC
+    )
+    assert sensor.state == "2026-01-01T00:00:00+00:00"

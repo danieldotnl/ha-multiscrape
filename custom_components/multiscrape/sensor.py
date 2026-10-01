@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+from datetime import date
 
 from homeassistant.components.sensor import SensorDeviceClass, SensorEntity
 from homeassistant.components.sensor.helpers import async_parse_date_datetime
@@ -125,6 +126,39 @@ class MultiscrapeSensor(MultiscrapeEntity, SensorEntity):
 
         self._sensor_selector = sensor_selector
 
+    def _parse_value(self, value):
+        """Convert a scraped, restored or default value to the native value.
+
+        Date and timestamp sensors must hand HA a `date`/`datetime`;
+        anything else raises on state write ("has timestamp device class
+        but provides state ...").
+        """
+        if self.device_class not in {
+            SensorDeviceClass.DATE,
+            SensorDeviceClass.TIMESTAMP,
+        }:
+            return value
+
+        if value is None or isinstance(value, date):
+            # datetime subclasses date, so both pass through untouched.
+            return value
+
+        if not isinstance(value, str):
+            _LOGGER.warning(
+                "%s # %s # Value %s cannot be converted to a %s",
+                self.scraper.name,
+                self._name,
+                value,
+                self.device_class,
+            )
+            return None
+
+        return async_parse_date_datetime(value, self.entity_id, self.device_class)
+
+    def _restore_native_value(self, value: str) -> None:
+        """Parse the restored state string before setting it (#623)."""
+        self._attr_native_value = self._parse_value(value)
+
     def _update_sensor(self):
         """Update state from the scraper data."""
         _LOGGER.debug(
@@ -142,16 +176,7 @@ class MultiscrapeSensor(MultiscrapeEntity, SensorEntity):
                 "%s # %s # Selected: %s", self.scraper.name, self._name, value
             )
 
-            if self.device_class not in {
-                SensorDeviceClass.DATE,
-                SensorDeviceClass.TIMESTAMP,
-            }:
-                self._attr_native_value = value
-
-            else:
-                self._attr_native_value = async_parse_date_datetime(
-                    value, self.entity_id, self.device_class
-                )
+            self._attr_native_value = self._parse_value(value)
         except Exception as exception:
             self.coordinator.request_reauth()
 
@@ -183,7 +208,9 @@ class MultiscrapeSensor(MultiscrapeEntity, SensorEntity):
                     self._scrape_error = True
                 return
             elif self._sensor_selector.on_error.value == CONF_ON_ERROR_VALUE_DEFAULT:
-                self._attr_native_value = self._sensor_selector.on_error_default
+                self._attr_native_value = self._parse_value(
+                    self._sensor_selector.on_error_default
+                )
                 _LOGGER.debug(
                     "%s # %s # On-error, set default value: %s",
                     self.scraper.name,
