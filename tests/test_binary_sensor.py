@@ -3,7 +3,9 @@
 import pytest
 from homeassistant.components.binary_sensor import BinarySensorDeviceClass
 from homeassistant.const import (CONF_DEVICE_CLASS, CONF_FORCE_UPDATE,
-                                 CONF_ICON, CONF_NAME, CONF_UNIQUE_ID)
+                                 CONF_ICON, CONF_NAME, CONF_UNIQUE_ID,
+                                 STATE_OFF, STATE_ON, STATE_UNAVAILABLE,
+                                 STATE_UNKNOWN)
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import PlatformNotReady
 from homeassistant.helpers.template import Template
@@ -671,3 +673,64 @@ async def test_async_setup_platform_raises_platform_not_ready(
 
     # Cleanup
     binary_sensor_module.async_get_config_and_coordinator = original_func
+
+
+@pytest.mark.integration
+@pytest.mark.async_test
+@pytest.mark.timeout(10)
+@pytest.mark.parametrize(
+    ("restored", "expected"),
+    [(STATE_ON, True), (STATE_OFF, False)],
+)
+async def test_binary_sensor_restores_previous_state(
+    setup_binary_sensor, restored, expected
+):
+    """The restored state must end up in `is_on`.
+
+    The base entity restores into `_attr_native_value`, which a binary
+    sensor never reads, so the sensor stayed `unknown` until the first
+    scrape instead of coming back up with its previous state.
+    """
+    from unittest.mock import AsyncMock, patch
+
+    from homeassistant.core import State
+
+    # Arrange
+    binary_sensor = setup_binary_sensor
+    mock_state = State(binary_sensor.entity_id, restored)
+
+    # Act
+    with patch.object(
+        binary_sensor, "async_get_last_state", new=AsyncMock(return_value=mock_state)
+    ):
+        await binary_sensor.async_added_to_hass()
+
+    # Assert
+    assert binary_sensor.is_on is expected
+    assert binary_sensor.state == restored
+
+
+@pytest.mark.integration
+@pytest.mark.async_test
+@pytest.mark.timeout(10)
+@pytest.mark.parametrize("sentinel", [STATE_UNAVAILABLE, STATE_UNKNOWN])
+async def test_binary_sensor_does_not_restore_sentinel_states(
+    setup_binary_sensor, sentinel
+):
+    """Sentinel states must leave `is_on` unset rather than becoming off."""
+    from unittest.mock import AsyncMock, patch
+
+    from homeassistant.core import State
+
+    # Arrange
+    binary_sensor = setup_binary_sensor
+    mock_state = State(binary_sensor.entity_id, sentinel)
+
+    # Act
+    with patch.object(
+        binary_sensor, "async_get_last_state", new=AsyncMock(return_value=mock_state)
+    ):
+        await binary_sensor.async_added_to_hass()
+
+    # Assert
+    assert binary_sensor.is_on is None

@@ -99,7 +99,7 @@ class MultiscrapeEntity(CoordinatorEntity[MultiscrapeDataUpdateCoordinator], Res
             return
         _LOGGER.debug("%s # %s # Restoring previous state: %s", self.scraper.name, self._name, state.state)
         if state.state not in (STATE_UNAVAILABLE, STATE_UNKNOWN):
-            self._restore_native_value(state.state)
+            self._restore_value(state.state)
 
         for name in self._attribute_selectors:
             if state.attributes.get(name) is not None:
@@ -134,13 +134,13 @@ class MultiscrapeEntity(CoordinatorEntity[MultiscrapeDataUpdateCoordinator], Res
             self._name,
         )
 
-    def _restore_native_value(self, value: str) -> None:
-        """Set the native value from a restored state string.
+    @abstractmethod
+    def _restore_value(self, value: str) -> None:
+        """Set the entity state from a restored state string.
 
-        Restored states are always strings, so subclasses with a typed
-        native value override this to convert first (#623).
+        Restored states are always strings, so each platform converts to
+        whatever its state attribute expects (#623).
         """
-        self._attr_native_value = value
 
     @abstractmethod
     def _update_sensor(self):

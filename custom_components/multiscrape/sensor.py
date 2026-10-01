@@ -155,7 +155,7 @@ class MultiscrapeSensor(MultiscrapeEntity, SensorEntity):
 
         return async_parse_date_datetime(value, self.entity_id, self.device_class)
 
-    def _restore_native_value(self, value: str) -> None:
+    def _restore_value(self, value: str) -> None:
         """Parse the restored state string before setting it (#623)."""
         self._attr_native_value = self._parse_value(value)
 
