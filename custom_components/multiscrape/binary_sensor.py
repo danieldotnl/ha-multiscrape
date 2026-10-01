@@ -6,7 +6,7 @@ import logging
 from homeassistant.components.binary_sensor import BinarySensorEntity
 from homeassistant.const import (CONF_DEVICE_CLASS, CONF_FORCE_UPDATE,
                                  CONF_ICON, CONF_NAME, CONF_UNIQUE_ID,
-                                 Platform)
+                                 STATE_ON, Platform)
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import PlatformNotReady
 from homeassistant.helpers.entity import async_generate_entity_id
@@ -117,6 +117,34 @@ class MultiscrapeBinarySensor(MultiscrapeEntity, BinarySensorEntity):
         self._attr_unique_id = unique_id
         self._sensor_selector = sensor_selector
 
+    def _parse_value(self, value) -> bool:
+        """Convert a scraped, restored or default value to an on/off state."""
+        try:
+            return bool(int(value))
+        except (ValueError, TypeError):
+            if isinstance(value, str):
+                return {
+                    "true": True,
+                    "on": True,
+                    "open": True,
+                    "yes": True,
+                }.get(value.lower(), False)
+
+            return bool(value)
+
+    def _restore_value(self, value: str) -> None:
+        """Restore the on/off state.
+
+        A binary sensor has no native value, so without this the restored
+        state was written to an attribute the entity never reads and the
+        sensor came up `unknown` until the first scrape.
+
+        HA only ever persists `on` or `off` here (the sentinels are
+        filtered out by the caller), so this compares against `STATE_ON`
+        rather than going through the scraper's looser `_parse_value`.
+        """
+        self._attr_is_on = value == STATE_ON
+
     def _update_sensor(self):
         """Update state from the scraped data."""
         _LOGGER.debug(
@@ -130,18 +158,7 @@ class MultiscrapeBinarySensor(MultiscrapeEntity, BinarySensorEntity):
 
             value = self.scraper.scrape(
                 self._sensor_selector, self._name, context=self.coordinator.scrape_context)
-            try:
-                self._attr_is_on = bool(int(value))
-            except (ValueError, TypeError):
-                if isinstance(value, str):
-                    self._attr_is_on = {
-                        "true": True,
-                        "on": True,
-                        "open": True,
-                        "yes": True,
-                    }.get(value.lower(), False)
-                else:
-                    self._attr_is_on = bool(value)
+            self._attr_is_on = self._parse_value(value)
 
             _LOGGER.debug(
                 "%s # %s # Selected: %s, set sensor to: %s",
@@ -180,19 +197,7 @@ class MultiscrapeBinarySensor(MultiscrapeEntity, BinarySensorEntity):
                 return
             elif self._sensor_selector.on_error.value == CONF_ON_ERROR_VALUE_DEFAULT:
                 default_value = self._sensor_selector.on_error_default
-                # Convert default value to boolean using the same logic as regular values
-                try:
-                    self._attr_is_on = bool(int(default_value))
-                except (ValueError, TypeError):
-                    if isinstance(default_value, str):
-                        self._attr_is_on = {
-                            "true": True,
-                            "on": True,
-                            "open": True,
-                            "yes": True,
-                        }.get(default_value.lower(), False)
-                    else:
-                        self._attr_is_on = bool(default_value)
+                self._attr_is_on = self._parse_value(default_value)
                 _LOGGER.debug(
                     "%s # %s # On-error, set default value: %s (converted to: %s)",
                     self.scraper.name,

@@ -125,6 +125,30 @@ class MultiscrapeSensor(MultiscrapeEntity, SensorEntity):
 
         self._sensor_selector = sensor_selector
 
+    def _parse_value(self, value):
+        """Convert a scraped, restored or default value to the native value.
+
+        Date and timestamp sensors must hand HA a `date`/`datetime`; a
+        string raises on state write ("has timestamp device class but
+        provides state ...").
+
+        Raises for a value that cannot be converted at all -- a
+        `value_template` rendering a number, say -- so that the caller
+        routes it through the configured `on_error` instead of silently
+        dropping the state.
+        """
+        if self.device_class not in {
+            SensorDeviceClass.DATE,
+            SensorDeviceClass.TIMESTAMP,
+        }:
+            return value
+
+        return async_parse_date_datetime(value, self.entity_id, self.device_class)
+
+    def _restore_value(self, value: str) -> None:
+        """Parse the restored state string before setting it (#623)."""
+        self._attr_native_value = self._parse_value(value)
+
     def _update_sensor(self):
         """Update state from the scraper data."""
         _LOGGER.debug(
@@ -142,16 +166,7 @@ class MultiscrapeSensor(MultiscrapeEntity, SensorEntity):
                 "%s # %s # Selected: %s", self.scraper.name, self._name, value
             )
 
-            if self.device_class not in {
-                SensorDeviceClass.DATE,
-                SensorDeviceClass.TIMESTAMP,
-            }:
-                self._attr_native_value = value
-
-            else:
-                self._attr_native_value = async_parse_date_datetime(
-                    value, self.entity_id, self.device_class
-                )
+            self._attr_native_value = self._parse_value(value)
         except Exception as exception:
             self.coordinator.request_reauth()
 
@@ -183,7 +198,22 @@ class MultiscrapeSensor(MultiscrapeEntity, SensorEntity):
                     self._scrape_error = True
                 return
             elif self._sensor_selector.on_error.value == CONF_ON_ERROR_VALUE_DEFAULT:
-                self._attr_native_value = self._sensor_selector.on_error_default
+                try:
+                    self._attr_native_value = self._parse_value(
+                        self._sensor_selector.on_error_default
+                    )
+                except (TypeError, ValueError):
+                    # Already handling an error, so there is nothing left to
+                    # fall back to -- don't let this escape _update_sensor.
+                    _LOGGER.error(
+                        "%s # %s # On-error default %s cannot be converted to a %s",
+                        self.scraper.name,
+                        self._name,
+                        self._sensor_selector.on_error_default,
+                        self.device_class,
+                    )
+                    self._attr_native_value = None
+                    self._scrape_error = True
                 _LOGGER.debug(
                     "%s # %s # On-error, set default value: %s",
                     self.scraper.name,

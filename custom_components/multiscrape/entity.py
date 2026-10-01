@@ -99,7 +99,7 @@ class MultiscrapeEntity(CoordinatorEntity[MultiscrapeDataUpdateCoordinator], Res
             return
         _LOGGER.debug("%s # %s # Restoring previous state: %s", self.scraper.name, self._name, state.state)
         if state.state not in (STATE_UNAVAILABLE, STATE_UNKNOWN):
-            self._attr_native_value = state.state
+            self._restore_value(state.state)
 
         for name in self._attribute_selectors:
             if state.attributes.get(name) is not None:
@@ -133,6 +133,14 @@ class MultiscrapeEntity(CoordinatorEntity[MultiscrapeDataUpdateCoordinator], Res
             self.scraper.name,
             self._name,
         )
+
+    @abstractmethod
+    def _restore_value(self, value: str) -> None:
+        """Set the entity state from a restored state string.
+
+        Restored states are always strings, so each platform converts to
+        whatever its state attribute expects (#623).
+        """
 
     @abstractmethod
     def _update_sensor(self):
