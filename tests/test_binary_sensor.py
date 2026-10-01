@@ -1,12 +1,14 @@
 """Integration tests for binary sensor platform."""
 
+from unittest.mock import AsyncMock, patch
+
 import pytest
 from homeassistant.components.binary_sensor import BinarySensorDeviceClass
 from homeassistant.const import (CONF_DEVICE_CLASS, CONF_FORCE_UPDATE,
                                  CONF_ICON, CONF_NAME, CONF_UNIQUE_ID,
                                  STATE_OFF, STATE_ON, STATE_UNAVAILABLE,
                                  STATE_UNKNOWN)
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, State
 from homeassistant.exceptions import PlatformNotReady
 from homeassistant.helpers.template import Template
 
@@ -691,10 +693,6 @@ async def test_binary_sensor_restores_previous_state(
     sensor never reads, so the sensor stayed `unknown` until the first
     scrape instead of coming back up with its previous state.
     """
-    from unittest.mock import AsyncMock, patch
-
-    from homeassistant.core import State
-
     # Arrange
     binary_sensor = setup_binary_sensor
     mock_state = State(binary_sensor.entity_id, restored)
@@ -718,10 +716,6 @@ async def test_binary_sensor_does_not_restore_sentinel_states(
     setup_binary_sensor, sentinel
 ):
     """Sentinel states must leave `is_on` unset rather than becoming off."""
-    from unittest.mock import AsyncMock, patch
-
-    from homeassistant.core import State
-
     # Arrange
     binary_sensor = setup_binary_sensor
     mock_state = State(binary_sensor.entity_id, sentinel)

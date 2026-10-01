@@ -6,7 +6,7 @@ import logging
 from homeassistant.components.binary_sensor import BinarySensorEntity
 from homeassistant.const import (CONF_DEVICE_CLASS, CONF_FORCE_UPDATE,
                                  CONF_ICON, CONF_NAME, CONF_UNIQUE_ID,
-                                 Platform)
+                                 STATE_ON, Platform)
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import PlatformNotReady
 from homeassistant.helpers.entity import async_generate_entity_id
@@ -138,8 +138,12 @@ class MultiscrapeBinarySensor(MultiscrapeEntity, BinarySensorEntity):
         A binary sensor has no native value, so without this the restored
         state was written to an attribute the entity never reads and the
         sensor came up `unknown` until the first scrape.
+
+        HA only ever persists `on` or `off` here (the sentinels are
+        filtered out by the caller), so this compares against `STATE_ON`
+        rather than going through the scraper's looser `_parse_value`.
         """
-        self._attr_is_on = self._parse_value(value)
+        self._attr_is_on = value == STATE_ON
 
     def _update_sensor(self):
         """Update state from the scraped data."""
