@@ -728,3 +728,23 @@ async def test_binary_sensor_does_not_restore_sentinel_states(
 
     # Assert
     assert binary_sensor.is_on is None
+
+
+@pytest.mark.integration
+@pytest.mark.async_test
+@pytest.mark.timeout(10)
+async def test_binary_sensor_uses_value_selected_off_the_event_loop(
+    hass: HomeAssistant, coordinator, scraper, setup_binary_sensor
+):
+    """A binary sensor reads its value precomputed in the executor (#633)."""
+    binary_sensor = setup_binary_sensor
+    with patch.object(binary_sensor, "async_get_last_state", new=AsyncMock(return_value=None)):
+        await binary_sensor.async_added_to_hass()
+
+    await scraper.set_content('<div class="availability">on</div>')
+    assert scraper._extracted[binary_sensor._sensor_selector] == "on"
+
+    with patch.object(scraper, "_extract_value", side_effect=AssertionError("selected on the loop")):
+        binary_sensor._handle_coordinator_update()
+
+    assert binary_sensor.is_on is True

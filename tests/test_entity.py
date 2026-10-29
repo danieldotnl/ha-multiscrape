@@ -650,3 +650,75 @@ async def test_async_added_to_hass_registers_coordinator_listener(
 
     # Assert - listener was registered with the callback
     mock_listener.assert_called_once_with(sensor._handle_coordinator_update, None)
+
+
+@pytest.mark.integration
+@pytest.mark.async_test
+@pytest.mark.timeout(10)
+async def test_async_added_to_hass_registers_selectors_with_scraper(
+    hass: HomeAssistant, coordinator, scraper
+):
+    """The entity's selectors are selected off the event loop while it is added (#633)."""
+    attr_selector = Selector(
+        hass, {CONF_NAME: "attr", CONF_SELECT: Template(".links a", hass)}
+    )
+    sensor = _create_sensor(
+        hass, coordinator, scraper, attribute_selectors={"attr": attr_selector}
+    )
+
+    with patch.object(sensor, "async_get_last_state", new=AsyncMock(return_value=None)):
+        await sensor.async_added_to_hass()
+
+    await scraper.set_content(SAMPLE_HTML_FULL)
+    assert set(scraper._extracted) == {sensor._sensor_selector, attr_selector}
+
+    sensor._handle_coordinator_update()
+    assert sensor.native_value == "Current Version: 2024.8.3"
+    assert sensor.extra_state_attributes["attr"] == "Release notes"
+
+    await sensor.async_will_remove_from_hass()
+    sensor._call_on_remove_callbacks()
+    assert scraper._selectors == {}
+
+
+@pytest.mark.integration
+@pytest.mark.async_test
+@pytest.mark.timeout(10)
+async def test_precomputed_errors_go_through_on_error(
+    hass: HomeAssistant, coordinator, scraper
+):
+    """Errors raised in the executor still drive the sensor and attribute on_error (#633)."""
+    sensor_selector = Selector(
+        hass,
+        {
+            CONF_NAME: "test_sensor",
+            CONF_SELECT: Template(".missing", hass),
+            CONF_ON_ERROR: {
+                CONF_ON_ERROR_VALUE: CONF_ON_ERROR_VALUE_DEFAULT,
+                CONF_ON_ERROR_DEFAULT: Template("fallback", hass),
+            },
+        },
+    )
+    attr_selector = Selector(
+        hass,
+        {
+            CONF_NAME: "attr",
+            CONF_SELECT: Template(".missing", hass),
+            CONF_ON_ERROR: {CONF_ON_ERROR_VALUE: CONF_ON_ERROR_VALUE_LAST},
+        },
+    )
+    sensor = _create_sensor(
+        hass, coordinator, scraper, attribute_selectors={"attr": attr_selector}
+    )
+    sensor._sensor_selector = sensor_selector
+    sensor._attr_extra_state_attributes = {"attr": "previous"}
+
+    with patch.object(sensor, "async_get_last_state", new=AsyncMock(return_value=None)):
+        await sensor.async_added_to_hass()
+    await scraper.set_content(SAMPLE_HTML_FULL)
+    assert isinstance(scraper._extracted[sensor_selector], ValueError)
+
+    sensor._handle_coordinator_update()
+
+    assert sensor.native_value == "fallback"
+    assert sensor.extra_state_attributes["attr"] == "previous"

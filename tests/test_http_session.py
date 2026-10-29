@@ -4,6 +4,7 @@
 import hashlib
 import logging
 import ssl
+import threading
 from unittest.mock import patch
 
 import httpx
@@ -21,6 +22,7 @@ from custom_components.multiscrape.http_session import (HttpConfig,
                                                         create_http_session)
 from custom_components.multiscrape.schema import COMBINED_SCHEMA
 from custom_components.multiscrape.scrape_context import ScrapeContext
+from custom_components.multiscrape.scraper import Scraper
 from custom_components.multiscrape.util import (create_dict_renderer,
                                                 create_renderer)
 
@@ -3002,3 +3004,50 @@ async def test_issue_630_form_verify_ssl_is_rejected(hass: HomeAssistant):
                 "form_submit": {"resource": "http://gw/login", "verify_ssl": False},
             }
         )
+
+
+@pytest.mark.integration
+@pytest.mark.async_test
+@pytest.mark.http
+@pytest.mark.timeout(10)
+@respx.mock
+async def test_form_variables_are_selected_off_the_event_loop(hass: HomeAssistant):
+    """The form_submit variable selectors are precomputed in the executor (#633)."""
+    conf = COMBINED_SCHEMA(
+        {
+            "resource": "https://example.com",
+            "parser": "html.parser",
+            "form_submit": {
+                "resource": "https://example.com/login",
+                "select": "#login",
+                "input": {"user": "admin"},
+                "variables": [{"name": "token", "select": "#token"}],
+            },
+        }
+    )
+    session = create_http_session("test", conf, hass, None)
+    respx.get("https://example.com/login").mock(
+        return_value=httpx.Response(
+            200, text='<form id="login" action="/submit"><input name="user"></form>'
+        )
+    )
+    respx.post("https://example.com/submit").mock(
+        return_value=httpx.Response(200, text='<div id="token">abc123</div>')
+    )
+
+    threads = []
+    extract_value = Scraper._extract_value
+
+    def _record_thread(*args):
+        threads.append(threading.current_thread())
+        return extract_value(*args)
+
+    try:
+        with patch.object(Scraper, "_extract_value", autospec=True, side_effect=_record_thread):
+            await session.ensure_authenticated("https://example.com")
+    finally:
+        await session.async_close()
+
+    assert session.form_variables == {"token": "abc123"}
+    assert threads
+    assert threading.main_thread() not in threads

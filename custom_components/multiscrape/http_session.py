@@ -331,6 +331,8 @@ def create_http_session(config_name, conf, hass, file_manager):
             scraper = create_scraper(config_name, form_submit_config, hass, file_manager)
             for variables_conf in variables:
                 variables_selectors[variables_conf.get(CONF_NAME)] = Selector(hass, variables_conf)
+            # Never unregistered: the form scraper lives as long as the session.
+            scraper.register_selectors(variables_selectors.values())
 
         # Mirror the main resource handling in create_content_request_manager:
         # resource and resource_template are mutually exclusive in the schema, and

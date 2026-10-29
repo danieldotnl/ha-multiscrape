@@ -80,7 +80,7 @@ async def setup_get_content_service(hass: HomeAssistant):
         try:
             result = await request_manager.get_content()
             await scraper.set_content(result)
-            return {"content": str(scraper.formatted_content)}
+            return {"content": str(await scraper.async_formatted_content())}
         finally:
             await session.async_close()
 
@@ -104,28 +104,39 @@ async def setup_scrape_service(hass: HomeAssistant):
             hass, conf, config_name
         )
         try:
+            sensors = [
+                (
+                    sensor,
+                    Selector(hass, sensor),
+                    {
+                        slugify(attr_conf[CONF_NAME]): Selector(hass, attr_conf)
+                        for attr_conf in sensor.get(CONF_SENSOR_ATTRS) or []
+                    },
+                )
+                for platform in [Platform.SENSOR, Platform.BINARY_SENSOR]
+                for sensor in conf.get(platform) or []
+            ]
+            for _, sensor_selector, attr_selectors in sensors:
+                scraper.register_selectors([sensor_selector, *attr_selectors.values()])
+
             result = await request_manager.get_content()
             await scraper.set_content(result)
 
             response = {}
 
-            for platform in [Platform.SENSOR, Platform.BINARY_SENSOR]:
-                for sensor in conf.get(platform) or []:
-                    name = sensor.get(CONF_UNIQUE_ID) or slugify(sensor.get(CONF_NAME))
-                    sensor_selector = Selector(hass, sensor)
-                    response[name] = {"value": scraper.scrape(sensor_selector, config_name)}
+            for sensor, sensor_selector, attr_selectors in sensors:
+                name = sensor.get(CONF_UNIQUE_ID) or slugify(sensor.get(CONF_NAME))
+                response[name] = {"value": scraper.scrape(sensor_selector, config_name)}
 
-                    if sensor.get(CONF_ICON):
-                        response[CONF_ICON] = sensor.get(CONF_ICON).async_render(
-                            variables={"value": response[name]}, parse_result=False
-                        )
+                if sensor.get(CONF_ICON):
+                    response[CONF_ICON] = sensor.get(CONF_ICON).async_render(
+                        variables={"value": response[name]}, parse_result=False
+                    )
 
-                    for attr_conf in sensor.get(CONF_SENSOR_ATTRS) or []:
-                        attr_name = slugify(attr_conf[CONF_NAME])
-                        attr_selector = Selector(hass, attr_conf)
-                        response[name].setdefault(CONF_SENSOR_ATTRS, {}).update(
-                            {attr_name: scraper.scrape(attr_selector, config_name)}
-                        )
+                for attr_name, attr_selector in attr_selectors.items():
+                    response[name].setdefault(CONF_SENSOR_ATTRS, {}).update(
+                        {attr_name: scraper.scrape(attr_selector, config_name)}
+                    )
 
             return response
         finally:

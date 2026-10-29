@@ -5,6 +5,8 @@ additional edge cases and error paths.
 """
 
 import hashlib
+import threading
+from unittest.mock import patch
 
 import pytest
 import respx
@@ -12,6 +14,7 @@ from homeassistant.const import CONF_RESOURCE, Platform
 from homeassistant.core import HomeAssistant
 
 from custom_components.multiscrape.const import CONF_PARSER, DOMAIN
+from custom_components.multiscrape.scraper import Scraper
 from custom_components.multiscrape.service import setup_scrape_service
 
 
@@ -169,3 +172,45 @@ async def test_scrape_service_restores_form_input_templates(hass: HomeAssistant)
     expected = hashlib.md5(b"codedeadbeef").hexdigest()
     body = submit_route.calls.last.request.content.decode()
     assert f"hashpassword={expected}" in body
+
+
+@pytest.mark.integration
+@pytest.mark.async_test
+@pytest.mark.timeout(10)
+@respx.mock
+async def test_scrape_service_selects_off_the_event_loop(hass: HomeAssistant):
+    """The service's sensor and attribute selectors are selected in the executor (#633)."""
+    await setup_scrape_service(hass)
+
+    test_url = "https://example.com/data"
+    html_content = '<html><body><div class="temp">23.5</div><a href="/x">x</a></body></html>'
+    respx.get(test_url).mock(return_value=respx.MockResponse(200, text=html_content))
+
+    service_data = {
+        CONF_RESOURCE: test_url,
+        CONF_PARSER: "html.parser",
+        Platform.SENSOR: [
+            {
+                "name": "Temperature",
+                "unique_id": "temp",
+                "select": ".temp",
+                "attributes": [{"name": "Link", "select": "a", "attribute": "href"}],
+            }
+        ],
+    }
+
+    threads = []
+    extract_value = Scraper._extract_value
+
+    def _record_thread(*args):
+        threads.append(threading.current_thread())
+        return extract_value(*args)
+
+    with patch.object(Scraper, "_extract_value", autospec=True, side_effect=_record_thread):
+        response = await hass.services.async_call(
+            DOMAIN, "scrape", service_data, blocking=True, return_response=True
+        )
+
+    assert response["temp"] == {"value": "23.5", "attributes": {"link": "/x"}}
+    assert len(threads) == 2
+    assert threading.main_thread() not in threads
