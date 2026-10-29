@@ -566,15 +566,24 @@ async def test_scraper_discards_results_for_replaced_content(
     selector = Selector(hass, {"name": "s", "select": Template(".current-version h1", hass)})
     scraper_instance.register_selectors([selector])
 
+    started = threading.Event()
+    release = threading.Event()
     extract_batch = scraper_instance._extract_batch
 
-    def _reset_meanwhile(soup, jobs):
-        hass.loop.call_soon_threadsafe(scraper_instance.reset)
+    def _blocking_batch(soup, jobs):
+        started.set()
+        release.wait(5)
         return extract_batch(soup, jobs)
 
     # A plain function, as the test harness runs Mock executor targets inline.
-    scraper_instance._extract_batch = _reset_meanwhile
-    await scraper_instance.set_content(SAMPLE_HTML_FULL)
+    scraper_instance._extract_batch = _blocking_batch
+    task = hass.async_create_task(scraper_instance.set_content(SAMPLE_HTML_FULL))
+
+    # Reset while the executor job is still running, then let it finish.
+    await hass.async_add_executor_job(started.wait, 5)
+    scraper_instance.reset()
+    release.set()
+    await task
 
     assert scraper_instance._extracted == {}
 
