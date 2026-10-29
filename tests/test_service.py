@@ -449,6 +449,37 @@ def test_restore_templates_restores_form_variable_templates(hass: HomeAssistant)
     assert isinstance(var["value_template"], Template)
 
 
+def test_restore_templates_restores_form_payload_template(hass: HomeAssistant):
+    """Test _restore_templates restores the form_submit payload template (#630).
+
+    The payload is rendered with the scraped `form` fields at submit time, so it
+    has to survive home assistant rendering the service call data.
+    """
+    # Arrange
+    config = {"form_submit": {"payload": '{"hash": "{!{ form.nonce }!}"}'}}
+
+    # Act
+    result = _restore_templates(config)
+
+    # Assert
+    payload = result["form_submit"]["payload"]
+    assert isinstance(payload, Template)
+    assert payload.template == '{"hash": "{{ form.nonce }}"}'
+
+
+def test_restore_templates_form_submit_without_payload(hass: HomeAssistant):
+    """Test a form_submit without a payload is left alone."""
+    # Arrange
+    config = {"form_submit": {"resource": "https://example.com/login"}}
+
+    # Act
+    result = _restore_templates(config)
+
+    # Assert
+    assert "payload" not in result["form_submit"]
+    assert result["form_submit"]["resource"] == "https://example.com/login"
+
+
 def test_restore_templates_restores_header_templates(hass: HomeAssistant):
     """Test _restore_templates restores header templates."""
     # Arrange

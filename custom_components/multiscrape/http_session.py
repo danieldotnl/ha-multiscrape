@@ -9,7 +9,8 @@ import httpx
 from homeassistant.const import (CONF_AUTHENTICATION, CONF_HEADERS,
                                  CONF_METHOD, CONF_NAME, CONF_PARAMS,
                                  CONF_PASSWORD, CONF_PAYLOAD, CONF_RESOURCE,
-                                 CONF_TIMEOUT, CONF_USERNAME, CONF_VERIFY_SSL,
+                                 CONF_RESOURCE_TEMPLATE, CONF_TIMEOUT,
+                                 CONF_USERNAME, CONF_VERIFY_SSL,
                                  HTTP_DIGEST_AUTHENTICATION)
 from homeassistant.core import HomeAssistant
 from homeassistant.util.ssl import client_context, create_no_verify_ssl_context
@@ -128,6 +129,7 @@ class HttpSession:
         params: dict,
         auth: Any,
         data: Any = None,
+        timeout: int | None = None,
     ) -> httpx.Response:
         """Core HTTP request with logging and error handling."""
         merged_resource = merge_url_with_params(resource, params)
@@ -154,6 +156,11 @@ class HttpSession:
                 "headers": headers,
                 "auth": auth,
             }
+
+            if timeout is not None:
+                # Omitted when unset so httpx falls back to the client timeout, which
+                # is built from the top-level timeout option.
+                request_params["timeout"] = timeout
 
             if data is not None:
                 if isinstance(data, dict):
@@ -325,8 +332,21 @@ def create_http_session(config_name, conf, hass, file_manager):
             for variables_conf in variables:
                 variables_selectors[variables_conf.get(CONF_NAME)] = Selector(hass, variables_conf)
 
+        # Mirror the main resource handling in create_content_request_manager:
+        # resource and resource_template are mutually exclusive in the schema, and
+        # create_renderer renders to None when neither is configured.
+        form_resource_template = form_submit_config.get(CONF_RESOURCE_TEMPLATE)
+        if form_resource_template is not None:
+            form_resource_renderer = create_renderer(
+                hass, form_resource_template, "form resource URL template"
+            )
+        else:
+            form_resource_renderer = create_renderer(
+                hass, form_submit_config.get(CONF_RESOURCE), "form resource URL"
+            )
+
         form_auth_config = FormAuthConfig(
-            resource=form_submit_config.get(CONF_RESOURCE),
+            resource_renderer=form_resource_renderer,
             select=form_submit_config.get(CONF_FORM_SELECT),
             # Rendered strictly and without logging content: these values are
             # credentials, and a silently empty hash would submit a wrong password.
@@ -345,8 +365,18 @@ def create_http_session(config_name, conf, hass, file_manager):
             parser=conf.get(CONF_PARSER, "lxml"),
             headers_renderer=create_dict_renderer(hass, form_submit_config.get(CONF_HEADERS)),
             params_renderer=create_dict_renderer(hass, form_submit_config.get(CONF_PARAMS)),
-            data_renderer=create_renderer(hass, form_submit_config.get(CONF_PAYLOAD), "form request payload"),
+            # Rendered strictly and without logging content for the same reason as
+            # the input above: a login payload holds credentials, and a silently
+            # empty hash would submit a wrong password.
+            data_renderer=create_renderer(
+                hass,
+                form_submit_config.get(CONF_PAYLOAD),
+                "form request payload",
+                strict=True,
+                log_content=False,
+            ),
             method=form_submit_config.get(CONF_METHOD),
+            timeout=form_submit_config.get(CONF_TIMEOUT),
             auth=form_auth,
         )
 

@@ -207,13 +207,28 @@ Configure the form-submit functionality which enables you to submit a (login) fo
 
 | name              | description                                                                                                                                                                                           | required | default | type                  |
 | ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- | ------- | --------------------- |
-| resource          | The url for the site with the form                                                                                                                                                                    | False    |         | string                |
+| resource          | The url for the site with the form. Not required when `resource_template` is provided.                                                                                                                | False    |         | string                |
+| resource_template | A template that will output the url for the site with the form. Only required when `resource` is not provided. Rendered without variables, since no scraped data exists yet.                          | False    |         | template              |
+| authentication    | Configure HTTP authentication for the form requests. `basic` or `digest`. Use this with username and password fields.                                                                                 | False    |         | string                |
+| username          | The username for the form requests.                                                                                                                                                                   | False    |         | string                |
+| password          | The password for the form requests.                                                                                                                                                                   | False    |         | string                |
+| headers           | The headers for the form requests.                                                                                                                                                                    | False    |         | template - list       |
+| params            | The query params for the form requests.                                                                                                                                                               | False    |         | template - list       |
+| method            | The method used to submit the form. Either `POST`, `GET` or `PUT`. When omitted, the `method` attribute of the selected `<form>` is used, falling back to `POST`.                                     | False    |         | string                |
+| payload           | A raw request body to submit instead of the url-encoded input fields. See [Form payload](#form-payload).                                                                                              | False    |         | template - string     |
+| timeout           | Max time to wait for the form page and the form submit response. When omitted, the top-level `timeout` is used.                                                                                       | False    |         | int                   |
 | select            | CSS selector used for selecting the form in the html. When omitted, the input fields are directly posted.                                                                                             | False    |         | string                |
 | input             | A dictionary with name/values which will be merged with the input fields on the form. Values are rendered as templates when the form is submitted. See [Form input templates](#form-input-templates). | False    |         | template - dictionary |
 | input_filter      | A list of input fields that should not be submitted with the form                                                                                                                                     | False    |         | string - list         |
 | submit_once       | Submit the form only once on startup instead of each scan interval                                                                                                                                    | False    | False   | boolean               |
 | resubmit_on_error | Resubmit the form after a scraping error is encountered                                                                                                                                               | False    | True    | boolean               |
 | variables         | See [Form Variables](#Form-Variables)                                                                                                                                                                 | False    |         | list                  |
+
+> **Breaking change:** `form_submit` has always accepted every HTTP option but honoured only some of them. `method`, `payload`, `timeout` and `resource_template` are now actually applied, and `verify_ssl` is rejected.
+>
+> - If you set `form_submit: verify_ssl:`, **remove it** or Home Assistant will refuse to load the multiscrape entry. SSL verification is configured once at the top level, because the form login and the data request deliberately share a single HTTP client so the login cookies carry over to the scrape.
+> - If you set `form_submit: method:`, check it. It used to be ignored and the form's own `method` attribute (or `POST`) was used instead; it is now applied.
+> - The same goes for `form_submit: timeout:`, which is now enforced on both form requests, and `form_submit: payload:`, which has never been submitted before and now replaces the url-encoded input fields.
 
 #### Form input templates
 
@@ -251,6 +266,29 @@ Notes:
 - These templates are rendered **strictly**: referencing a field that is not on the form raises an error instead of rendering an empty string, so a renamed or mistyped field can never silently submit the hash of your access code alone. Use `{{ form.field | default('') }}` for a genuinely optional field.
 - `form` is the only extra variable multiscrape provides here; the standard Home Assistant template functions are available as usual. [Form variables](#form-variables) are scraped from the form _response_, which does not exist yet when `input` is rendered, so they cannot be used in `input`.
 - Because the values hold credentials, multiscrape does not log the template or the scraped fields when rendering fails; the error only names the `input` key. (Home Assistant core may still log the template itself.)
+
+#### Form payload
+
+`payload` submits a raw request body instead of the url-encoded input fields. Use it for login endpoints that expect JSON rather than a form post.
+
+```yaml
+multiscrape:
+  - resource: https://example.com/data
+    form_submit:
+      resource: https://example.com/login
+      select: "form#login"
+      headers:
+        Content-Type: application/json
+      payload: >-
+        {"user": "admin", "hash": "{{ md5('<access code>' ~ form.nonce) }}"}
+```
+
+Notes:
+
+- `payload` **replaces** the input fields rather than merging with them: when both are configured, the input fields are not submitted and a debug line names the keys that were dropped. They cannot be merged, because a raw body and url-encoded fields are two different ways of filling the same request body. And the other way round — letting the input fields win — would make `payload` silently inert whenever `select` is set, which is the behaviour this option is fixing.
+- **No `Content-Type` is set for a raw body.** Set it yourself through `form_submit: headers:`, as in the example above.
+- The input fields scraped from the form are available as `form`, exactly as in [`input`](#form-input-templates), so a JSON body can embed a scraped nonce. All the notes there apply to `payload` too, including the escaping of literal `{{`, the strict rendering and the fact that failures are not logged because the body holds credentials.
+- A `payload` that renders to an empty string is treated as not configured, so the input fields are submitted as before.
 
 ### Form Variables
 
@@ -322,7 +360,7 @@ Multiscrape also offers a `get_content` and a `scrape` service. `get_content` re
 Both services accept the same configuration as what you would provide in your configuration yaml (what is described above), with a small but important caveat: if the service input contains templates, those are automatically parsed by home assistant when the service is being called. That is fine for templates like `resource` and `select`, but templates that need to be applied on the scraped data itself (like `value_template`), cannot be parsed when the service is called. Therefore you need to slightly alter the syntax and add a `!` in the middle. E.g. `{{` becomes `{!{` and `%}` becomes `%!}`. Multiscrape will then understand that this string needs to handled as a template after the service has been called.\
 _If someone has a better solution, please let me know!_
 
-The same applies to [form input templates](#form-input-templates): in a service call, write `hashpassword: "{!{ md5('<access code>' ~ form.nonce) }!}"`.
+The same applies to [form input templates](#form-input-templates) and the [form payload](#form-payload), which are both rendered against the scraped form: in a service call, write `hashpassword: "{!{ md5('<access code>' ~ form.nonce) }!}"`.
 
 To call one of those services, go to 'Developer tools' in Home Assistant and then to 'services'. Find the `multiscrape.get_content` or `multiscrape.scrape` services and go to yaml mode. There you enter your configuration.
 Example:

@@ -9,6 +9,7 @@ from unittest.mock import patch
 import httpx
 import pytest
 import respx
+import voluptuous as vol
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import TemplateError
 from httpx import RequestError, TimeoutException
@@ -20,7 +21,8 @@ from custom_components.multiscrape.http_session import (HttpConfig,
                                                         create_http_session)
 from custom_components.multiscrape.schema import COMBINED_SCHEMA
 from custom_components.multiscrape.scrape_context import ScrapeContext
-from custom_components.multiscrape.util import create_dict_renderer
+from custom_components.multiscrape.util import (create_dict_renderer,
+                                                create_renderer)
 
 # ============================================================================
 # Test helpers
@@ -34,6 +36,23 @@ _NOOP_DATA = lambda variables={}, parse_result=None: None
 def static_input_renderer(values):
     """Build an input renderer returning fixed values (no templates involved)."""
     return lambda variables={}, parse_result=None: dict(values)
+
+
+def static_resource_renderer(value):
+    """Build a resource renderer returning a fixed url (no templates involved)."""
+    return lambda variables={}, parse_result=None: value
+
+
+def static_data_renderer(value):
+    """Build a payload renderer returning a fixed body (no templates involved)."""
+    return lambda variables={}, parse_result=None: value
+
+
+def form_payload_renderer(hass, value):
+    """Build a payload renderer with the same settings create_http_session uses."""
+    return create_renderer(
+        hass, value, "form request payload", strict=True, log_content=False
+    )
 
 
 def form_input_renderer(hass, values):
@@ -60,8 +79,9 @@ def make_http_config(**overrides):
 def make_form_config(**overrides):
     """Create a FormAuthConfig with sensible defaults for testing.
 
-    `input_values={...}` is a convenience that is translated into a static
-    `input_renderer`. Pass `input_renderer=` directly to exercise templates.
+    `input_values={...}` and `resource="..."` are conveniences that are translated
+    into a static `input_renderer` / `resource_renderer`. Pass the renderer directly
+    to exercise templates.
     """
     defaults = {
         "parser": "html.parser",
@@ -69,6 +89,8 @@ def make_form_config(**overrides):
         "params_renderer": _NOOP_PARAMS,
         "data_renderer": _NOOP_DATA,
     }
+    if "resource" in overrides:
+        overrides["resource_renderer"] = static_resource_renderer(overrides.pop("resource"))
     if "input_values" in overrides:
         overrides["input_renderer"] = static_input_renderer(overrides.pop("input_values"))
     return FormAuthConfig(**{**defaults, **overrides})
@@ -145,6 +167,16 @@ FORM_PAGE_WITH_NONCE = """
     <input name="password" value="" />
     <input type="hidden" name="nonce" value="deadbeef" />
     <button type="submit">Login</button>
+</form>
+</body>
+</html>
+"""
+
+FORM_PAGE_NO_METHOD = """
+<html>
+<body>
+<form id="login" action="/submit">
+    <input name="user" value="admin" />
 </form>
 </body>
 </html>
@@ -847,68 +879,48 @@ async def test_form_auth_input_template_error_keeps_secrets_out_of_log(
     assert "deadbeef" not in multiscrape_log
 
 
-@pytest.mark.integration
-@pytest.mark.async_test
-@pytest.mark.http
-@pytest.mark.timeout(10)
-@respx.mock
-async def test_form_action_url_resolution(hass: HomeAssistant):
-    """Test _determine_submit_resource with various URL combinations."""
-    form_config = make_form_config(
-        resource="https://example.com/auth/login",
-        select="#login",
-        input_values={"user": "admin"},
-    )
-    auth = FormAuthenticator(
+def _resolver(hass):
+    """Build an authenticator for exercising _determine_submit_resource directly."""
+    return FormAuthenticator(
         config_name="test",
-        config=form_config,
+        config=make_form_config(),
         execute_request=lambda **kwargs: None,
     )
 
-    # action + form_resource → urljoin(form_resource, action)
-    result = auth._determine_submit_resource("/do_login", "https://main.com/page")
+
+@pytest.mark.unit
+def test_determine_submit_resource_action_with_form_resource(hass: HomeAssistant):
+    """Test URL resolution: action + form_resource → urljoin(form_resource, action)."""
+    result = _resolver(hass)._determine_submit_resource(
+        "/do_login", "https://main.com/page", "https://example.com/auth/login"
+    )
     assert result == "https://example.com/do_login"
 
 
 @pytest.mark.unit
 def test_determine_submit_resource_action_no_form_resource(hass: HomeAssistant):
     """Test URL resolution: action + no form_resource → urljoin(main, action)."""
-    form_config = make_form_config(resource=None)
-    auth = FormAuthenticator(
-        config_name="test",
-        config=form_config,
-        execute_request=lambda **kwargs: None,
+    result = _resolver(hass)._determine_submit_resource(
+        "/login", "https://main.com/page", None
     )
-
-    result = auth._determine_submit_resource("/login", "https://main.com/page")
     assert result == "https://main.com/login"
 
 
 @pytest.mark.unit
 def test_determine_submit_resource_no_action_with_form_resource(hass: HomeAssistant):
     """Test URL resolution: no action + form_resource → form_resource."""
-    form_config = make_form_config(resource="https://example.com/auth/login")
-    auth = FormAuthenticator(
-        config_name="test",
-        config=form_config,
-        execute_request=lambda **kwargs: None,
+    result = _resolver(hass)._determine_submit_resource(
+        None, "https://main.com/page", "https://example.com/auth/login"
     )
-
-    result = auth._determine_submit_resource(None, "https://main.com/page")
     assert result == "https://example.com/auth/login"
 
 
 @pytest.mark.unit
 def test_determine_submit_resource_no_action_no_form_resource(hass: HomeAssistant):
     """Test URL resolution: no action + no form_resource → main_resource."""
-    form_config = make_form_config(resource=None)
-    auth = FormAuthenticator(
-        config_name="test",
-        config=form_config,
-        execute_request=lambda **kwargs: None,
+    result = _resolver(hass)._determine_submit_resource(
+        None, "https://main.com/page", None
     )
-
-    result = auth._determine_submit_resource(None, "https://main.com/page")
     assert result == "https://main.com/page"
 
 
@@ -1137,15 +1149,15 @@ async def test_create_http_session_with_form(hass: HomeAssistant):
             "submit_once": True,
             "resubmit_on_error": False,
             "variables": [],
-            "method": "post",
-            "verify_ssl": True,
-            "timeout": 10,
         },
     }
     session = create_http_session("test", conf, hass, None)
 
     assert session._form_authenticator is not None
-    assert session._form_authenticator._config.resource == "https://example.com/login"
+    assert (
+        session._form_authenticator._config.resource_renderer()
+        == "https://example.com/login"
+    )
     assert session._form_authenticator._config.select == "#login"
     assert session._form_authenticator._config.submit_once is True
     assert session._form_authenticator._config.resubmit_on_error is False
@@ -1172,7 +1184,6 @@ async def test_create_http_session_builds_input_renderer(hass: HomeAssistant):
                     "user": "admin",
                     "hashpassword": "{{ md5('code' ~ form.nonce) }}",
                 },
-                "method": "post",
             },
         }
     )
@@ -1200,7 +1211,7 @@ async def test_create_http_session_without_form_input_renders_empty(hass: HomeAs
         "resource": "https://example.com",
         "method": "get",
         "parser": "html.parser",
-        "form_submit": {"resource": "https://example.com/login", "method": "post"},
+        "form_submit": {"resource": "https://example.com/login"},
     }
     session = create_http_session("test", conf, hass, None)
 
@@ -1284,9 +1295,6 @@ async def test_e2e_form_login_then_scrape_separate_resource(hass: HomeAssistant)
             "submit_once": False,
             "resubmit_on_error": True,
             "variables": [],
-            "method": "get",
-            "verify_ssl": True,
-            "timeout": 10,
         },
     }
 
@@ -1359,9 +1367,6 @@ async def test_e2e_form_login_same_resource(hass: HomeAssistant):
             "submit_once": False,
             "resubmit_on_error": True,
             "variables": [],
-            "method": "get",
-            "verify_ssl": True,
-            "timeout": 10,
         },
     }
 
@@ -1412,9 +1417,6 @@ async def test_e2e_form_submit_once_skips_on_second_call(hass: HomeAssistant):
             "submit_once": True,
             "resubmit_on_error": True,
             "variables": [],
-            "method": "get",
-            "verify_ssl": True,
-            "timeout": 10,
         },
     }
 
@@ -1469,9 +1471,6 @@ async def test_e2e_form_resubmit_on_error(hass: HomeAssistant):
             "submit_once": True,
             "resubmit_on_error": True,
             "variables": [],
-            "method": "get",
-            "verify_ssl": True,
-            "timeout": 10,
         },
     }
 
@@ -1559,9 +1558,6 @@ async def test_e2e_form_auth_error_falls_back_to_page_fetch(hass: HomeAssistant)
             "submit_once": False,
             "resubmit_on_error": True,
             "variables": [],
-            "method": "get",
-            "verify_ssl": True,
-            "timeout": 10,
         },
     }
 
@@ -1633,9 +1629,6 @@ async def test_e2e_cookies_from_form_page_get_persist_to_submit(hass: HomeAssist
             "submit_once": False,
             "resubmit_on_error": False,
             "variables": [],
-            "method": "get",
-            "verify_ssl": True,
-            "timeout": 10,
         },
     }
 
@@ -1697,9 +1690,6 @@ async def test_e2e_cookies_accumulate_across_all_steps(hass: HomeAssistant):
             "submit_once": False,
             "resubmit_on_error": False,
             "variables": [],
-            "method": "get",
-            "verify_ssl": True,
-            "timeout": 10,
         },
     }
 
@@ -1767,9 +1757,6 @@ async def test_e2e_cookies_persist_across_multiple_scrape_cycles(hass: HomeAssis
             "submit_once": True,
             "resubmit_on_error": False,
             "variables": [],
-            "method": "get",
-            "verify_ssl": True,
-            "timeout": 10,
         },
     }
 
@@ -1859,9 +1846,6 @@ async def test_e2e_form_variables_scraped_from_response(hass: HomeAssistant):
                     "extract": "text",
                 },
             ],
-            "method": "get",
-            "verify_ssl": True,
-            "timeout": 10,
             "parser": "html.parser",
             "separator": ",",
         },
@@ -1939,9 +1923,6 @@ async def test_e2e_form_variables_passed_to_page_request_headers(hass: HomeAssis
                     "extract": "text",
                 },
             ],
-            "method": "get",
-            "verify_ssl": True,
-            "timeout": 10,
             "parser": "html.parser",
             "separator": ",",
         },
@@ -2024,9 +2005,6 @@ async def test_e2e_form_variables_updated_on_resubmit(hass: HomeAssistant):
                     "extract": "text",
                 },
             ],
-            "method": "get",
-            "verify_ssl": True,
-            "timeout": 10,
             "parser": "html.parser",
             "separator": ",",
         },
@@ -2090,9 +2068,6 @@ async def test_e2e_form_variables_empty_when_no_variables_configured(
             "submit_once": False,
             "resubmit_on_error": False,
             "variables": [],
-            "method": "get",
-            "verify_ssl": True,
-            "timeout": 10,
         },
     }
 
@@ -2152,9 +2127,6 @@ def _make_e2e_form_conf(hass):
                     "extract": "text",
                 },
             ],
-            "method": "get",
-            "verify_ssl": True,
-            "timeout": 10,
             "parser": "html.parser",
             "separator": ",",
         },
@@ -2488,9 +2460,6 @@ async def test_create_http_session_form_variables_none(hass: HomeAssistant):
             "submit_once": False,
             "resubmit_on_error": True,
             # "variables" key deliberately omitted — config.get() returns None
-            "method": "post",
-            "verify_ssl": True,
-            "timeout": 10,
         },
     }
     session = create_http_session("none_vars_test", conf, hass, None)
@@ -2502,3 +2471,534 @@ async def test_create_http_session_form_variables_none(hass: HomeAssistant):
     assert session.form_variables == {}
 
     await session.async_close()
+
+
+# ============================================================================
+# Form-submit HTTP Option Tests (#630)
+# ============================================================================
+
+
+@pytest.mark.integration
+@pytest.mark.async_test
+@pytest.mark.http
+@pytest.mark.timeout(10)
+@respx.mock
+async def test_form_payload_replaces_input_fields(hass: HomeAssistant):
+    """Test a configured payload is submitted instead of the input fields.
+
+    The payload wins because it is explicit config while the input fields are
+    mostly scraped; letting the input fields win would make payload silently
+    inert whenever select is set.
+    """
+    form_config = make_form_config(
+        resource="https://example.com/login",
+        select="#login",
+        input_values={"username": "admin", "password": "secret"},
+        data_renderer=static_data_renderer('{"u":"admin","p":"secret"}'),
+    )
+    sess = make_form_session(hass, form_config)
+
+    respx.get("https://example.com/login").mock(
+        return_value=respx.MockResponse(200, text=FORM_PAGE_HTML)
+    )
+    submit_route = respx.post("https://example.com/submit").mock(
+        return_value=respx.MockResponse(200, text="Welcome!")
+    )
+
+    await sess.ensure_authenticated("https://example.com/main")
+
+    body = submit_route.calls.last.request.content.decode()
+    assert body == '{"u":"admin","p":"secret"}'
+    # Neither the scraped nor the configured input fields are url-encoded into it
+    assert "csrf_token" not in body
+    assert "username=admin" not in body
+
+
+@pytest.mark.integration
+@pytest.mark.async_test
+@pytest.mark.http
+@pytest.mark.timeout(10)
+@respx.mock
+async def test_form_payload_supersede_logs_keys_not_values(hass: HomeAssistant, caplog):
+    """Test the supersede debug line names the dropped keys but not their values."""
+    form_config = make_form_config(
+        resource="https://example.com/login",
+        select="#login",
+        input_values={"password": "s3cret"},
+        data_renderer=static_data_renderer('{"u":"admin"}'),
+    )
+    sess = make_form_session(hass, form_config)
+
+    respx.get("https://example.com/login").mock(
+        return_value=respx.MockResponse(200, text=FORM_PAGE_HTML)
+    )
+    respx.post("https://example.com/submit").mock(
+        return_value=respx.MockResponse(200, text="Welcome!")
+    )
+
+    with caplog.at_level(logging.DEBUG, logger="custom_components.multiscrape.form_auth"):
+        await sess.ensure_authenticated("https://example.com/main")
+
+    supersede = [
+        record.getMessage()
+        for record in caplog.records
+        if "submitted as the request body instead of" in record.getMessage()
+    ]
+    assert len(supersede) == 1
+    # The keys are named so the config can be debugged, the values are not: they
+    # are frequently the scraped credentials.
+    assert "'password'" in supersede[0]
+    assert "s3cret" not in supersede[0]
+
+
+@pytest.mark.integration
+@pytest.mark.async_test
+@pytest.mark.http
+@pytest.mark.timeout(10)
+@respx.mock
+async def test_form_payload_without_select_is_sent_raw(hass: HomeAssistant):
+    """Test a payload is submitted when no form is scraped at all."""
+    form_config = make_form_config(
+        resource="https://example.com/login",
+        data_renderer=static_data_renderer('{"u":"admin"}'),
+    )
+    sess = make_form_session(hass, form_config)
+
+    submit_route = respx.post("https://example.com/login").mock(
+        return_value=respx.MockResponse(200, text="Welcome!")
+    )
+
+    await sess.ensure_authenticated("https://example.com/main")
+
+    assert submit_route.calls.last.request.content.decode() == '{"u":"admin"}'
+
+
+@pytest.mark.integration
+@pytest.mark.async_test
+@pytest.mark.http
+@pytest.mark.timeout(10)
+@respx.mock
+async def test_form_payload_renders_with_scraped_form_fields(hass: HomeAssistant):
+    """Test the payload template sees the scraped form as `form`, like input does."""
+    form_config = make_form_config(
+        resource="https://example.com/login",
+        select="#login",
+        data_renderer=form_payload_renderer(
+            hass, '{"hash": "{{ md5("code" ~ form.nonce) }}"}'
+        ),
+    )
+    sess = make_form_session(hass, form_config)
+
+    respx.get("https://example.com/login").mock(
+        return_value=respx.MockResponse(200, text=FORM_PAGE_WITH_NONCE)
+    )
+    submit_route = respx.post("https://example.com/submit").mock(
+        return_value=respx.MockResponse(200, text="Welcome!")
+    )
+
+    await sess.ensure_authenticated("https://example.com/main")
+
+    expected = hashlib.md5(b"codedeadbeef").hexdigest()
+    assert submit_route.calls.last.request.content.decode() == f'{{"hash": "{expected}"}}'
+
+
+@pytest.mark.integration
+@pytest.mark.async_test
+@pytest.mark.http
+@pytest.mark.timeout(10)
+@respx.mock
+async def test_form_empty_payload_falls_back_to_input_fields(hass: HomeAssistant):
+    """Test a payload rendering to nothing leaves the input fields in place."""
+    form_config = make_form_config(
+        resource="https://example.com/login",
+        select="#login",
+        input_values={"username": "admin"},
+        data_renderer=static_data_renderer(""),
+    )
+    sess = make_form_session(hass, form_config)
+
+    respx.get("https://example.com/login").mock(
+        return_value=respx.MockResponse(200, text=FORM_PAGE_HTML)
+    )
+    submit_route = respx.post("https://example.com/submit").mock(
+        return_value=respx.MockResponse(200, text="Welcome!")
+    )
+
+    await sess.ensure_authenticated("https://example.com/main")
+
+    body = submit_route.calls.last.request.content.decode()
+    assert "username=admin" in body
+    assert "csrf_token=abc123" in body
+
+
+@pytest.mark.integration
+@pytest.mark.async_test
+@pytest.mark.http
+@pytest.mark.timeout(10)
+@respx.mock
+async def test_configured_method_overrides_form_attribute(hass: HomeAssistant):
+    """Test form_submit method wins over the scraped <form method=...>."""
+    form_config = make_form_config(
+        resource="https://example.com/login",
+        select="#login",
+        method="put",
+    )
+    sess = make_form_session(hass, form_config)
+
+    respx.get("https://example.com/login").mock(
+        return_value=respx.MockResponse(200, text=FORM_PAGE_HTML)  # method="post"
+    )
+    put_route = respx.put("https://example.com/submit").mock(
+        return_value=respx.MockResponse(200, text="OK")
+    )
+    post_route = respx.post("https://example.com/submit").mock(
+        return_value=respx.MockResponse(200, text="OK")
+    )
+
+    await sess.ensure_authenticated("https://example.com/main")
+
+    assert put_route.called
+    assert not post_route.called
+
+
+@pytest.mark.integration
+@pytest.mark.async_test
+@pytest.mark.http
+@pytest.mark.timeout(10)
+@respx.mock
+async def test_method_falls_back_to_post_when_neither_set(hass: HomeAssistant):
+    """Test a form without a method attribute and no config still POSTs."""
+    form_config = make_form_config(
+        resource="https://example.com/login",
+        select="#login",
+    )
+    sess = make_form_session(hass, form_config)
+
+    respx.get("https://example.com/login").mock(
+        return_value=respx.MockResponse(200, text=FORM_PAGE_NO_METHOD)
+    )
+    submit_route = respx.post("https://example.com/submit").mock(
+        return_value=respx.MockResponse(200, text="OK")
+    )
+
+    await sess.ensure_authenticated("https://example.com/main")
+
+    assert submit_route.called
+
+
+@pytest.mark.integration
+@pytest.mark.async_test
+@pytest.mark.http
+@pytest.mark.timeout(10)
+@respx.mock
+async def test_form_timeout_applies_to_both_form_requests(hass: HomeAssistant):
+    """Test form_submit timeout is sent per request, not left at the client value."""
+    form_config = make_form_config(
+        resource="https://example.com/login",
+        select="#login",
+        timeout=3,
+    )
+    sess = make_form_session(hass, form_config, http_config=make_http_config(timeout=10))
+
+    page_route = respx.get("https://example.com/login").mock(
+        return_value=respx.MockResponse(200, text=FORM_PAGE_HTML)
+    )
+    submit_route = respx.post("https://example.com/submit").mock(
+        return_value=respx.MockResponse(200, text="OK")
+    )
+
+    await sess.ensure_authenticated("https://example.com/main")
+
+    for route in (page_route, submit_route):
+        assert route.calls.last.request.extensions["timeout"]["read"] == 3
+
+
+@pytest.mark.integration
+@pytest.mark.async_test
+@pytest.mark.http
+@pytest.mark.timeout(10)
+@respx.mock
+async def test_form_timeout_unset_uses_client_timeout(hass: HomeAssistant):
+    """Test an unset form timeout inherits the top-level client timeout."""
+    form_config = make_form_config(
+        resource="https://example.com/login",
+        select="#login",
+    )
+    sess = make_form_session(hass, form_config, http_config=make_http_config(timeout=25))
+
+    respx.get("https://example.com/login").mock(
+        return_value=respx.MockResponse(200, text=FORM_PAGE_HTML)
+    )
+    submit_route = respx.post("https://example.com/submit").mock(
+        return_value=respx.MockResponse(200, text="OK")
+    )
+
+    await sess.ensure_authenticated("https://example.com/main")
+
+    assert submit_route.calls.last.request.extensions["timeout"]["read"] == 25
+
+
+@pytest.mark.integration
+@pytest.mark.async_test
+@pytest.mark.http
+@pytest.mark.timeout(10)
+@respx.mock
+async def test_form_resource_template_is_rendered(hass: HomeAssistant):
+    """Test a form_submit resource_template is used instead of the main resource."""
+    form_config = make_form_config(
+        resource_renderer=create_renderer(
+            hass, "https://example.com/{{ 'login' }}", "form resource URL template"
+        ),
+        select="#login",
+    )
+    sess = make_form_session(hass, form_config)
+
+    page_route = respx.get("https://example.com/login").mock(
+        return_value=respx.MockResponse(200, text=FORM_PAGE_HTML)
+    )
+    submit_route = respx.post("https://example.com/submit").mock(
+        return_value=respx.MockResponse(200, text="Welcome!")
+    )
+
+    result = await sess.ensure_authenticated("https://example.com/main")
+
+    assert page_route.called
+    assert submit_route.called
+    # A form resource is configured, so the response is not reused as content
+    assert result is None
+
+
+@pytest.mark.integration
+@pytest.mark.async_test
+@pytest.mark.http
+@pytest.mark.timeout(10)
+@respx.mock
+async def test_form_resource_template_rendering_empty_reuses_response(hass: HomeAssistant):
+    """Test a resource_template rendering to nothing behaves as "not configured".
+
+    An empty render has produced no usable url, so the only coherent behaviour is
+    the no-resource one: submit to the main resource and reuse the response.
+    """
+    form_config = make_form_config(
+        resource_renderer=create_renderer(hass, "{{ '' }}", "form resource URL template"),
+        select="#login",
+    )
+    sess = make_form_session(hass, form_config)
+
+    respx.get("https://example.com/main").mock(
+        return_value=respx.MockResponse(200, text=FORM_PAGE_HTML)
+    )
+    respx.post("https://example.com/submit").mock(
+        return_value=respx.MockResponse(200, text="Welcome!")
+    )
+
+    result = await sess.ensure_authenticated("https://example.com/main")
+
+    assert result == "Welcome!"
+
+
+@pytest.mark.integration
+@pytest.mark.async_test
+@pytest.mark.timeout(10)
+async def test_create_http_session_builds_resource_renderer_from_template(hass: HomeAssistant):
+    """Test the factory honours form_submit resource_template (#630)."""
+    conf = COMBINED_SCHEMA(
+        {
+            "resource": "https://example.com",
+            "parser": "html.parser",
+            "form_submit": {
+                "resource_template": "https://example.com/{{ 'login' }}",
+                "select": "#login",
+            },
+        }
+    )
+    session = create_http_session("test", conf, hass, None)
+
+    renderer = session._form_authenticator._config.resource_renderer
+    assert renderer() == "https://example.com/login"
+
+    await session.async_close()
+
+
+@pytest.mark.integration
+@pytest.mark.async_test
+@pytest.mark.timeout(10)
+async def test_create_http_session_builds_resource_renderer_from_resource(hass: HomeAssistant):
+    """Test a plain form_submit resource still renders to itself."""
+    conf = COMBINED_SCHEMA(
+        {
+            "resource": "https://example.com",
+            "parser": "html.parser",
+            "form_submit": {"resource": "https://example.com/login"},
+        }
+    )
+    session = create_http_session("test", conf, hass, None)
+
+    assert (
+        session._form_authenticator._config.resource_renderer()
+        == "https://example.com/login"
+    )
+
+    await session.async_close()
+
+
+@pytest.mark.integration
+@pytest.mark.async_test
+@pytest.mark.timeout(10)
+async def test_create_http_session_without_form_resource_renders_none(hass: HomeAssistant):
+    """Test omitting both resource keys renders None, meaning "not configured"."""
+    conf = COMBINED_SCHEMA(
+        {
+            "resource": "https://example.com",
+            "parser": "html.parser",
+            "form_submit": {"select": "#login"},
+        }
+    )
+    session = create_http_session("test", conf, hass, None)
+
+    assert session._form_authenticator._config.resource_renderer() is None
+
+    await session.async_close()
+
+
+@pytest.mark.integration
+@pytest.mark.async_test
+@pytest.mark.timeout(10)
+async def test_create_http_session_wires_form_method_and_timeout(hass: HomeAssistant):
+    """Test form_submit method and timeout reach the authenticator (#630)."""
+    conf = COMBINED_SCHEMA(
+        {
+            "resource": "https://example.com",
+            "parser": "html.parser",
+            "form_submit": {
+                "resource": "https://example.com/login",
+                "method": "put",
+                "timeout": 99,
+            },
+        }
+    )
+    session = create_http_session("test", conf, hass, None)
+
+    assert session._form_authenticator._config.method == "put"
+    assert session._form_authenticator._config.timeout == 99
+
+    await session.async_close()
+
+
+@pytest.mark.integration
+@pytest.mark.async_test
+@pytest.mark.timeout(10)
+async def test_create_http_session_form_method_and_timeout_default_to_none(hass: HomeAssistant):
+    """Test unset method and timeout stay None so the existing behaviour is kept."""
+    conf = COMBINED_SCHEMA(
+        {
+            "resource": "https://example.com",
+            "timeout": 60,
+            "parser": "html.parser",
+            "form_submit": {"resource": "https://example.com/login"},
+        }
+    )
+    session = create_http_session("test", conf, hass, None)
+
+    # Not "get" from HTTP_SCHEMA's default, and not the top-level 60: unset means
+    # "use the form's own method" and "inherit the client timeout".
+    assert session._form_authenticator._config.method is None
+    assert session._form_authenticator._config.timeout is None
+
+    await session.async_close()
+
+
+@pytest.mark.integration
+@pytest.mark.async_test
+@pytest.mark.timeout(10)
+async def test_create_http_session_builds_strict_payload_renderer(hass: HomeAssistant):
+    """Test the factory wires form_submit payload up strictly and feeds it `form`."""
+    conf = COMBINED_SCHEMA(
+        {
+            "resource": "https://example.com",
+            "parser": "html.parser",
+            "form_submit": {
+                "resource": "https://example.com/login",
+                "select": "#login",
+                "payload": '{"hash": "{{ md5("code" ~ form.nonce) }}"}',
+            },
+        }
+    )
+    session = create_http_session("test", conf, hass, None)
+
+    renderer = session._form_authenticator._config.data_renderer
+    expected = hashlib.md5(b"codedeadbeef").hexdigest()
+    assert renderer({"form": {"nonce": "deadbeef"}}) == f'{{"hash": "{expected}"}}'
+    # An unknown form field is an error, not an empty string that would hash into
+    # a wrong credential.
+    with pytest.raises(TemplateError):
+        renderer({"form": {}})
+
+    await session.async_close()
+
+
+@pytest.mark.integration
+@pytest.mark.async_test
+@pytest.mark.http
+@pytest.mark.timeout(10)
+@respx.mock
+async def test_issue_630_reproduction_config(hass: HomeAssistant):
+    """Test the config from #630 end to end, from schema to submitted request.
+
+    Previously this validated cleanly and then submitted a POST of the scraped
+    fields to the main resource, on the main config's timeout. Only verify_ssl is
+    dropped from the reported config, because it cannot work per form.
+    """
+    conf = COMBINED_SCHEMA(
+        {
+            "resource": "http://gw/data",
+            "parser": "html.parser",
+            "timeout": 10,
+            "form_submit": {
+                "resource": "http://gw/login",
+                "select": "form",
+                "payload": '{"user":"admin","pw":"s3cret"}',
+                "method": "put",
+                "timeout": 99,
+            },
+        }
+    )
+    session = create_http_session("test", conf, hass, None)
+
+    try:
+        respx.get("http://gw/login").mock(
+            return_value=respx.MockResponse(
+                200,
+                text='<html><form action="/login" method="post">'
+                     '<input name="nonce" value="abc" /></form></html>',
+            )
+        )
+        submit_route = respx.put("http://gw/login").mock(
+            return_value=respx.MockResponse(200, text="OK")
+        )
+
+        await session.ensure_authenticated("http://gw/data")
+
+        request = submit_route.calls.last.request
+        # payload is submitted instead of the scraped nonce=abc
+        assert request.content.decode() == '{"user":"admin","pw":"s3cret"}'
+        # method is honoured instead of the form's POST
+        assert request.method == "PUT"
+        # timeout is honoured instead of the main config's 10
+        assert request.extensions["timeout"]["read"] == 99
+    finally:
+        await session.async_close()
+
+
+@pytest.mark.integration
+@pytest.mark.async_test
+@pytest.mark.timeout(10)
+async def test_issue_630_form_verify_ssl_is_rejected(hass: HomeAssistant):
+    """Test the one option from #630 that is rejected rather than implemented."""
+    with pytest.raises(vol.Invalid, match="verify_ssl"):
+        COMBINED_SCHEMA(
+            {
+                "resource": "http://gw/data",
+                "form_submit": {"resource": "http://gw/login", "verify_ssl": False},
+            }
+        )

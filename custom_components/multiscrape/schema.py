@@ -42,6 +42,12 @@ from .scraper import DEFAULT_TIMEOUT
 
 _LOGGER = logging.getLogger(__name__)
 
+_METHOD_VALIDATOR = vol.All(
+    cv.string,  # Ensure it's a string
+    lambda method: method.lower(),  # Convert to lowercase
+    vol.In([m.lower() for m in METHODS])  # Validate against lowercase methods
+)
+
 HTTP_SCHEMA = {
     vol.Exclusive(CONF_RESOURCE, CONF_RESOURCE): cv.url,
     vol.Exclusive(CONF_RESOURCE_TEMPLATE, CONF_RESOURCE): cv.template,
@@ -50,11 +56,7 @@ HTTP_SCHEMA = {
     ),
     vol.Optional(CONF_HEADERS): vol.Schema({cv.string: cv.template}),
     vol.Optional(CONF_PARAMS): vol.Schema({cv.string: cv.template}),
-    vol.Optional(CONF_METHOD, default=DEFAULT_METHOD): vol.All(
-        cv.string,  # Ensure it's a string
-        lambda method: method.lower(),  # Convert to lowercase
-        vol.In([m.lower() for m in METHODS])  # Validate against lowercase methods
-    ),
+    vol.Optional(CONF_METHOD, default=DEFAULT_METHOD): _METHOD_VALIDATOR,
     vol.Optional(CONF_USERNAME): cv.string,
     vol.Optional(CONF_PASSWORD): cv.string,
     vol.Optional(CONF_PAYLOAD): cv.template,
@@ -95,8 +97,29 @@ SELECTOR_SCHEMA = {
 
 FORM_HEADERS_MAPPING_SCHEMA = {vol.Required(CONF_NAME): cv.string, **SELECTOR_SCHEMA}
 
+# form_submit inherits the HTTP options, with three exceptions (#630):
+# - verify_ssl is client-level and the httpx client is deliberately shared with the
+#   data request so the login cookies carry over. It cannot be overridden per form,
+#   so the key is dropped: setting it is a config error naming the key instead of
+#   being silently ignored.
+# - method must not inherit HTTP_SCHEMA's "GET" default, or every form submit would
+#   suddenly be a GET. Unset means: use the <form method=...> attribute, else POST.
+# - timeout must not inherit its default either, or a form submit would always time
+#   out after 10s even when the top-level timeout is higher. Unset means: inherit the
+#   client timeout, which is built from the top-level timeout.
+# Markers compare equal to their key string, so reassigning a key after the splat
+# would keep the inherited marker (and its default) and only swap the validator.
+# Hence the filtered copy.
+_FORM_INHERITED_HTTP_SCHEMA = {
+    key: validator
+    for key, validator in HTTP_SCHEMA.items()
+    if key not in (CONF_VERIFY_SSL, CONF_METHOD, CONF_TIMEOUT)
+}
+
 FORM_SUBMIT_SCHEMA = {
-    **HTTP_SCHEMA,
+    **_FORM_INHERITED_HTTP_SCHEMA,
+    vol.Optional(CONF_METHOD): _METHOD_VALIDATOR,
+    vol.Optional(CONF_TIMEOUT): cv.positive_int,
     vol.Optional(CONF_FORM_SELECT): cv.string,
     vol.Optional(CONF_FORM_INPUT): vol.Schema({cv.string: cv.template}),
     vol.Optional(CONF_FORM_INPUT_FILTER, default=[]): cv.ensure_list,

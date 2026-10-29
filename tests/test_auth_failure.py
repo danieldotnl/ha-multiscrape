@@ -39,6 +39,11 @@ def static_input_renderer(values):
     return lambda variables={}, parse_result=None: dict(values)
 
 
+def static_resource_renderer(value):
+    """Build a resource renderer returning a fixed url (no templates involved)."""
+    return lambda variables={}, parse_result=None: value
+
+
 LOGIN_PAGE_HTML = """
 <html><body>
 <form id="loginform" action="/auth/submit" method="post">
@@ -78,8 +83,9 @@ def make_http_config(**overrides):
 def make_form_config(**overrides):
     """Create a FormAuthConfig with sensible defaults.
 
-    `input_values={...}` is a convenience that is translated into a static
-    `input_renderer`. Pass `input_renderer=` directly to exercise templates.
+    `input_values={...}` and `resource="..."` are conveniences that are translated
+    into a static `input_renderer` / `resource_renderer`. Pass the renderer directly
+    to exercise templates.
     """
     defaults = {
         "parser": "html.parser",
@@ -87,6 +93,8 @@ def make_form_config(**overrides):
         "params_renderer": _NOOP_PARAMS,
         "data_renderer": _NOOP_DATA,
     }
+    if "resource" in overrides:
+        overrides["resource_renderer"] = static_resource_renderer(overrides.pop("resource"))
     if "input_values" in overrides:
         overrides["input_renderer"] = static_input_renderer(overrides.pop("input_values"))
     return FormAuthConfig(**{**defaults, **overrides})
@@ -115,9 +123,6 @@ def make_full_conf(**form_overrides):
         "submit_once": False,
         "resubmit_on_error": True,
         "variables": [],
-        "method": "get",
-        "verify_ssl": True,
-        "timeout": 10,
     }
     form_defaults.update(form_overrides)
 
