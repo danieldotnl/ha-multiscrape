@@ -5,10 +5,13 @@ to extract data from HTML content using CSS selectors.
 """
 
 import re
-from unittest.mock import MagicMock
+import threading
+from unittest.mock import MagicMock, patch
 
 import pytest
+from bs4 import BeautifulSoup
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import TemplateError
 from homeassistant.helpers.template import Template
 
 from custom_components.multiscrape.const import DEFAULT_SEPARATOR
@@ -457,3 +460,168 @@ async def test_scraper_context_immutability_across_calls(
     # Context should be unchanged (no "value" key leaked into form_variables)
     assert "value" not in ctx.form_variables
     assert ctx.current_value is None
+
+
+@pytest.mark.integration
+@pytest.mark.async_test
+@pytest.mark.timeout(5)
+async def test_scraper_selects_registered_selectors_off_the_event_loop(
+    hass: HomeAssistant, scraper_instance
+):
+    """Registered selectors are selected in the executor, not in scrape() (#633)."""
+    single = Selector(
+        hass,
+        {
+            "name": "single",
+            "select": Template(".current-version h1", hass),
+            "value_template": Template("{{ value | upper }}", hass),
+        },
+    )
+    listed = Selector(hass, {"name": "listed", "select_list": Template("li", hass)})
+    scraper_instance.register_selectors([single, listed])
+
+    threads = []
+    extract_value = scraper_instance._extract_value
+
+    def _record_thread(*args):
+        threads.append(threading.current_thread())
+        return extract_value(*args)
+
+    with patch.object(scraper_instance, "_extract_value", side_effect=_record_thread):
+        await scraper_instance.set_content(SAMPLE_HTML_FULL)
+        assert len(threads) == 2
+        assert threading.main_thread() not in threads
+
+        # scrape() reads the precomputed values and doesn't select again.
+        assert scraper_instance.scrape(single, "single") == "CURRENT VERSION: 2024.8.3"
+        assert scraper_instance.scrape(listed, "listed") == scraper_instance._extracted[listed]
+        assert len(threads) == 2
+
+
+@pytest.mark.integration
+@pytest.mark.async_test
+@pytest.mark.timeout(5)
+async def test_scraper_registered_selector_errors_are_raised_by_scrape(
+    hass: HomeAssistant, scraper_instance
+):
+    """Errors from the executor run surface from scrape(), so on_error still applies."""
+    missing = Selector(hass, {"name": "missing", "select": Template(".does-not-exist", hass)})
+    broken = Selector(hass, {"name": "broken", "select": Template("{{ 1 / 0 }}", hass)})
+    scraper_instance.register_selectors([missing, broken])
+
+    await scraper_instance.set_content(SAMPLE_HTML_FULL)
+
+    with pytest.raises(ValueError, match="Could not find a tag"):
+        scraper_instance.scrape(missing, "missing")
+    with pytest.raises(TemplateError):
+        scraper_instance.scrape(broken, "broken")
+
+
+@pytest.mark.integration
+@pytest.mark.async_test
+@pytest.mark.timeout(5)
+async def test_scraper_unregistered_selector_falls_back_to_selecting_in_scrape(
+    hass: HomeAssistant, scraper_instance
+):
+    """After unregistering, a selector is no longer precomputed but still scrapes."""
+    selector = Selector(hass, {"name": "s", "select": Template(".current-version h1", hass)})
+    unregister = scraper_instance.register_selectors([selector])
+    await scraper_instance.set_content(SAMPLE_HTML_FULL)
+    assert selector in scraper_instance._extracted
+
+    unregister()
+    assert selector not in scraper_instance._extracted
+
+    await scraper_instance.set_content(SAMPLE_HTML_FULL)
+    assert scraper_instance._extracted == {}
+    assert scraper_instance.scrape(selector, "s") == "Current Version: 2024.8.3"
+
+
+@pytest.mark.integration
+@pytest.mark.async_test
+@pytest.mark.timeout(5)
+async def test_scraper_new_content_replaces_precomputed_values(
+    hass: HomeAssistant, scraper_instance
+):
+    """Values from a previous page never leak into the next one."""
+    selector = Selector(hass, {"name": "s", "select": Template(".current-version h1", hass)})
+    scraper_instance.register_selectors([selector])
+    await scraper_instance.set_content(SAMPLE_HTML_FULL)
+
+    scraper_instance.reset()
+    assert scraper_instance._extracted == {}
+
+    await scraper_instance.set_content(SAMPLE_JSON_SIMPLE)
+    with pytest.raises(ValueError, match="JSON cannot be scraped"):
+        scraper_instance.scrape(selector, "s")
+
+
+@pytest.mark.integration
+@pytest.mark.async_test
+@pytest.mark.timeout(5)
+async def test_scraper_discards_results_for_replaced_content(
+    hass: HomeAssistant, scraper_instance
+):
+    """A reset while the executor job runs must not resurrect its results."""
+    selector = Selector(hass, {"name": "s", "select": Template(".current-version h1", hass)})
+    scraper_instance.register_selectors([selector])
+
+    started = threading.Event()
+    release = threading.Event()
+    extract_batch = scraper_instance._extract_batch
+
+    def _blocking_batch(soup, jobs):
+        started.set()
+        release.wait(5)
+        return extract_batch(soup, jobs)
+
+    # A plain function, as the test harness runs Mock executor targets inline.
+    scraper_instance._extract_batch = _blocking_batch
+    task = hass.async_create_task(scraper_instance.set_content(SAMPLE_HTML_FULL))
+
+    # Reset while the executor job is still running, then let it finish.
+    await hass.async_add_executor_job(started.wait, 5)
+    scraper_instance.reset()
+    release.set()
+    await task
+
+    assert scraper_instance._extracted == {}
+
+
+@pytest.mark.integration
+@pytest.mark.async_test
+@pytest.mark.timeout(5)
+async def test_scraper_register_selectors_ignores_just_value_selectors(
+    hass: HomeAssistant, scraper_instance
+):
+    """A value_template-only selector has nothing to select, so it isn't registered."""
+    selector = Selector(hass, {"name": "v", "value_template": Template("{{ 42 }}", hass)})
+    scraper_instance.register_selectors([selector])
+    await scraper_instance.set_content(SAMPLE_HTML_FULL)
+
+    assert selector not in scraper_instance._extracted
+    assert scraper_instance.scrape(selector, "v") == 42
+
+
+@pytest.mark.integration
+@pytest.mark.async_test
+@pytest.mark.timeout(5)
+async def test_scraper_async_formatted_content_formats_off_the_event_loop(
+    hass: HomeAssistant, scraper_instance
+):
+    """Prettifying a large page must not block the event loop either (#633)."""
+    await scraper_instance.set_content(SAMPLE_HTML_FULL)
+
+    threads = []
+    prettify = BeautifulSoup.prettify
+
+    def _record_thread(*args, **kwargs):
+        threads.append(threading.current_thread())
+        return prettify(*args, **kwargs)
+
+    with patch.object(BeautifulSoup, "prettify", autospec=True, side_effect=_record_thread):
+        formatted = await scraper_instance.async_formatted_content()
+
+    assert formatted == scraper_instance.formatted_content
+    assert threads
+    assert threading.main_thread() not in threads

@@ -2,6 +2,8 @@
 
 import json
 import logging
+from collections.abc import Callable, Iterable
+from typing import Any
 
 from bs4 import BeautifulSoup
 
@@ -9,6 +11,7 @@ from .const import CONF_PARSER, CONF_SEPARATOR
 from .extractors import ValueExtractor
 from .parsers import JsonParser, ParserFactory
 from .scrape_context import ScrapeContext
+from .selector import Selector
 
 DEFAULT_TIMEOUT = 10
 _LOGGER = logging.getLogger(__name__)
@@ -51,6 +54,11 @@ class Scraper:
         self._soup: BeautifulSoup = None
         self._data = None
         self._is_json = False
+        # Selectors whose CSS selection runs in the executor on every
+        # set_content, and the outcome of that run: the extracted value, or
+        # the exception the extraction raised.
+        self._selectors: dict[Selector, None] = {}
+        self._extracted: dict[Selector, Any] = {}
         self.reset()
 
     @property
@@ -63,6 +71,23 @@ class Scraper:
         self._data = None
         self._soup = None
         self._is_json = False
+        self._extracted = {}
+
+    def register_selectors(self, selectors: Iterable[Selector]) -> Callable[[], None]:
+        """Have the selection for these selectors run off the event loop.
+
+        Returns a callback that unregisters them again.
+        """
+        selectors = [selector for selector in selectors if not selector.just_value]
+        for selector in selectors:
+            self._selectors[selector] = None
+
+        def _unregister():
+            for selector in selectors:
+                self._selectors.pop(selector, None)
+                self._extracted.pop(selector, None)
+
+        return _unregister
 
     @property
     def formatted_content(self):
@@ -79,9 +104,14 @@ class Scraper:
                 return self._data
         return self._data
 
+    async def async_formatted_content(self):
+        """Return formatted_content, formatted in the executor as pages can be large."""
+        return await self._hass.async_add_executor_job(lambda: self.formatted_content)
+
     async def set_content(self, content):
         """Set the content to be scraped."""
         self._data = content
+        self._extracted = {}
         parser = self._parser_factory.get_parser(content)
 
         if isinstance(parser, JsonParser):
@@ -91,7 +121,9 @@ class Scraper:
             )
             self._is_json = True
             if self._file_manager:
-                await self._async_file_log("page_json", self.formatted_content)
+                await self._async_file_log(
+                    "page_json", await self.async_formatted_content()
+                )
             return
 
         try:
@@ -102,7 +134,9 @@ class Scraper:
             self._soup = await parser.parse(content, self._hass)
 
             if self._file_manager:
-                await self._async_file_log("page_soup", self._soup.prettify())
+                await self._async_file_log(
+                    "page_soup", await self.async_formatted_content()
+                )
 
         except Exception as ex:
             self.reset()
@@ -112,6 +146,53 @@ class Scraper:
                 ex,
             )
             raise
+
+        await self._async_extract_registered()
+
+    async def _async_extract_registered(self):
+        """Run the selection for all registered selectors in the executor.
+
+        Selecting can take seconds on large pages (#633), so it must not block
+        the event loop. The select templates are rendered here first, since
+        rendering belongs on the loop.
+        """
+        soup = self._soup
+        extracted = {}
+        jobs = []
+        for selector in self._selectors:
+            try:
+                css = selector.list if selector.is_list else selector.element
+            except Exception as ex:
+                extracted[selector] = ex
+            else:
+                jobs.append((selector, css))
+
+        if jobs:
+            extracted.update(
+                await self._hass.async_add_executor_job(self._extract_batch, soup, jobs)
+            )
+        # Don't store results for content that was replaced or reset meanwhile,
+        # nor for selectors that were unregistered meanwhile.
+        if self._soup is soup:
+            self._extracted = {
+                selector: value
+                for selector, value in extracted.items()
+                if selector in self._selectors
+            }
+
+    def _extract_batch(self, soup, jobs):
+        """Extract the values for a batch of (selector, css) jobs. Runs in the executor."""
+        results = {}
+        for selector, css in jobs:
+            try:
+                results[selector] = self._extract_value(
+                    soup, selector, css, self._make_log_prefix(selector.name, None)
+                )
+            except Exception as ex:
+                # Without its traceback, the stored exception doesn't keep
+                # this run's frames (and with them the soup) alive.
+                results[selector] = ex.with_traceback(None)
+        return results
 
     def scrape(
         self, selector, sensor, attribute=None, context: ScrapeContext | None = None
@@ -136,7 +217,17 @@ class Scraper:
                 "JSON cannot be scraped. Please provide a value template to parse JSON response."
             )
 
-        value = self._extract_value(selector, log_prefix)
+        if selector in self._extracted:
+            value = self._extracted[selector]
+            if isinstance(value, Exception):
+                raise value
+            _LOGGER.debug("%s # Selected off the event loop: %s", log_prefix, value)
+        else:
+            _LOGGER.debug(
+                "%s # Selector not precomputed, selecting on the event loop", log_prefix
+            )
+            css = selector.list if selector.is_list else selector.element
+            value = self._extract_value(self._soup, selector, css, log_prefix)
 
         if value is not None and selector.value_template is not None:
             _LOGGER.debug("%s # Applying value_template on selector result", log_prefix)
@@ -150,14 +241,14 @@ class Scraper:
         )
         return value
 
-    def _extract_value(self, selector, log_prefix):
-        """Delegate extraction to ValueExtractor."""
+    def _extract_value(self, soup, selector, css, log_prefix):
+        """Select the tag(s) for css and delegate extraction to ValueExtractor."""
         if selector.is_list:
-            tags = self._soup.select(selector.list)
+            tags = soup.select(css)
             _LOGGER.debug("%s # List selector selected tags: %s", log_prefix, tags)
             return self._extractor.extract_list(tags, selector)
         else:
-            tag = self._soup.select_one(selector.element)
+            tag = soup.select_one(css)
             _LOGGER.debug("%s # Tag selected: %s", log_prefix, tag)
             if tag is None:
                 raise ValueError("Could not find a tag for given selector")
