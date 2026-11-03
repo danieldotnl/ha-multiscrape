@@ -939,16 +939,15 @@ class TestXmlErrorHandling:
     @pytest.mark.integration
     @pytest.mark.async_test
     @pytest.mark.timeout(5)
-    async def test_empty_select_list_returns_empty_string(
+    async def test_empty_select_list_raises(
         self, hass: HomeAssistant, xml_scraper
     ):
-        """Test that select_list with no matches returns empty string."""
+        """Test that select_list with no matches raises, like select (#639)."""
         await xml_scraper.set_content(SAMPLE_XML_WEATHER)
 
         selector = Selector(hass, {"select_list": Template("nonexistent", hass)})
-        value = xml_scraper.scrape(selector, "empty_list")
-
-        assert value == ""
+        with pytest.raises(ValueError, match="Could not find any tags"):
+            xml_scraper.scrape(selector, "empty_list")
 
 
 # ============================================================================

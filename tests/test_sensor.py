@@ -238,6 +238,54 @@ async def test_sensor_on_error_value_last(hass: HomeAssistant, coordinator, scra
 @pytest.mark.integration
 @pytest.mark.async_test
 @pytest.mark.timeout(10)
+async def test_sensor_empty_select_list_uses_on_error_and_requests_reauth(
+    hass: HomeAssistant, coordinator, scraper
+):
+    """An empty select_list must be a scrape error, not an empty value (#639).
+
+    E.g. when an expired session returns the login page: an empty string would
+    pass as a successful scrape, so the form would never be re-submitted and a
+    numeric sensor would fail on the state write instead.
+    """
+    from custom_components.multiscrape.const import CONF_SELECT_LIST
+
+    config = {
+        CONF_NAME: "temperature",
+        CONF_SELECT_LIST: Template(".nonexistent-selector", hass),
+        CONF_VALUE_TEMPLATE: Template(
+            "{% set v = value | trim %}{% if v %}{{ v | float }}{% endif %}", hass
+        ),
+        CONF_ON_ERROR: {CONF_ON_ERROR_VALUE: CONF_ON_ERROR_VALUE_LAST},
+    }
+    sensor = MultiscrapeSensor(
+        hass=hass,
+        coordinator=coordinator,
+        scraper=scraper,
+        unique_id="temperature",
+        name="temperature",
+        unit_of_measurement="°F",
+        device_class=SensorDeviceClass.TEMPERATURE,
+        state_class="measurement",
+        force_update=False,
+        icon_template=None,
+        picture=None,
+        sensor_selector=Selector(hass, config),
+        attribute_selectors={},
+    )
+    sensor._attr_native_value = 36.2
+    await scraper.set_content(SAMPLE_HTML_FULL)
+
+    with patch.object(coordinator, "request_reauth") as request_reauth:
+        sensor._update_sensor()
+
+    assert sensor._attr_native_value == 36.2
+    assert sensor._scrape_error is False
+    request_reauth.assert_called_once()
+
+
+@pytest.mark.integration
+@pytest.mark.async_test
+@pytest.mark.timeout(10)
 async def test_sensor_on_error_value_last_with_none_value(hass: HomeAssistant, coordinator, scraper):
     """Test sensor with on_error value 'last' but no previous value."""
     from custom_components.multiscrape.selector import Selector

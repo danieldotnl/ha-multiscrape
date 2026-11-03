@@ -477,7 +477,7 @@ async def test_scraper_selects_registered_selectors_off_the_event_loop(
             "value_template": Template("{{ value | upper }}", hass),
         },
     )
-    listed = Selector(hass, {"name": "listed", "select_list": Template("li", hass)})
+    listed = Selector(hass, {"name": "listed", "select_list": Template("h1", hass)})
     scraper_instance.register_selectors([single, listed])
 
     threads = []
@@ -506,13 +506,18 @@ async def test_scraper_registered_selector_errors_are_raised_by_scrape(
 ):
     """Errors from the executor run surface from scrape(), so on_error still applies."""
     missing = Selector(hass, {"name": "missing", "select": Template(".does-not-exist", hass)})
+    missing_list = Selector(
+        hass, {"name": "missing_list", "select_list": Template(".does-not-exist", hass)}
+    )
     broken = Selector(hass, {"name": "broken", "select": Template("{{ 1 / 0 }}", hass)})
-    scraper_instance.register_selectors([missing, broken])
+    scraper_instance.register_selectors([missing, missing_list, broken])
 
     await scraper_instance.set_content(SAMPLE_HTML_FULL)
 
     with pytest.raises(ValueError, match="Could not find a tag"):
         scraper_instance.scrape(missing, "missing")
+    with pytest.raises(ValueError, match="Could not find any tags"):
+        scraper_instance.scrape(missing_list, "missing_list")
     with pytest.raises(TemplateError):
         scraper_instance.scrape(broken, "broken")
 
