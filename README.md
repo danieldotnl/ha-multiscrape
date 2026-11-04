@@ -351,7 +351,7 @@ Set `max_retries: 0` to switch the automatic retries off entirely. This is usefu
 
 ## Services
 
-After removing the entire `multiscrape:` section from your YAML configuration, call `multiscrape.reload` to shut down the configured scrapers.
+After removing the entire `multiscrape:` section from your YAML configuration, restart Home Assistant or call `multiscrape.reload` to shut down the configured scrapers.
 
 For each multiscrape instance, a service will be created to trigger a scrape run through an automation. (For manual triggering, the button entity can now be configured.)
 The services are named `multiscrape.trigger_{name of integration}`.

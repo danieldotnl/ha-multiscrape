@@ -687,9 +687,13 @@ async def test_reload_after_removing_multiscrape_config(
     assert old_coordinator._retry_unsub is not None
     old_coordinator._request_manager.get_content.reset_mock()
 
+    assert hass.services.has_service(DOMAIN, "trigger_test_scraper")
+
+    # Patch the YAML file itself, so the real validation of a configuration
+    # without a multiscrape section runs as well.
     with patch(
-        "custom_components.multiscrape.async_integration_yaml_config",
-        AsyncMock(return_value={}),
+        "homeassistant.config.async_hass_config_yaml",
+        AsyncMock(return_value={"homeassistant": {}}),
     ), patch(
         "custom_components.multiscrape.async_reload_integration_platforms",
         AsyncMock(),
@@ -698,6 +702,9 @@ async def test_reload_after_removing_multiscrape_config(
         await hass.async_block_till_done()
 
     reload_platforms.assert_awaited_once()
+    assert not hass.services.has_service(DOMAIN, "trigger_test_scraper")
+    assert hass.services.has_service(DOMAIN, SERVICE_RELOAD)
+    assert hass.services.has_service(DOMAIN, "get_content")
     assert old_registry.get_all() == []
     assert hass.data[DOMAIN] is not old_registry
     assert hass.data[DOMAIN].get_all() == []
@@ -712,3 +719,61 @@ async def test_reload_after_removing_multiscrape_config(
     await hass.async_block_till_done()
 
     old_coordinator._request_manager.get_content.assert_not_called()
+
+
+@pytest.mark.integration
+@pytest.mark.async_test
+@pytest.mark.timeout(10)
+@pytest.mark.respx
+async def test_reload_removes_trigger_service_of_removed_scraper(
+    hass: HomeAssistant, minimal_config
+):
+    """Test reload removes the trigger service of a scraper that was removed."""
+    config = {
+        DOMAIN: [
+            dict(minimal_config[DOMAIN][0], **{CONF_NAME: "kept"}),
+            dict(minimal_config[DOMAIN][0], **{CONF_NAME: "removed"}),
+        ]
+    }
+    await async_setup(hass, config)
+    await hass.async_block_till_done()
+    assert hass.services.has_service(DOMAIN, "trigger_removed")
+
+    new_config = {DOMAIN: [config[DOMAIN][0]]}
+    with patch(
+        "custom_components.multiscrape.async_integration_yaml_config",
+        AsyncMock(return_value=new_config),
+    ), patch(
+        "custom_components.multiscrape.async_reload_integration_platforms",
+        AsyncMock(),
+    ):
+        await hass.services.async_call(DOMAIN, SERVICE_RELOAD, blocking=True)
+        await hass.async_block_till_done()
+
+    assert not hass.services.has_service(DOMAIN, "trigger_removed")
+    assert hass.services.has_service(DOMAIN, "trigger_kept")
+    assert hass.data[DOMAIN].get("kept").trigger_service == "trigger_kept"
+
+    await _async_shutdown_scrapers(hass)
+
+
+@pytest.mark.integration
+@pytest.mark.async_test
+@pytest.mark.timeout(10)
+async def test_reload_service_only_mode(hass: HomeAssistant, empty_config):
+    """Test reload with a resource-less entry sets up no scraper, like setup."""
+    await async_setup(hass, empty_config)
+
+    with patch(
+        "custom_components.multiscrape.async_integration_yaml_config",
+        AsyncMock(return_value=empty_config),
+    ), patch(
+        "custom_components.multiscrape.async_reload_integration_platforms",
+        AsyncMock(),
+    ):
+        await hass.services.async_call(DOMAIN, SERVICE_RELOAD, blocking=True)
+        await hass.async_block_till_done()
+
+    assert hass.data[DOMAIN].get_all() == []
+    assert not hass.services.has_service(DOMAIN, "trigger_scraper_unnamed_0")
+    assert hass.services.has_service(DOMAIN, "get_content")

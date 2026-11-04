@@ -54,15 +54,6 @@ async def async_setup(hass: HomeAssistant, entry: ConfigEntry):
 
     await setup_integration_services(hass)
 
-    if len(entry[DOMAIN]) == 1:
-        if not entry[DOMAIN][0].get(CONF_RESOURCE) and not entry[DOMAIN][0].get(
-            CONF_RESOURCE_TEMPLATE
-        ):
-            _LOGGER.info(
-                "Did not find any configuration. Assuming we want just the integration level services."
-            )
-            return True
-
     return await _async_process_config(hass, entry)
 
 
@@ -86,6 +77,12 @@ async def _async_shutdown_scrapers(hass: HomeAssistant) -> None:
         return
 
     for instance in registry.get_all():
+        # Remove the trigger service first, so an automation can no longer reach
+        # a coordinator that is being shut down.
+        if instance.trigger_service and hass.services.has_service(
+            DOMAIN, instance.trigger_service
+        ):
+            hass.services.async_remove(DOMAIN, instance.trigger_service)
         try:
             await instance.async_shutdown()
         except Exception:  # pylint: disable=broad-except
@@ -102,14 +99,18 @@ async def _async_process_config(hass: HomeAssistant, config) -> bool:
 
     _LOGGER.debug("# Start processing config from configuration.yaml")
 
-    refresh_tasks = []
+    # A reload after the multiscrape section was removed passes no section at all.
+    scraper_confs = config.get(DOMAIN) or []
+    if _is_services_only_config(scraper_confs):
+        _LOGGER.info(
+            "Did not find any configuration. Assuming we want just the integration level services."
+        )
+        return True
+
     load_tasks = []
     registry: ScraperRegistry = hass.data[DOMAIN]
 
-    if DOMAIN not in config:
-        return True
-
-    for scraper_idx, conf in enumerate(config[DOMAIN]):
+    for scraper_idx, conf in enumerate(scraper_confs):
         config_name = conf.get(CONF_NAME)
         if config_name is None:
             resource = conf.get(CONF_RESOURCE) or ""
@@ -156,7 +157,9 @@ async def _async_process_config(hass: HomeAssistant, config) -> bool:
         )
         registry.register(instance)
 
-        await setup_config_services(hass, coordinator, config_name)
+        instance.trigger_service = await setup_config_services(
+            hass, coordinator, config_name
+        )
 
         for platform_domain in PLATFORMS:
             if platform_domain not in conf:
@@ -179,14 +182,23 @@ async def _async_process_config(hass: HomeAssistant, config) -> bool:
                 )
                 load_tasks.append(load)
 
-    if refresh_tasks:
-        await asyncio.gather(*refresh_tasks)
-
     if load_tasks:
         await asyncio.gather(*load_tasks)
 
-
     return True
+
+
+def _is_services_only_config(scraper_confs: list) -> bool:
+    """Return True for a lone entry without a resource.
+
+    Such an entry only enables the integration level services (get_content and
+    scrape), so no scraper is set up for it.
+    """
+    return (
+        len(scraper_confs) == 1
+        and not scraper_confs[0].get(CONF_RESOURCE)
+        and not scraper_confs[0].get(CONF_RESOURCE_TEMPLATE)
+    )
 
 
 def _deduplicate_id(registry: ScraperRegistry, base_id: str) -> str:
