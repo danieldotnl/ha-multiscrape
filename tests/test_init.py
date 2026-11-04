@@ -661,3 +661,54 @@ async def test_reload_shuts_down_discarded_coordinators(
     await hass.async_block_till_done()
 
     old_coordinator._request_manager.get_content.assert_not_called()
+
+
+@pytest.mark.integration
+@pytest.mark.async_test
+@pytest.mark.timeout(10)
+@pytest.mark.respx
+async def test_reload_after_removing_multiscrape_config(
+    hass: HomeAssistant, zero_interval_config
+):
+    """Test reload shuts down all scrapers after removing their YAML section."""
+    await async_setup(hass, zero_interval_config)
+    await hass.async_block_till_done()
+
+    old_registry = hass.data[DOMAIN]
+    old_instance = old_registry.get("test_scraper")
+    old_coordinator = old_instance.coordinator
+    old_session_close = AsyncMock(wraps=old_instance.session.async_close)
+    old_instance.session.async_close = old_session_close
+    old_coordinator._request_manager.get_content = AsyncMock(
+        side_effect=Exception("Network error")
+    )
+
+    await old_coordinator.async_refresh()
+    assert old_coordinator._retry_unsub is not None
+    old_coordinator._request_manager.get_content.reset_mock()
+
+    with patch(
+        "custom_components.multiscrape.async_integration_yaml_config",
+        AsyncMock(return_value={}),
+    ), patch(
+        "custom_components.multiscrape.async_reload_integration_platforms",
+        AsyncMock(),
+    ) as reload_platforms:
+        await hass.services.async_call(DOMAIN, SERVICE_RELOAD, blocking=True)
+        await hass.async_block_till_done()
+
+    reload_platforms.assert_awaited_once()
+    assert old_registry.get_all() == []
+    assert hass.data[DOMAIN] is not old_registry
+    assert hass.data[DOMAIN].get_all() == []
+    assert old_coordinator._shutdown_requested is True
+    assert old_coordinator._retry_unsub is None
+    assert old_instance.unsub_session_stop is None
+    old_session_close.assert_awaited_once()
+
+    async_fire_time_changed(
+        hass, utcnow() + timedelta(seconds=RETRY_DELAY_SECONDS + 1)
+    )
+    await hass.async_block_till_done()
+
+    old_coordinator._request_manager.get_content.assert_not_called()

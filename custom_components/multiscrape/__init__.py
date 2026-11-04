@@ -106,6 +106,9 @@ async def _async_process_config(hass: HomeAssistant, config) -> bool:
     load_tasks = []
     registry: ScraperRegistry = hass.data[DOMAIN]
 
+    if DOMAIN not in config:
+        return True
+
     for scraper_idx, conf in enumerate(config[DOMAIN]):
         config_name = conf.get(CONF_NAME)
         if config_name is None:
