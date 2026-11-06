@@ -9,7 +9,8 @@
 # Fixtures that are defined in conftest.py are available across all tests. You can also
 # define fixtures within a particular test file to scope them locally.
 #
-# pytest_homeassistant provides fixtures maintained in Home Assistant Core.
+# pytest_homeassistant provides fixtures maintained in Home Assistant Core. You can find
+# those fixture definitions in pytest_homeassistant/plugins.py.
 #
 # See here for more info: https://docs.pytest.org/en/latest/fixture.html (note that
 # pytest includes fixtures OOB which you can use as defined on this page)
@@ -28,13 +29,12 @@ from custom_components.multiscrape.scraper import Scraper
 #                                                CONF_METER_TYPE, DOMAIN)
 
 
-
-# This fixture enables loading custom integrations in all tests.
-# Remove to enable selective use of this fixture
-@pytest.fixture(autouse=True)
-def auto_enable_custom_integrations(enable_custom_integrations):
-    """Enable custom integrations in all tests."""
-    yield
+# This fixture gives each test its own temporary config directory, so that tests writing
+# to hass.config.config_dir don't create files inside the repository.
+@pytest.fixture
+def hass_config_dir(hass_tmp_config_dir):
+    """Use a temporary config directory in all tests."""
+    return hass_tmp_config_dir
 
 
 # This fixture is used to prevent HomeAssistant from attempting to create and dismiss persistent
