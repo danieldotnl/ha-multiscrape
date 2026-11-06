@@ -3,5 +3,5 @@ pytest-homeassistant==2026.11.0
 pip>=26.0,<27
 lxml>=4.9.1
 beautifulsoup4>=4.12.2
-ruff==0.17.3
+ruff==0.17.4
 pytest-timeout==2.4.0
