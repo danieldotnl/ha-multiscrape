@@ -246,6 +246,11 @@ class Scraper:
         if selector.is_list:
             tags = soup.select(css)
             _LOGGER.debug("%s # List selector selected tags: %s", log_prefix, tags)
+            # Like select, fail when nothing matches: an empty string would pass
+            # as a successful scrape, so on_error and re-authentication never
+            # kick in (e.g. when a login page is returned instead, #639).
+            if not tags:
+                raise ValueError("Could not find any tags for given selector")
             return self._extractor.extract_list(tags, selector)
         else:
             tag = soup.select_one(css)
