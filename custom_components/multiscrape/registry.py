@@ -27,6 +27,7 @@ class ScraperInstance:
     platform_configs: dict[Platform, dict[str, dict]] = field(default_factory=dict)
     session: HttpSession | None = None
     unsub_session_stop: CALLBACK_TYPE | None = None
+    trigger_service: str | None = None
 
     async def async_shutdown(self) -> None:
         """Shut down the coordinator and close the HTTP session.

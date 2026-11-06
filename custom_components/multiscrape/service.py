@@ -35,16 +35,19 @@ async def setup_integration_services(hass: HomeAssistant):
 
 async def setup_config_services(
     hass: HomeAssistant, coordinator: MultiscrapeDataUpdateCoordinator, config_name: str
-):
-    """Set up the multiscrape configuration level services."""
+) -> str:
+    """Set up the multiscrape configuration level services.
+
+    Returns the name of the trigger service, so it can be removed on reload.
+    """
     _LOGGER.debug(
         "%s # Setting up multiscrape configuration level services", config_name
     )
     target_name = slugify(config_name)
-    await _setup_trigger_service(hass, target_name, coordinator)
+    return await _setup_trigger_service(hass, target_name, coordinator)
 
 
-async def _setup_trigger_service(hass: HomeAssistant, target_name, coordinator):
+async def _setup_trigger_service(hass: HomeAssistant, target_name, coordinator) -> str:
     async def _async_trigger_service(service: ServiceCall):
         _LOGGER.info("Multiscrape triggered by service: %s", service.__repr__())
         # async_refresh() waits for a refresh already in progress instead of going
@@ -65,6 +68,7 @@ async def _setup_trigger_service(hass: HomeAssistant, target_name, coordinator):
         CONF_FIELDS: {},
     }
     async_set_service_schema(hass, DOMAIN, f"trigger_{target_name}", service_desc)
+    return f"trigger_{target_name}"
 
 
 async def setup_get_content_service(hass: HomeAssistant):
