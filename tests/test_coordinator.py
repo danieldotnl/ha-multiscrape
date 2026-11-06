@@ -5,8 +5,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from homeassistant.core import CoreState, HomeAssistant
 from homeassistant.util.dt import utcnow
-from pytest_homeassistant.common import \
-    async_fire_time_changed
+from pytest_homeassistant.common import async_fire_time_changed
 
 from custom_components.multiscrape.const import (MAX_RETRIES,
                                                  RETRY_DELAY_SECONDS)

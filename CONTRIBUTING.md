@@ -63,10 +63,17 @@ file.
 You can use the `pre-commit` settings implemented in this repository to have
 linting tool checking your contributions (see deicated section below).
 
+The tests need Python 3.14.2 or newer and use
+[`pytest-homeassistant`](https://pypi.org/project/pytest-homeassistant).
+If your environment was created when the tests still used
+`pytest-homeassistant-custom-component`, rebuild it (or the dev container) rather
+than installing `requirements.txt` on top of it. Installing the new requirements
+leaves the old package in place, and the two packages must not be installed together.
+
 ## Pre-commit
 
 You can use the [pre-commit](https://pre-commit.com/) settings included in the
-repostory to have code style and linting checks.
+repository to have code style and linting checks.
 
 With `pre-commit` tool already installed,
 activate the settings of the repository:

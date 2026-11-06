@@ -187,8 +187,10 @@ def test_on_error_schema_defaults():
 # ============================================================================
 
 
-@pytest.mark.unit
-def test_combined_schema_minimal_valid():
+@pytest.mark.integration
+@pytest.mark.async_test
+@pytest.mark.timeout(10)
+async def test_combined_schema_minimal_valid(hass):
     """Test minimal valid config: resource + one sensor with select."""
     result = _validate_combined({
         CONF_RESOURCE: "https://example.com",
@@ -230,8 +232,10 @@ def test_config_schema_rejects_missing_domain():
 # ============================================================================
 
 
-@pytest.mark.unit
-def test_service_schema_accepts_string_value_template():
+@pytest.mark.integration
+@pytest.mark.async_test
+@pytest.mark.timeout(10)
+async def test_service_schema_accepts_string_value_template(hass):
     """Test service schema accepts plain strings for value_template (not cv.template)."""
     result = SERVICE_COMBINED_SCHEMA({
         CONF_RESOURCE: "https://example.com",
@@ -244,8 +248,10 @@ def test_service_schema_accepts_string_value_template():
     assert result["sensor"][0]["value_template"] == "{{ value | float }}"
 
 
-@pytest.mark.unit
-def test_service_schema_accepts_string_icon():
+@pytest.mark.integration
+@pytest.mark.async_test
+@pytest.mark.timeout(10)
+async def test_service_schema_accepts_string_icon(hass):
     """Test service schema accepts plain strings for icon (not cv.template)."""
     result = SERVICE_COMBINED_SCHEMA({
         CONF_RESOURCE: "https://example.com",
@@ -280,8 +286,10 @@ def test_form_schema_default_variables_empty_list():
     assert result[CONF_FORM_VARIABLES] == []
 
 
-@pytest.mark.unit
-def test_form_schema_accepts_variables_with_name_and_select():
+@pytest.mark.integration
+@pytest.mark.async_test
+@pytest.mark.timeout(10)
+async def test_form_schema_accepts_variables_with_name_and_select(hass):
     """Test that properly structured variables pass validation."""
     result = _validate_form({
         CONF_FORM_VARIABLES: [
@@ -529,8 +537,10 @@ def test_service_schema_inherits_integration_defaults():
     assert result[CONF_VERIFY_SSL] is True
 
 
-@pytest.mark.unit
-def test_service_schema_binary_sensor_accepts_string_templates():
+@pytest.mark.integration
+@pytest.mark.async_test
+@pytest.mark.timeout(10)
+async def test_service_schema_binary_sensor_accepts_string_templates(hass):
     """Test service schema accepts plain strings for binary_sensor templates."""
     result = SERVICE_COMBINED_SCHEMA({
         CONF_RESOURCE: "https://example.com",
@@ -545,8 +555,10 @@ def test_service_schema_binary_sensor_accepts_string_templates():
     assert result["binary_sensor"][0][CONF_ICON] == "mdi:check"
 
 
-@pytest.mark.unit
-def test_service_schema_sensor_attributes_accept_string_value_template():
+@pytest.mark.integration
+@pytest.mark.async_test
+@pytest.mark.timeout(10)
+async def test_service_schema_sensor_attributes_accept_string_value_template(hass):
     """Test service schema accepts string value_template in sensor attributes."""
     result = SERVICE_COMBINED_SCHEMA({
         CONF_RESOURCE: "https://example.com",
@@ -580,8 +592,10 @@ def test_service_schema_idempotent():
 # ============================================================================
 
 
-@pytest.mark.unit
-def test_combined_schema_accepts_binary_sensor():
+@pytest.mark.integration
+@pytest.mark.async_test
+@pytest.mark.timeout(10)
+async def test_combined_schema_accepts_binary_sensor(hass):
     """Test COMBINED_SCHEMA accepts binary_sensor config."""
     result = _validate_combined({
         CONF_RESOURCE: "https://example.com",
@@ -600,8 +614,10 @@ def test_combined_schema_accepts_button():
     assert len(result["button"]) == 1
 
 
-@pytest.mark.unit
-def test_combined_schema_accepts_all_entity_types():
+@pytest.mark.integration
+@pytest.mark.async_test
+@pytest.mark.timeout(10)
+async def test_combined_schema_accepts_all_entity_types(hass):
     """Test COMBINED_SCHEMA accepts sensor, binary_sensor, and button together."""
     result = _validate_combined({
         CONF_RESOURCE: "https://example.com",
