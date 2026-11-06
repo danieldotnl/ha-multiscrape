@@ -9,7 +9,7 @@ from homeassistant.const import (CONF_NAME, CONF_RESOURCE, CONF_SCAN_INTERVAL,
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.template import Template
 from homeassistant.util.dt import utcnow
-from pytest_homeassistant_custom_component.common import \
+from pytest_homeassistant.common import \
     async_fire_time_changed
 
 from custom_components.multiscrape import (_async_process_config,
