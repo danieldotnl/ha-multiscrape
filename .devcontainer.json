@@ -1,6 +1,6 @@
 {
   "name": "danieldotnl/multiscrape",
-  "image": "mcr.microsoft.com/vscode/devcontainers/python:3.14-bookworm",
+  "image": "mcr.microsoft.com/vscode/devcontainers/python:3.15-bookworm",
   "postCreateCommand": "scripts/setup",
   "forwardPorts": [8123],
   "portsAttributes": {
